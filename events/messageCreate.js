@@ -290,14 +290,156 @@ module.exports = {
     }
 
 
-    const sent = await embed.replyError(
-      message,
-      `La commande \`${commandName}\` n'existe pas.`,
-      { timestamp: false }
-    ).catch(() => null);
+    const suggestions = _findSimilarCommands(commandName, client.commands);
 
-    if (sent && errorDeleteReply) {
-      embed.scheduleDelete(sent, deleteDelay);
+    if (suggestions.length > 0) {
+      const {
+        ActionRowBuilder,
+        ButtonBuilder,
+        ButtonStyle,
+        ContainerBuilder,
+        SectionBuilder,
+        TextDisplayBuilder,
+        MessageFlags,
+      } = require('discord.js');
+
+      const COMPONENTS_V2_FLAG = MessageFlags?.IsComponentsV2 ?? (1 << 15);
+      const V2_AVAILABLE = typeof ContainerBuilder === 'function' &&
+                         typeof SectionBuilder === 'function' &&
+                         typeof TextDisplayBuilder === 'function';
+
+      const suggestionText = suggestions.map(s => `\`+${s.name}\``).join(', ');
+
+      const desc = `La commande \`+${commandName}\` n'existe pas.\n\nVous voulez plutôt essayer :\n${suggestionText}`;
+
+      let sent;
+
+      if (V2_AVAILABLE) {
+        const container = new ContainerBuilder().setAccentColor(0xFEE75C);
+
+        const closeButton = new ButtonBuilder()
+          .setCustomId('suggest:close')
+          .setLabel('✖')
+          .setStyle(ButtonStyle.Danger);
+
+        container.addSectionComponents(
+          new SectionBuilder()
+            .addTextDisplayComponents(
+              new TextDisplayBuilder().setContent(`**Commande introuvable**\n${desc}`),
+            )
+            .setButtonAccessory(closeButton),
+        );
+
+        sent = await message.channel.send({
+          flags      : COMPONENTS_V2_FLAG,
+          components : [container],
+          allowedMentions : { parse: [] },
+        }).catch(() => null);
+      }
+
+      if (!sent) {
+        const suggestionEmbed = embed.build(message.guild.id, desc, {
+          title       : 'Commande introuvable',
+          color       : '#FEE75C',
+          timestamp   : false,
+        });
+
+        const closeRow = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId('suggest:close')
+            .setLabel('✖')
+            .setStyle(ButtonStyle.Danger)
+        );
+
+        sent = await message.channel.send({
+          embeds     : [suggestionEmbed],
+          components : [closeRow],
+          allowedMentions : { parse: [] },
+        }).catch(() => null);
+      }
+
+      if (sent) {
+        const collector = sent.createMessageComponentCollector({
+          filter : i => i.user.id === message.author.id && i.customId === 'suggest:close',
+          time   : 60000,
+        });
+
+        collector.on('collect', async interaction => {
+          collector.stop('closed');
+          await interaction.deferUpdate().catch(() => {});
+          await sent.delete().catch(() => {});
+          await message.delete().catch(() => {});
+        });
+
+        collector.on('end', async () => {
+              await sent.edit({ components: [] }).catch(() => {});
+        });
+      }
+    } else {
+      const sent = await embed.replyError(
+        message,
+        `La commande \`+${commandName}\` n'existe pas.`,
+        { timestamp: false }
+      ).catch(() => null);
+
+      if (sent && errorDeleteReply) {
+        embed.scheduleDelete(sent, deleteDelay);
+      }
     }
   },
 };
+
+function _levenshtein(a, b) {
+  const matrix = [];
+  for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+  for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      const cost = b[i - 1] === a[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,
+        matrix[i][j - 1] + 1,
+        matrix[i - 1][j - 1] + cost
+      );
+    }
+  }
+  return matrix[b.length][a.length];
+}
+
+function _findSimilarCommands(input, commands) {
+  const inputLower = input.toLowerCase();
+  const allCommands = Array.from(commands.values());
+  const suggestions = [];
+
+  for (const cmd of allCommands) {
+    const cmdName = cmd.help?.name?.toLowerCase() || '';
+    const aliases = cmd.help?.aliases?.map(a => a.toLowerCase()) || [];
+
+    const nameDist = _levenshtein(inputLower, cmdName);
+    if (nameDist <= 2 && cmdName !== inputLower) {
+      suggestions.push({ name: cmd.help.name, dist: nameDist });
+      continue;
+    }
+
+    for (const alias of aliases) {
+      if (alias.length < 3) continue;
+      const aliasDist = _levenshtein(inputLower, alias);
+      if (aliasDist <= 2 && alias !== inputLower) {
+        suggestions.push({ name: cmd.help.name, dist: aliasDist });
+        break;
+      }
+    }
+  }
+
+  const bestMatch = new Map();
+  for (const s of suggestions) {
+    if (!bestMatch.has(s.name) || s.dist < bestMatch.get(s.name).dist) {
+      bestMatch.set(s.name, s);
+    }
+  }
+
+  const uniqueSuggestions = Array.from(bestMatch.values());
+  uniqueSuggestions.sort((a, b) => a.dist - b.dist);
+  return uniqueSuggestions.slice(0, 3);
+}

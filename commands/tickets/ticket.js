@@ -205,6 +205,42 @@ exports.run = async (client, message, args) => {
       );
     }
 
+    case 'rating': {
+      const sub2 = args[1]?.toLowerCase();
+
+      if (sub2 === 'off') {
+        db.setGuildConfig(guildId, 'ticketRatingEnabled', 0);
+        return embed.reply(message, 'Système d\'évaluation des tickets désactivé.');
+      }
+
+      if (sub2 === 'on') {
+        db.setGuildConfig(guildId, 'ticketRatingEnabled', 1);
+        return embed.reply(message, 'Système d\'évaluation des tickets activé (les évaluations sont envoyées en DM).');
+      }
+
+      const channel = _resolveTextChannel(message, args[1]);
+      if (!channel) {
+        return embed.replyError(
+          message,
+          `Utilisation :\n\`+ticket rating #salon\` → définir le salon\n\`+ticket rating on\` → activer (DM)\n\`+ticket rating off\` → désactiver`
+        );
+      }
+
+      if (![ChannelType.GuildText, ChannelType.GuildAnnouncement].includes(channel.type)) {
+        return embed.replyError(message, 'Le salon doit être un salon textuel.');
+      }
+
+      const me = message.guild.members.me ?? await message.guild.members.fetchMe().catch(() => null);
+      const botPerms = me ? channel.permissionsFor(me) : null;
+      if (!botPerms?.has('ViewChannel') || !botPerms?.has('SendMessages') || !botPerms?.has('EmbedLinks')) {
+        return embed.replyError(message, `Je n'ai pas les permissions nécessaires dans <#${channel.id}>.`);
+      }
+
+      db.setGuildConfig(guildId, 'ticketRatingChannel', channel.id);
+      db.setGuildConfig(guildId, 'ticketRatingEnabled', 1);
+      return embed.reply(message, `Salon des évaluations défini sur <#${channel.id}>.`);
+    }
+
     default:
       return _sendHelp(message);
   }
@@ -240,11 +276,10 @@ async function _renderTicketSettingsEmpty(client, message) {
   );
 }
 
-async function _renderTicketSettingsSelector(client, message, panels) {
+async function _renderTicketSettingsSelector(client, message, panels, existingSent = null) {
   const guildId = message.guild.id;
 
-
-  if (panels.length === 1) {
+  if (panels.length === 1 && !existingSent) {
     return _openPanelConfig(client, message, panels[0].id);
   }
 
@@ -274,26 +309,36 @@ async function _renderTicketSettingsSelector(client, message, panels) {
     new ButtonBuilder().setCustomId('tp_settings_close').setLabel('Fermer').setStyle(ButtonStyle.Secondary),
   );
 
-  const sent = await message.reply({
+  const selectorPayload = {
     embeds          : [e],
     components      : [new ActionRowBuilder().addComponents(select), closeRow],
     allowedMentions : { parse: [], repliedUser: false },
-  }).catch(() => null);
+  };
 
-  if (!sent) return;
-  embed.registerPrivateInteraction(sent, message.author.id, 3_600_000);
+  let sent = existingSent;
+  if (sent) {
+    sent._activeCollector?.stop('replaced');
+    await sent.edit(selectorPayload).catch(() => {});
+  } else {
+    sent = await message.reply(selectorPayload).catch(() => null);
+    if (!sent) return;
+  }
+
+  embed.registerPrivateInteraction(sent, message.author.id, 900_000);
 
   const collector = sent.createMessageComponentCollector({
     filter : i => i.user.id === message.author.id,
-    idle   : 3_600_000,
-    time   : 3_600_000,
+    idle   : 900_000,
+    time   : 900_000,
   });
+  sent._activeCollector = collector;
 
   collector.on('collect', async interaction => {
     if (interaction.customId === 'tp_settings_close') {
       collector.stop('closed');
       await interaction.deferUpdate().catch(() => {});
       await sent.edit({ components: [] }).catch(() => {});
+      await message.delete().catch(() => {});
       return;
     }
 
@@ -313,8 +358,7 @@ async function _renderTicketSettingsSelector(client, message, panels) {
 
       collector.stop('navigate');
       await interaction.deferUpdate().catch(() => {});
-      await sent.edit({ components: [] }).catch(() => {});
-      return _openPanelConfig(client, message, panelId);
+      return _openPanelConfig(client, message, panelId, sent);
     }
 
     return interaction.deferUpdate().catch(() => {});
@@ -329,9 +373,10 @@ async function _renderTicketSettingsSelector(client, message, panels) {
 }
 
 
-async function _openPanelConfig(client, message, panelId) {
+async function _openPanelConfig(client, message, panelId, existingSent = null) {
   const guildId = message.guild.id;
   let panel = db.getTicketPanel(panelId);
+  const hasMultiplePanels = db.getTicketPanels(guildId).length > 1;
 
   if (!panel || panel.guildId !== guildId) {
     return embed.replyError(message, 'Panel introuvable sur ce serveur.');
@@ -359,7 +404,7 @@ async function _openPanelConfig(client, message, panelId) {
       options,
       payload: {
         embeds          : [_buildPanelConfigEmbed(guildId, panel, options, viewState)],
-        components      : _buildPanelConfigRows(panel, options, viewState, message.guild),
+        components      : _buildPanelConfigRows(panel, options, viewState, message.guild, hasMultiplePanels),
         allowedMentions : { repliedUser: false },
       },
       isV2: false,
@@ -369,10 +414,16 @@ async function _openPanelConfig(client, message, panelId) {
   let state = buildPayload();
   if (!state) return embed.replyError(message, 'Panel introuvable.');
 
-  const sent = await message.reply(state.payload).catch(() => null);
+  let sent = existingSent;
+  if (sent) {
+    sent._activeCollector?.stop('replaced');
+    await sent.edit(state.payload).catch(() => {});
+  } else {
+    sent = await message.reply(state.payload).catch(() => null);
+    if (!sent) return;
+  }
 
-  if (!sent) return;
-  embed.registerPrivateInteraction(sent, message.author.id, 3_600_000);
+  embed.registerPrivateInteraction(sent, message.author.id, 900_000);
 
   const refreshMessage = async () => {
     const next = buildPayload();
@@ -498,9 +549,10 @@ async function _openPanelConfig(client, message, panelId) {
 
   const collector = sent.createMessageComponentCollector({
     filter : i => i.user.id === message.author.id,
-    idle   : 3_600_000,
-    time   : 3_600_000,
+    idle   : 900_000,
+    time   : 900_000,
   });
+  sent._activeCollector = collector;
 
   collector.on('collect', async interaction => {
     panel = db.getTicketPanel(panelId);
@@ -593,9 +645,10 @@ async function _openPanelConfig(client, message, panelId) {
         await refreshMessage();
         return;
       }
-      collector.stop('validated');
+      collector.stop('navigate');
       await interaction.deferUpdate().catch(() => {});
-      return sent.edit(buildClosedPayload('Configuration du panel enregistrée.')).catch(() => {});
+      const allPanels = db.getTicketPanels(guildId);
+      return _renderTicketSettingsSelector(client, message, allPanels, sent);
     }
 
     if (interaction.isStringSelectMenu() && id === 'tp_manage_options') {
@@ -689,7 +742,7 @@ async function _openPanelConfig(client, message, panelId) {
 
         collector.stop('navigate');
         await submit.deferUpdate().catch(() => {});
-        return _openOptionConfig(client, message, newId);
+        return _openOptionConfig(client, message, newId, null, sent);
         } finally {
           busy = false;
         }
@@ -705,7 +758,7 @@ async function _openPanelConfig(client, message, panelId) {
 
         collector.stop('navigate');
         await interaction.deferUpdate().catch(() => {});
-        return _openOptionConfig(client, message, optionId);
+        return _openOptionConfig(client, message, optionId, null, sent);
       }
 
       await interaction.deferUpdate().catch(() => {});
@@ -1261,7 +1314,7 @@ async function _openPanelConfig(client, message, panelId) {
       }).catch(() => {});
 
       collector.stop('deleted');
-      return sent.edit(buildClosedPayload(`Panel \`${panel.id}\` supprimé.`, true)).catch(() => {});
+      return sent.edit(buildClosedPayload(`Panel \`${panel.id}\` supprimé.`, '#57F287')).catch(() => {});
     }
 
     return interaction.deferUpdate().catch(() => {});
@@ -1270,11 +1323,7 @@ async function _openPanelConfig(client, message, panelId) {
   collector.on('end', (_, reason) => {
     busy = false;
     embed.clearPrivateInteraction(sent);
-    if (['deleted', 'validated'].includes(reason)) return;
-    if (reason === 'navigate') {
-      sent.edit(buildClosedPayload('Vous avez ouvert un autre menu.')).catch(() => {});
-      return;
-    }
+    if (['deleted', 'validated', 'navigate', 'replaced'].includes(reason)) return;
     sent.edit(buildClosedPayload('Configuration expirée.')).catch(() => {});
   });
 }
@@ -1332,7 +1381,7 @@ function _buildPanelConfigEmbed(guildId, panel, options, viewState = 'main') {
 }
 
 
-function _buildPanelConfigRows(panel, options, viewState = 'main', guild = null) {
+function _buildPanelConfigRows(panel, options, viewState = 'main', guild = null, hasMultiplePanels = true) {
   if (viewState === 'advanced') {
     return _buildPanelConfigAdvancedRows(panel);
   }
@@ -1411,13 +1460,16 @@ function _buildPanelConfigRows(panel, options, viewState = 'main', guild = null)
     .addOptions(optionSelections);
 
 
-  const footerRow = new ActionRowBuilder().addComponents(
+  const footerButtons = [
     new ButtonBuilder().setCustomId('tp_validate').setLabel('Valider').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('tp_add_panel').setLabel('Ajouter un panel').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('tp_advanced').setEmoji('🔧').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('tp_delete').setEmoji('🗑️').setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId('tp_back').setLabel('Retour').setStyle(ButtonStyle.Secondary),
-  );
+  ];
+  if (hasMultiplePanels) {
+    footerButtons.push(new ButtonBuilder().setCustomId('tp_back').setLabel('Retour').setStyle(ButtonStyle.Secondary));
+  }
+  const footerRow = new ActionRowBuilder().addComponents(footerButtons);
 
   return [
     typeClaimRow,
@@ -1774,7 +1826,7 @@ function _appendAdvancedV2(container, panel) {
 }
 
 
-async function _openOptionConfig(client, message, optionId, forcePanelId = null) {
+async function _openOptionConfig(client, message, optionId, forcePanelId = null, existingSent = null) {
   const guildId = message.guild.id;
 
   let option = optionId ? db.getTicketOption(optionId) : null;
@@ -1814,11 +1866,6 @@ async function _openOptionConfig(client, message, optionId, forcePanelId = null)
     option = db.getTicketOption(option.id);
     if (!option) return null;
 
-    if (V2_AVAILABLE) {
-      const v2 = _buildOptionV2Payload(option, panel, message.guild, accentColor);
-      if (v2) return { payload: v2, isV2: true };
-    }
-
     return {
       payload: {
         embeds          : [_buildOptionConfigEmbed(guildId, option, panel)],
@@ -1832,10 +1879,15 @@ async function _openOptionConfig(client, message, optionId, forcePanelId = null)
   const state = buildState();
   if (!state) return embed.replyError(message, 'Option introuvable.');
 
+  if (existingSent) {
+    existingSent._activeCollector?.stop('replaced');
+    await existingSent.edit({ components: [], embeds: [] }).catch(() => {});
+  }
+
   const sent = await message.reply(state.payload).catch(() => null);
   if (!sent) return;
 
-  embed.registerPrivateInteraction(sent, message.author.id, 3_600_000);
+  embed.registerPrivateInteraction(sent, message.author.id, 900_000);
 
   const refreshMessage = async () => {
     const next = buildState();
@@ -1843,29 +1895,21 @@ async function _openOptionConfig(client, message, optionId, forcePanelId = null)
     await sent.edit(next.payload).catch(() => {});
   };
 
-  const buildClosedPayload = (text, color) => {
-    if (V2_AVAILABLE) {
-      try {
-        const c = new ContainerBuilder().setAccentColor(_hexToInt(color || '#ED4245'));
-        c.addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
-        return { flags: COMPONENTS_V2_FLAG, components: [c], allowedMentions: { repliedUser: false } };
-      } catch {}
-    }
-    return {
-      embeds          : [embed.build(guildId, text, { color: color || '#ED4245', timestamp: false })],
-      components      : [],
-      allowedMentions : { repliedUser: false },
-    };
-  };
+  const buildClosedPayload = (text, color) => ({
+    embeds          : [embed.build(guildId, text, { color: color || '#ED4245', timestamp: false })],
+    components      : [],
+    allowedMentions : { repliedUser: false },
+  });
 
 
   let busy = false;
 
   const collector = sent.createMessageComponentCollector({
     filter : i => i.user.id === message.author.id,
-    idle   : 3_600_000,
-    time   : 3_600_000,
+    idle   : 900_000,
+    time   : 900_000,
   });
+  sent._activeCollector = collector;
 
   const _selectMap = {
       edit_identity      : 'to_set_label',
@@ -2286,6 +2330,7 @@ async function _openOptionConfig(client, message, optionId, forcePanelId = null)
     if (action === 'to_back') {
       collector.stop('navigate');
       await interaction.deferUpdate().catch(() => {});
+      await sent.edit({ components: [], embeds: [] }).catch(() => {});
       return _openPanelConfig(client, message, panel.id);
     }
 
@@ -2295,13 +2340,7 @@ async function _openOptionConfig(client, message, optionId, forcePanelId = null)
   collector.on('end', (_, reason) => {
     busy = false;
     embed.clearPrivateInteraction(sent);
-    if (reason === 'deleted') return;
-
-
-    if (reason === 'navigate') {
-      sent.edit(buildClosedPayload('Vous avez ouvert un autre menu.')).catch(() => {});
-      return;
-    }
+    if (['deleted', 'navigate', 'replaced'].includes(reason)) return;
     sent.edit(buildClosedPayload('Configuration expirée.')).catch(() => {});
   });
 }
@@ -2969,9 +3008,13 @@ function _sendHelp(message) {
         '`ticket panel <id>` -ouvrir le configurateur du panel',
         '`ticket option <id>` -configurer une option existante',
         '`ticket send <id>` -envoyer le panel dans son salon',
+        '`ticket preview <id>` -prévisualiser le panel',
         '`ticket delete <id>` -supprimer un panel',
         '`ticket delete all` -supprimer tous les panels du serveur',
-        '`ticket logchannel #salon` -définir le salon de log global (formulaires)',
+        '`ticket logchannel #salon` -définir le salon de log global',
+        '`ticket rating #salon` -définir le salon des évaluations',
+        '`ticket rating on/off` -activer/désactiver les évaluations',
+        '`ticketstats` -voir les statistiques des tickets',
       ].join('\n'),
     }],
     timestamp: false,

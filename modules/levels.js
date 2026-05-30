@@ -6,9 +6,9 @@ const embed        = require('../utils/embed');
 const errorHandler = require('../utils/errorHandler');
 const { replaceVariables } = require('../utils/variables');
 
-const XP_COOLDOWN = 60;
-const XP_MIN      = 15;
-const XP_MAX      = 25;
+const XP_COOLDOWN_DEFAULT = 60;
+const XP_MIN              = 15;
+const XP_MAX              = 25;
 
 
 function xpForLevel(level) {
@@ -35,13 +35,28 @@ async function process(client, message) {
     const config = db.getGuildConfig(guildId);
     if (!config?.levelEnabled) return;
 
+    if (db.isXpIgnoredChannel(guildId, message.channel.id)) return;
+
     const now  = Math.floor(Date.now() / 1000);
     const data = db.getLevel(guildId, member.id);
 
+    const cooldown = db.getXpChannelCooldown(guildId, message.channel.id) ?? XP_COOLDOWN_DEFAULT;
+    if (now - data.lastXpAt < cooldown) return;
 
-    if (now - data.lastXpAt < XP_COOLDOWN) return;
+    let xpGain = Math.floor(Math.random() * (XP_MAX - XP_MIN + 1)) + XP_MIN;
 
-    const xpGain = Math.floor(Math.random() * (XP_MAX - XP_MIN + 1)) + XP_MIN;
+    const multipliers = db.getXpRoleMultipliers(guildId);
+    if (multipliers.length > 0) {
+      const memberRoles = member.roles.cache;
+      let bestMultiplier = 1.0;
+      for (const { roleId, multiplier } of multipliers) {
+        if (memberRoles.has(roleId) && multiplier > bestMultiplier) {
+          bestMultiplier = multiplier;
+        }
+      }
+      xpGain = Math.round(xpGain * bestMultiplier);
+    }
+
     db.addXp(guildId, member.id, xpGain);
 
     const updated   = db.getLevel(guildId, member.id);
@@ -100,6 +115,24 @@ async function _onLevelUp(client, message, newLevel, guildId, config) {
       }
 
     }
+
+    try {
+      const guildConfig = db.getGuildConfig(guildId);
+      if (guildConfig?.levelLogChannel) {
+        const logChannel = message.guild.channels.cache.get(guildConfig.levelLogChannel);
+        if (logChannel?.isTextBased()) {
+          await logChannel.send({
+            embeds: [embed.build(guildId, null, {
+              title       : 'Niveau gagné',
+              description : `${message.author} a atteint le niveau **${newLevel}**`,
+              color       : '#FEE75C',
+              timestamp   : true,
+            })],
+            allowedMentions: { parse: [] },
+          }).catch(() => {});
+        }
+      }
+    } catch {}
 
     const levelRoles = db.getLevelRoles(guildId);
     if (!levelRoles.length) return;

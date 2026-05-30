@@ -271,6 +271,7 @@
           collector.stop('closed');
           await interaction.deferUpdate().catch(() => {});
           await panel.delete().catch(() => {});
+          await message.delete().catch(() => {});
           return;
         }
 

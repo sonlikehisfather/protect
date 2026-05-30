@@ -4,15 +4,21 @@
 const db = require('../core/database');
 
 const LOG_CHANNELS = {
-  modlog    : 'modLogChannel',
-  joinlog   : 'joinLogChannel',
-  leavelog  : 'leaveLogChannel',
-  messagelog: 'messageLogChannel',
-  voicelog  : 'voiceLogChannel',
-  boostlog  : 'boostLogChannel',
-  rolelog   : 'roleLogChannel',
-  raidlog   : 'raidLogChannel',
-  errorlog  : 'errorLogChannel',
+  modlog     : 'modLogChannel',
+  joinlog    : 'joinLogChannel',
+  leavelog   : 'leaveLogChannel',
+  messagelog : 'messageLogChannel',
+  voicelog   : 'voiceLogChannel',
+  boostlog   : 'boostLogChannel',
+  rolelog    : 'roleLogChannel',
+  raidlog    : 'raidLogChannel',
+  errorlog   : 'errorLogChannel',
+  invitelog  : 'inviteLogChannel',
+  levellog   : 'levelLogChannel',
+  channellog : 'channelLogChannel',
+  serverlog  : 'serverLogChannel',
+  emojilog   : 'emojiLogChannel',
+  ticketlog  : 'ticketLogChannel',
 };
 
 

@@ -18,9 +18,6 @@ module.exports = {
       if (guild?.available === false) return;
 
       db.markGuildPendingPurge(guildId, 'guildDelete');
-
-      const name = guild?.name ? ` (${guild.name})` : '';
-      console.log(`[guildDelete] ${guildId}${name} marqué pour purge dans 30 jours.`);
     } catch (err) {
       errorHandler.handle(err, {
         source  : 'guildDelete',

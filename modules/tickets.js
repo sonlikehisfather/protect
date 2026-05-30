@@ -636,7 +636,7 @@ async function handleClose(client, ctx, reason = null) {
     const closingEmbed = embed.build(
       guildId,
       deleteDelaySeconds
-        ? `Le ticket sera fermé dans ${deleteDelaySeconds} secondes.\nFermé par <@${userId}>${reason ? `\nRaison : ${reason}` : ''}`
+        ? `Le ticket sera supprimé <t:${nowEpoch + deleteDelaySeconds}:R>.\nFermé par <@${userId}>${reason ? `\nRaison : ${reason}` : ''}`
         : `Le ticket est fermé. Il peut être rouvert par le staff.\nFermé par <@${userId}>${reason ? `\nRaison : ${reason}` : ''}`,
       { timestamp: new Date() }
     );
@@ -699,11 +699,129 @@ async function handleClose(client, ctx, reason = null) {
 
     if (deleteDelaySeconds && deleteDelaySeconds > 0) {
       _schedulePendingDelete(client, ticket, deleteDelaySeconds * 1000);
+    } else {
+      await _executeTicketDelete(client, ticket);
     }
 
   } catch (err) {
     errorHandler.handle(err, { source: 'tickets.handleClose', guildId });
   }
+}
+
+async function _sendRatingDm(client, ticket, guildId) {
+  const { ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = require('discord.js');
+
+  const ratingRow = new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId(`ticket_rating:${ticket.id}`)
+      .setPlaceholder('Choisir une note...')
+      .addOptions(
+        new StringSelectMenuOptionBuilder().setLabel('⭐ Très mauvais').setValue('1').setDescription('1/5'),
+        new StringSelectMenuOptionBuilder().setLabel('⭐⭐ Mauvais').setValue('2').setDescription('2/5'),
+        new StringSelectMenuOptionBuilder().setLabel('⭐⭐⭐ Correct').setValue('3').setDescription('3/5'),
+        new StringSelectMenuOptionBuilder().setLabel('⭐⭐⭐⭐ Bien').setValue('4').setDescription('4/5'),
+        new StringSelectMenuOptionBuilder().setLabel('⭐⭐⭐⭐⭐ Excellent').setValue('5').setDescription('5/5'),
+      )
+  );
+
+  const guildConfig   = db.getGuildConfig(guildId);
+  const ratingChannelId = guildConfig?.ticketRatingChannel;
+  const guild         = client.guilds.cache.get(guildId);
+  const guildName     = guild?.name ?? 'Serveur';
+
+  const claimedBy = ticket.claimedBy
+    ? `<@${ticket.claimedBy}>`
+    : 'Non assigné';
+
+  const openedAt = ticket.createdAt
+    ? `<t:${ticket.createdAt}:F>`
+    : 'Inconnu';
+
+  const ratingEmbed = embed.build(guildId, null, {
+    title  : `Évaluation — Ticket #${ticket.id}`,
+    fields : [
+      { name: 'Serveur',       value: guildName,                     inline: true },
+      { name: 'Ouvert le',     value: openedAt,                      inline: true },
+      { name: 'Pris en charge', value: claimedBy,                    inline: true },
+    ],
+    color    : '#5865F2',
+    timestamp: false,
+  });
+
+  const descriptionEmbed = embed.build(guildId, 'Ton ticket a été fermé. Comment évalues-tu le support reçu ?', {
+    timestamp: false,
+  });
+
+  const user = await client.users.fetch(ticket.userId).catch(() => null);
+  if (!user) return;
+
+  const dmMsg = await user.send({
+    embeds    : [ratingEmbed, descriptionEmbed],
+    components: [ratingRow],
+  }).catch(() => null);
+
+  if (!dmMsg) return;
+
+  const collector = dmMsg.createMessageComponentCollector({ time: 24 * 60 * 60 * 1000 });
+
+  collector.on('collect', async interaction => {
+    collector.stop();
+
+    const fresh = db.getTicket(ticket.channelId);
+    if (fresh && fresh.status !== 'closed') {
+      await interaction.update({
+        embeds    : [embed.build(guildId, 'Ce ticket a été rouvert, l\'évaluation est annulée.', { color: '#ED4245', timestamp: false })],
+        components: [],
+      }).catch(() => {});
+      return;
+    }
+
+    const rating = parseInt(interaction.values[0], 10);
+    db.setTicketRating(ticket.id, rating, null);
+
+    const stars  = '⭐'.repeat(rating);
+    const labels = ['', 'Très mauvais', 'Mauvais', 'Correct', 'Bien', 'Excellent'];
+
+    const thankEmbed = embed.build(guildId, null, {
+      title  : 'Merci pour ton évaluation !',
+      fields : [
+        { name: 'Ticket',         value: `#${ticket.id}`,               inline: true },
+        { name: 'Note',           value: `${stars} — ${labels[rating]}`, inline: true },
+        { name: 'Pris en charge', value: claimedBy,                      inline: true },
+      ],
+      color    : '#57F287',
+      timestamp: false,
+    });
+
+    await interaction.update({
+      embeds    : [thankEmbed],
+      components: [],
+    }).catch(() => {});
+
+    if (ratingChannelId) {
+      const ratingChannel = guild?.channels.cache.get(ratingChannelId);
+      if (ratingChannel?.isTextBased()) {
+        const logEmbed = embed.build(guildId, null, {
+          title  : `Évaluation reçue — Ticket #${ticket.id}`,
+          fields : [
+            { name: 'Membre',         value: `<@${ticket.userId}>`,        inline: true },
+            { name: 'Note',           value: `${stars} — ${labels[rating]}`, inline: true },
+            { name: 'Pris en charge', value: claimedBy,                      inline: true },
+            { name: 'Serveur',        value: guildName,                      inline: true },
+            { name: 'Ouvert le',      value: openedAt,                       inline: true },
+          ],
+          color    : '#57F287',
+          timestamp: false,
+        });
+        await ratingChannel.send({ embeds: [logEmbed] }).catch(() => {});
+      }
+    }
+  });
+
+  collector.on('end', async (_, reason) => {
+    if (reason !== 'time') return;
+    await dmMsg.edit({ components: [] }).catch(() => {});
+  });
 }
 
 async function handleCloseModal(client, interaction) {
@@ -1110,16 +1228,20 @@ async function _executeTicketDelete(client, ticket) {
     const guild = client.guilds.cache.get(ticket.guildId);
     if (!guild) return;
 
+    const guildConfig = db.getGuildConfig(ticket.guildId);
+    if (Number(guildConfig?.ticketRatingEnabled ?? 1) !== 0) {
+      await _sendRatingDm(client, fresh, ticket.guildId).catch(() => {});
+    }
+
     const channel = guild.channels.cache.get(ticket.channelId)
       ?? await guild.channels.fetch(ticket.channelId).catch(() => null);
 
     if (channel) {
-      await channel.delete('Auto-delete ticket (recovery)').catch(() => {});
+      await channel.delete('Auto-delete ticket').catch(() => {});
     }
 
-
     db.raw()
-      .prepare('DELETE FROM tickets WHERE guildId = ? AND channelId = ?')
+      .prepare("UPDATE tickets SET channelId = 'deleted_' || id, deleteAt = NULL, updatedAt = unixepoch() WHERE guildId = ? AND channelId = ?")
       .run(ticket.guildId, ticket.channelId);
   } catch (err) {
     errorHandler.handle(err, { source: 'tickets.executeTicketDelete', channelId: ticket.channelId });

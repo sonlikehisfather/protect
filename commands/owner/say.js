@@ -7,6 +7,20 @@ const perms = require('../../utils/permissions');
 
 const MAX_CONTENT_LENGTH = 2000;
 
+function extractRawSayContent(message, prefix, args) {
+  const raw = String(message.content || '').trimStart();
+  if (!raw.startsWith(prefix)) {
+    return args.join(' ').trim();
+  }
+
+  const withoutPrefix = raw.slice(prefix.length);
+  const firstWsIndex  = withoutPrefix.search(/\s/);
+
+  if (firstWsIndex === -1) return '';
+
+  return withoutPrefix.slice(firstWsIndex + 1).trim();
+}
+
 module.exports = {
   help: {
     name        : 'say',
@@ -30,7 +44,8 @@ module.exports = {
 
     const config      = db.getGuildConfig(guildId);
     const deleteDelay = config?.autoDeleteDelay ?? 5;
-    const content     = args.join(' ').trim();
+    const prefix      = config?.prefix || '+';
+    const content     = extractRawSayContent(message, prefix, args);
 
     if (!content) {
       const sent = await embed.replyError(

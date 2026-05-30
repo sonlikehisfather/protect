@@ -191,6 +191,7 @@ async function _handleSettings(client, message, guildId) {
       embed.clearPrivateInteraction(panel);
       await interaction.deferUpdate().catch(() => {});
       await panel.delete().catch(() => {});
+      await message.delete().catch(() => {});
       return;
     }
 

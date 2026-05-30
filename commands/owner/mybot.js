@@ -1,12 +1,27 @@
 'use strict';
 
 
-const { PermissionFlagsBits } = require('discord.js');
+const {
+  PermissionFlagsBits,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ContainerBuilder,
+  TextDisplayBuilder,
+  MessageFlags,
+} = require('discord.js');
 
 const db     = require('../../core/database');
 const embed  = require('../../utils/embed');
 const perms  = require('../../utils/permissions');
 const config = require('../../config.json');
+
+const COMPONENTS_V2_FLAG = MessageFlags?.IsComponentsV2 ?? null;
+const V2_AVAILABLE = !!(
+  COMPONENTS_V2_FLAG &&
+  typeof ContainerBuilder    === 'function' &&
+  typeof TextDisplayBuilder  === 'function'
+);
 
 exports.help = {
   name        : 'mybot',
@@ -61,33 +76,78 @@ exports.run = async (client, message) => {
   inviteUrl.searchParams.set('permissions', permissions);
   inviteUrl.searchParams.set('scope', 'bot applications.commands');
 
-  const sent = await message.reply({
-    embeds: [
-      embed.build(guildId, null, {
-        title: 'Invitation du bot',
-        fields: [
-          {
-            name: 'Lien',
-            value: `[Cliquez ici pour inviter le bot](${inviteUrl.toString()})`,
-          },
-          {
-            name: 'Commande',
-            value: `\`${prefix}mybot\``,
-            inline: true,
-          },
-          {
-            name: 'Permissions',
-            value: 'Administrateur',
-            inline: true,
-          },
-        ],
-        timestamp: false,
-      }),
-    ],
-    allowedMentions: { repliedUser: false, parse: [] },
-  }).catch(() => null);
+  const btnInvite = new ButtonBuilder()
+    .setCustomId('mybot:get_invite')
+    .setLabel('✓')
+    .setStyle(ButtonStyle.Primary);
 
-  if (sent && deleteReply) {
+  const btnClose = new ButtonBuilder()
+    .setCustomId('mybot:close')
+    .setLabel('\u2716')
+    .setStyle(ButtonStyle.Danger);
+
+  let sent;
+
+  if (V2_AVAILABLE) {
+    const container = new ContainerBuilder();
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent('# Invitation du bot'),
+    );
+    container.addActionRowComponents(new ActionRowBuilder().addComponents(btnInvite, btnClose));
+
+    sent = await message.reply({
+      flags: COMPONENTS_V2_FLAG,
+      components: [container],
+      allowedMentions: { repliedUser: false, parse: [] },
+    }).catch(() => null);
+  } else {
+    const row = new ActionRowBuilder().addComponents(btnInvite, btnClose);
+    sent = await message.reply({
+      embeds: [
+        embed.build(guildId, null, {
+          title: 'Invitation du bot',
+          description: 'Clique sur le bouton ci-dessous pour recevoir le lien d\'invitation en message privé.',
+          timestamp: false,
+        }),
+      ],
+      components: [row],
+      allowedMentions: { repliedUser: false, parse: [] },
+    }).catch(() => null);
+  }
+
+  if (!sent) return;
+
+  const collector = sent.createMessageComponentCollector({
+    filter: i => i.customId === 'mybot:get_invite' || i.customId === 'mybot:close',
+    time: 60_000,
+  });
+
+  collector.on('collect', async interaction => {
+    if (interaction.customId === 'mybot:close') {
+      collector.stop('closed');
+      await message.delete().catch(() => {});
+      await sent.delete().catch(() => {});
+      return;
+    }
+
+    const url = inviteUrl.toString();
+    await interaction.reply({
+      embeds: [
+        embed.build(guildId, `[Clique ici pour inviter le bot](${url})`, {
+          title: 'Lien d\'invitation',
+          timestamp: false,
+        }),
+      ],
+      flags: 64,
+    }).catch(() => {});
+  });
+
+  collector.on('end', (_, reason) => {
+    if (reason === 'closed') return;
+    sent.edit({ components: [] }).catch(() => {});
+  });
+
+  if (deleteReply) {
     embed.scheduleDelete(sent, deleteDelay);
   }
 };

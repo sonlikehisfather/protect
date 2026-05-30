@@ -311,6 +311,78 @@ exports.run = async (client, message, args) => {
       );
     }
 
+    case 'xpignore': {
+      const channel = message.mentions.channels.first();
+      if (!channel) {
+        return embed.replyError(message, 'Utilisation : `level xpignore #salon`');
+      }
+      db.addXpIgnoredChannel(guildId, channel.id);
+      return embed.reply(message, `<#${channel.id}> ignoré pour l'XP.`);
+    }
+
+    case 'xpunignore': {
+      const channel = message.mentions.channels.first();
+      if (!channel) {
+        return embed.replyError(message, 'Utilisation : `level xpunignore #salon`');
+      }
+      db.removeXpIgnoredChannel(guildId, channel.id);
+      return embed.reply(message, `<#${channel.id}> retiré des salons ignorés pour l'XP.`);
+    }
+
+    case 'xpignored': {
+      const ignored = db.getXpIgnoredChannels(guildId);
+      if (!ignored.length) return embed.reply(message, 'Aucun salon ignoré pour l\'XP.');
+      return embed.reply(message, `Salons ignorés pour l'XP :\n${ignored.map(id => `<#${id}>`).join('\n')}`);
+    }
+
+    case 'xpmulti': {
+      const role = message.mentions.roles.first();
+      const multi = parseFloat(args[2]);
+      if (!role || isNaN(multi) || multi <= 0) {
+        return embed.replyError(message, 'Utilisation : `level xpmulti @role <multiplicateur>` (ex: `level xpmulti @Booster 2`)');
+      }
+      db.setXpRoleMultiplier(guildId, role.id, multi);
+      return embed.reply(message, `Multiplicateur XP de **${multi}x** défini pour <@&${role.id}>.`);
+    }
+
+    case 'xpmultiremove': {
+      const role = message.mentions.roles.first();
+      if (!role) return embed.replyError(message, 'Utilisation : `level xpmultiremove @role`');
+      db.removeXpRoleMultiplier(guildId, role.id);
+      return embed.reply(message, `Multiplicateur XP retiré pour <@&${role.id}>.`);
+    }
+
+    case 'xpmultis': {
+      const multis = db.getXpRoleMultipliers(guildId);
+      if (!multis.length) return embed.reply(message, 'Aucun multiplicateur XP configuré.');
+      const lines = multis.map(r => `<@&${r.roleId}> → **${r.multiplier}x**`).join('\n');
+      return embed.reply(message, `Multiplicateurs XP :\n${lines}`);
+    }
+
+    case 'xpcooldown': {
+      const channel = message.mentions.channels.first();
+      const secs = parseInt(args[2], 10);
+      if (!channel || isNaN(secs) || secs < 1) {
+        return embed.replyError(message, 'Utilisation : `level xpcooldown #salon <secondes>` (ex: `level xpcooldown #général 30`)');
+      }
+      db.setXpChannelCooldown(guildId, channel.id, secs);
+      return embed.reply(message, `Cooldown XP de **${secs}s** défini pour <#${channel.id}>.`);
+    }
+
+    case 'xpcooldownremove': {
+      const channel = message.mentions.channels.first();
+      if (!channel) return embed.replyError(message, 'Utilisation : `level xpcooldownremove #salon`');
+      db.removeXpChannelCooldown(guildId, channel.id);
+      return embed.reply(message, `Cooldown XP retiré pour <#${channel.id}> (retour au cooldown global).`);
+    }
+
+    case 'xpcooldowns': {
+      const cooldowns = db.getAllXpChannelCooldowns(guildId);
+      if (!cooldowns.length) return embed.reply(message, 'Aucun cooldown XP personnalisé configuré.');
+      const lines = cooldowns.map(r => `<#${r.channelId}> → **${r.cooldown}s**`).join('\n');
+      return embed.reply(message, `Cooldowns XP par salon :\n${lines}`);
+    }
+
     default:
       return _sendHelp(message);
 
@@ -324,17 +396,23 @@ function _sendHelp(message) {
   return embed.reply(message, null, {
     title : 'Levels',
     fields: [
-
-      { name: 'level on', value: 'Activer les niveaux.', inline: false },
-      { name: 'level off', value: 'Désactiver les niveaux.', inline: false },
+      { name: 'level on/off', value: 'Activer/désactiver les niveaux.', inline: false },
       { name: 'level status', value: 'Voir l\'état.', inline: false },
-      { name: 'level reset', value: 'Reset un membre.', inline: false },
+      { name: 'level reset @membre', value: 'Reset un membre.', inline: false },
       { name: 'level resetall confirm', value: 'Reset serveur.', inline: false },
-      { name: 'level channel', value: 'Définir salon.', inline: false },
-      { name: 'level message', value: 'Changer message.', inline: false },
-      { name: 'level role', value: 'Ajouter rôle niveau.', inline: false },
-      { name: 'level removerole', value: 'Retirer rôle niveau.', inline: false },
-
+      { name: 'level channel #salon', value: 'Définir salon de level-up.', inline: false },
+      { name: 'level message <texte>', value: 'Changer message de level-up.', inline: false },
+      { name: 'level role <niveau> @role', value: 'Ajouter rôle niveau.', inline: false },
+      { name: 'level removerole <niveau>', value: 'Retirer rôle niveau.', inline: false },
+      { name: 'level xpignore #salon', value: 'Ignorer un salon pour l\'XP.', inline: false },
+      { name: 'level xpunignore #salon', value: 'Retirer un salon ignoré.', inline: false },
+      { name: 'level xpignored', value: 'Voir les salons ignorés.', inline: false },
+      { name: 'level xpmulti @role <multi>', value: 'Multiplicateur XP pour un rôle.', inline: false },
+      { name: 'level xpmultiremove @role', value: 'Retirer le multiplicateur.', inline: false },
+      { name: 'level xpmultis', value: 'Voir tous les multiplicateurs.', inline: false },
+      { name: 'level xpcooldown #salon <secs>', value: 'Cooldown XP par salon.', inline: false },
+      { name: 'level xpcooldownremove #salon', value: 'Retirer le cooldown.', inline: false },
+      { name: 'level xpcooldowns', value: 'Voir tous les cooldowns.', inline: false },
     ],
     timestamp: false,
   });

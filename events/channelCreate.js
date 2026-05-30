@@ -2,6 +2,8 @@
 
 
 const db                              = require('../core/database');
+const logger                          = require('../utils/logger');
+const embed                           = require('../utils/embed');
 const { applyMuteOverwriteToChannel } = require('../utils/applyMuteOverwrites');
 
 module.exports = {
@@ -13,6 +15,29 @@ module.exports = {
 
       const guild = channel?.guild;
       if (!guild) return;
+
+      try {
+        const typeNames = {
+          0: 'Texte',
+          2: 'Vocal',
+          4: 'Catégorie',
+          5: 'Annonces',
+          13: 'Stage',
+          15: 'Forum',
+        };
+
+        await logger.send(
+          client,
+          guild.id,
+          'channellog',
+          embed.build(guild.id, null, {
+            title: 'Salon créé',
+            description: `**${channel.name}** (${typeNames[channel.type] || 'Inconnu'})\n<#${channel.id}>`,
+            color: '#57F287',
+            timestamp: true,
+          })
+        );
+      } catch {}
 
 
       const config = db.getGuildConfig(guild.id);

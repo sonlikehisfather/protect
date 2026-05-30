@@ -176,6 +176,7 @@ module.exports = {
         embed.clearPrivateInteraction(panel);
         await interaction.deferUpdate().catch(() => {});
         await panel.delete().catch(() => {});
+        await message.delete().catch(() => {});
         return;
       }
 
@@ -2104,6 +2105,7 @@ async function _handleList(client, message, guildId, deleteReply, deleteDelay) {
       embed.clearPrivateInteraction(panel);
       await interaction.deferUpdate().catch(() => {});
       await panel.delete().catch(() => {});
+      await message.delete().catch(() => {});
       return;
     }
 

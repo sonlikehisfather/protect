@@ -438,6 +438,7 @@ async function _openServerProfilePanel(client, message, deleteReply, deleteDelay
       embed.clearPrivateInteraction(panel);
       await interaction.deferUpdate().catch(() => {});
       await panel.delete().catch(() => {});
+      await message.delete().catch(() => {});
       return;
     }
 
@@ -694,6 +695,7 @@ async function _openProfilePanel(client, message, deleteReply, deleteDelay) {
       embed.clearPrivateInteraction(panel);
       await interaction.deferUpdate().catch(() => {});
       await panel.delete().catch(() => {});
+      await message.delete().catch(() => {});
       return;
     }
 

@@ -2,6 +2,8 @@
 
 
 const db           = require('../core/database');
+const logger       = require('../utils/logger');
+const embed        = require('../utils/embed');
 const giveaways    = require('../modules/giveaways');
 const errorHandler = require('../utils/errorHandler');
 
@@ -14,6 +16,20 @@ module.exports = {
       if (!channel.guild) return;
 
       const guildId = channel.guild.id;
+
+      try {
+        await logger.send(
+          client,
+          guildId,
+          'channellog',
+          embed.build(guildId, null, {
+            title: 'Salon supprimé',
+            description: `**${channel.name}**`,
+            color: '#ED4245',
+            timestamp: true,
+          })
+        );
+      } catch {}
 
       const ticket = db.getTicket(channel.id);
 

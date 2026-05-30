@@ -265,8 +265,10 @@ async function _handleButton(client, interaction) {
   }
 
 
-  if (id.startsWith('to_') || id.startsWith('tp_')) {
-    return embed.replyExpiredPanel(interaction);
+  if (id.startsWith('tp_') || id.startsWith('to_') || id.startsWith('mybot:') ||
+      id.startsWith('coinflip:') || id.startsWith('guess:') || id.startsWith('quiz:') ||
+      id.startsWith('roulette:') || id.startsWith('bj:')) {
+    return;
   }
 
 
@@ -372,7 +374,89 @@ async function _handleButton(client, interaction) {
     return _handleSuggestionVote(interaction);
   }
 
+  if (id.startsWith('server_invite_')) {
+    return _handleServerInviteButton(client, interaction, id);
+  }
+
+  if (id.startsWith('server_leave_')) {
+    return _handleServerLeaveButton(client, interaction, id);
+  }
+
   return interaction.deferUpdate().catch(() => {});
+}
+
+async function _handleServerInviteButton(client, interaction, id) {
+  const guildId = id.replace('server_invite_', '');
+  const guild = client.guilds.cache.get(guildId);
+
+  if (!guild) {
+    return interaction.reply({
+      content: 'Je ne suis plus sur ce serveur.',
+      flags: 64,
+    }).catch(() => {});
+  }
+
+  try {
+    const textChannel = guild.channels.cache.find(c => 
+      c.isTextBased() && !c.isThread() && c.permissionsFor(guild.members.me).has('CreateInstantInvite')
+    );
+
+    if (!textChannel) {
+      return interaction.reply({
+        content: ' Aucun salon disponible pour créer une invitation.',
+        flags: 64,
+      }).catch(() => {});
+    }
+
+    const invite = await textChannel.createInvite({
+      maxAge: 86400, 
+      maxUses: 1,
+      reason: `Invité par ${interaction.user.tag} via le panel owner`,
+    });
+
+    await interaction.reply({
+      content: ` **Invitation créée pour ${guild.name}**\n\n${invite.url}`,
+      flags: 64,
+    }).catch(() => {});
+
+  } catch (err) {
+    console.error('[ServerInvite] Erreur:', err);
+    await interaction.reply({
+      content: ' Erreur lors de la création de l\'invitation.',
+      flags: 64,
+    }).catch(() => {});
+  }
+}
+
+async function _handleServerLeaveButton(client, interaction, id) {
+  const guildId = id.replace('server_leave_', '');
+  const guild = client.guilds.cache.get(guildId);
+
+  if (!guild) {
+    return interaction.reply({
+      content: 'Je ne suis plus sur ce serveur.',
+      flags: 64,
+    }).catch(() => {});
+  }
+
+  try {
+    await guild.leave();
+    await interaction.reply({
+      content: ` **Quitté le serveur** : ${guild.name}`,
+      flags: 64,
+    }).catch(() => {});
+
+    await interaction.message.edit({
+      components: [],
+    }).catch(() => {});
+
+  } catch (err) {
+    console.error('[ServerLeave] Erreur:', err);
+    await interaction.reply({
+      content: ' Erreur lors de la sortie du serveur.',
+      flags: 64,
+    }).catch(() => {});
+  }
 }
 
 
@@ -411,10 +495,9 @@ async function _handleSelectMenu(client, interaction) {
   }
 
 
-  if (id.startsWith('tp_')) {
-    return embed.replyExpiredPanel(interaction);
+  if (id.startsWith('tp_') || id === 'to_config_menu' || id.startsWith('to_select_') || id.startsWith('ticket_rating:')) {
+    return;
   }
-
 
   if (id.startsWith('gw_select_')) {
     return embed.replyExpiredPanel(interaction);
@@ -1731,7 +1814,6 @@ async function _handleCustomSelect(client, interaction) {
   if (!customCommandsRuntime?.executeFromInteraction) {
     return interaction.deferUpdate().catch(() => {});
   }
-
 
   const parts = interaction.customId.split(':');
   const cbGuildId = parts[1];

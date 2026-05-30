@@ -257,7 +257,8 @@ function build(guildId, description = '', options = {}) {
   }
 
   if (options.timestamp !== false) {
-    embed.setTimestamp(options.timestamp ?? Date.now());
+    const ts = options.timestamp === true ? Date.now() : (options.timestamp ?? Date.now());
+    embed.setTimestamp(ts);
   }
 
   return embed;

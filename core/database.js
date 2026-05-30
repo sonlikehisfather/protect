@@ -166,6 +166,8 @@ const GUILD_CONFIG_KEYS = new Set([
   'verifyButtonLabel',
   'verifyButtonEmoji',
   'verifyButtonStyle',
+  'ticketRatingChannel',
+  'ticketRatingEnabled',
 ]);
 
 const CUSTOM_COMMAND_KEYS = new Set([
@@ -2876,6 +2878,60 @@ up(db) {
   },
 },
 
+{
+  version: 83,
+  up(db) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS xp_ignored_channels (
+        guildId   TEXT NOT NULL,
+        channelId TEXT NOT NULL,
+        PRIMARY KEY (guildId, channelId)
+      );
+
+      CREATE TABLE IF NOT EXISTS xp_role_multipliers (
+        guildId    TEXT    NOT NULL,
+        roleId     TEXT    NOT NULL,
+        multiplier REAL    NOT NULL DEFAULT 1.0,
+        PRIMARY KEY (guildId, roleId)
+      );
+
+      CREATE TABLE IF NOT EXISTS xp_channel_cooldowns (
+        guildId   TEXT    NOT NULL,
+        channelId TEXT    NOT NULL,
+        cooldown  INTEGER NOT NULL DEFAULT 60,
+        PRIMARY KEY (guildId, channelId)
+      );
+    `);
+
+    const hasColumn = (table, col) =>
+      !!db.prepare(`SELECT 1 FROM pragma_table_info('${table}') WHERE name = ?`).get(col);
+
+    if (!hasColumn('tickets', 'rating'))
+      db.prepare('ALTER TABLE tickets ADD COLUMN rating INTEGER').run();
+    if (!hasColumn('tickets', 'ratingComment'))
+      db.prepare('ALTER TABLE tickets ADD COLUMN ratingComment TEXT').run();
+    if (!hasColumn('tickets', 'messageCount'))
+      db.prepare('ALTER TABLE tickets ADD COLUMN messageCount INTEGER NOT NULL DEFAULT 0').run();
+    if (!hasColumn('guild_config', 'ticketRatingChannel'))
+      db.prepare('ALTER TABLE guild_config ADD COLUMN ticketRatingChannel TEXT').run();
+    if (!hasColumn('guild_config', 'ticketRatingEnabled'))
+      db.prepare('ALTER TABLE guild_config ADD COLUMN ticketRatingEnabled INTEGER NOT NULL DEFAULT 1').run();
+  },
+},
+
+{
+  version: 84,
+  up(db) {
+    const hasColumn = (table, col) =>
+      !!db.prepare(`SELECT 1 FROM pragma_table_info('${table}') WHERE name = ?`).get(col);
+
+    if (!hasColumn('guild_config', 'ticketRatingChannel'))
+      db.prepare('ALTER TABLE guild_config ADD COLUMN ticketRatingChannel TEXT').run();
+    if (!hasColumn('guild_config', 'ticketRatingEnabled'))
+      db.prepare('ALTER TABLE guild_config ADD COLUMN ticketRatingEnabled INTEGER NOT NULL DEFAULT 1').run();
+  },
+},
+
 ];
 
 
@@ -3895,6 +3951,59 @@ const db = {
     return getDb().prepare('SELECT * FROM level_roles WHERE guildId = ? ORDER BY level ASC').all(guildId);
   },
 
+  getXpIgnoredChannels(guildId) {
+    return getDb().prepare('SELECT channelId FROM xp_ignored_channels WHERE guildId = ?').all(guildId).map(r => r.channelId);
+  },
+  addXpIgnoredChannel(guildId, channelId) {
+    getDb().prepare('INSERT OR IGNORE INTO xp_ignored_channels (guildId, channelId) VALUES (?, ?)').run(guildId, channelId);
+  },
+  removeXpIgnoredChannel(guildId, channelId) {
+    getDb().prepare('DELETE FROM xp_ignored_channels WHERE guildId = ? AND channelId = ?').run(guildId, channelId);
+  },
+  isXpIgnoredChannel(guildId, channelId) {
+    return !!getDb().prepare('SELECT 1 FROM xp_ignored_channels WHERE guildId = ? AND channelId = ?').get(guildId, channelId);
+  },
+
+  getXpRoleMultipliers(guildId) {
+    return getDb().prepare('SELECT roleId, multiplier FROM xp_role_multipliers WHERE guildId = ?').all(guildId);
+  },
+  setXpRoleMultiplier(guildId, roleId, multiplier) {
+    getDb().prepare('INSERT OR REPLACE INTO xp_role_multipliers (guildId, roleId, multiplier) VALUES (?, ?, ?)').run(guildId, roleId, multiplier);
+  },
+  removeXpRoleMultiplier(guildId, roleId) {
+    getDb().prepare('DELETE FROM xp_role_multipliers WHERE guildId = ? AND roleId = ?').run(guildId, roleId);
+  },
+
+  getXpChannelCooldown(guildId, channelId) {
+    const row = getDb().prepare('SELECT cooldown FROM xp_channel_cooldowns WHERE guildId = ? AND channelId = ?').get(guildId, channelId);
+    return row ? row.cooldown : null;
+  },
+  setXpChannelCooldown(guildId, channelId, cooldown) {
+    getDb().prepare('INSERT OR REPLACE INTO xp_channel_cooldowns (guildId, channelId, cooldown) VALUES (?, ?, ?)').run(guildId, channelId, cooldown);
+  },
+  removeXpChannelCooldown(guildId, channelId) {
+    getDb().prepare('DELETE FROM xp_channel_cooldowns WHERE guildId = ? AND channelId = ?').run(guildId, channelId);
+  },
+  getAllXpChannelCooldowns(guildId) {
+    return getDb().prepare('SELECT channelId, cooldown FROM xp_channel_cooldowns WHERE guildId = ?').all(guildId);
+  },
+
+  setTicketRating(ticketId, rating, comment) {
+    getDb().prepare('UPDATE tickets SET rating = ?, ratingComment = ? WHERE id = ?').run(rating, comment ?? null, ticketId);
+  },
+  getTicketStats(guildId) {
+    const db = getDb();
+    const total = db.prepare("SELECT COUNT(*) as c FROM tickets WHERE guildId = ? AND status IN ('closed','deleted')").get(guildId)?.c ?? 0;
+    const rated = db.prepare("SELECT COUNT(*) as c FROM tickets WHERE guildId = ? AND status IN ('closed','deleted') AND rating IS NOT NULL").get(guildId)?.c ?? 0;
+    const avgRating = db.prepare("SELECT AVG(rating) as avg FROM tickets WHERE guildId = ? AND status IN ('closed','deleted') AND rating IS NOT NULL").get(guildId)?.avg ?? null;
+    const avgClose = db.prepare(`
+      SELECT AVG(COALESCE(closedAt, updatedAt) - createdAt) as avg
+      FROM tickets WHERE guildId = ? AND status IN ('closed','deleted')
+      AND COALESCE(closedAt, updatedAt) IS NOT NULL
+    `).get(guildId)?.avg ?? null;
+    return { total, rated, avgRating, avgClose };
+  },
+
   addLevelRole(guildId, level, roleId) {
     getDb().prepare('INSERT OR REPLACE INTO level_roles (guildId, level, roleId) VALUES (?, ?, ?)').run(guildId, level, roleId);
   },
@@ -3919,6 +4028,10 @@ const db = {
   getTicket(channelId) {
     getDb();
     return _stmts.getTicket.get(channelId);
+  },
+
+  getTicketById(id) {
+    return getDb().prepare('SELECT * FROM tickets WHERE id = ?').get(id);
   },
 
   getOpenTickets(guildId, userId) {

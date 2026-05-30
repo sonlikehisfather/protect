@@ -20,8 +20,6 @@ backups/
 !commands/backups/*.js
 data/backups/
 dumps/
-logs/
-*.log
 .vscode/
 .idea/
 .DS_Store

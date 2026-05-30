@@ -345,6 +345,7 @@ async function _openPanel(client, message, guildId, custom, deleteReply, deleteD
       embed.clearPrivateInteraction(panel);
       await interaction.deferUpdate().catch(() => {});
       await panel.delete().catch(() => {});
+      await message.delete().catch(() => {});
       return;
     }
 
