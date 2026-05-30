@@ -80,6 +80,10 @@ BUYER_ID=987654321098765432
 DEV_GUILD_ID=1234567890123456789
 NODE_ENV=development
 DEBUG_LOADER=false
+
+# === SUPABASE BACKUP (optionnel) ===
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_KEY=your-supabase-anon-key
 ```
 
 | Variable | Où la trouver |

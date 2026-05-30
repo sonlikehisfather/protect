@@ -17,7 +17,7 @@ Affiche votre carte de niveau ou celle d'un autre membre.
 
 **Usage:** `+rank [@user]`
 
-**Alias:** `level`, `xp`, `card`
+**Alias:** `level`, `xp`, `profile`, `card`
 
 ### Affichage
 - Niveau actuel
@@ -180,6 +180,24 @@ Formule : `XP_Nécessaire = Niveau × 100`
 ```
 +levelconfig message Félicitations {user.mention} ! Tu as atteint le niveau {level} ! 🎉
 ```
+
+---
+
+## Système XP des Jeux
+
+Les mini-jeux du bot récompensent également de l'XP qui s'ajoute à votre progression de niveau.
+
+| Jeu | XP gagnée |
+|-----|-----------|
+| `+quiz` | 10-100 XP selon score |
+| `+guess` | +15 XP par essai restant |
+| `+roulette` | 10-200 XP selon résultat |
+| `+blackjack` | 10-40 XP selon résultat |
+| `+coinflip` | 10-30 XP |
+| `+roll` | 5 XP |
+| `+8ball` | 5 XP |
+
+L'XP des jeux est ajoutée immédiatement et compte pour le level up.
 
 ---
 
