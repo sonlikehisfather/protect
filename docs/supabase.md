@@ -1,4 +1,4 @@
-# 💾 Système de Backup
+# 💾 Système de Backup Supabase
 
 ## Overview
 
@@ -23,14 +23,6 @@ SUPABASE_KEY=your-supabase-anon-key
    - `URL` → `SUPABASE_URL`
    - `anon public` → `SUPABASE_KEY`
 
-### Tables requises
-
-Le bot crée automatiquement les tables si elles n'existent pas :
-
-- `backups` : Sauvegardes complètes
-- `guild_data` : Données des serveurs
-- `user_data` : Données des utilisateurs
-
 ---
 
 ## Fonctionnement
@@ -52,7 +44,6 @@ Le bot crée automatiquement les tables si elles n'existent pas :
 ### Purge automatique
 - Les données des serveurs supprimés sont marquées pour purge
 - Suppression automatique après 30 jours
-- Nettoie l'espace cloud
 
 ---
 
@@ -68,19 +59,8 @@ Pour désactiver le backup, retirez simplement les variables d'environnement :
 
 ---
 
-## Dépannage
-
-| Erreur | Solution |
-|--------|----------|
-| `Invalid API key` | Vérifiez la clé Supabase |
-| `Connection timeout` | Vérifiez l'URL et votre connexion |
-| `Table not found` | Attendez la première sauvegarde auto |
-
----
-
 ## Notes
 
-- Le backup est **optionnel** (bot fonctionne sans)
+- Le backup Supabase est **optionnel** (bot fonctionne sans)
 - La base SQLite locale reste la source principale
-- Supabase sert uniquement de sauvegarde cloud
 - Pas d'impact sur les performances si désactivé

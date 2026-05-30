@@ -25,8 +25,6 @@ Documentation complète du bot Discord Protect.
 ---
 
 ## Systèmes avancés
-
-- [Système de Backup](./backup.md) - Supabase et persistance
 - [Fonctionnalités Owner](./owner-features.md) - Notifications et panel
 
 ---
