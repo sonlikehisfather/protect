@@ -29,8 +29,9 @@
 ### 🔧 Modération
 - **Commandes de modération** : ban, kick, mute, warn, lock, slowmode, etc.
 - **Système de warn** avec configuration automatique des punitions
-- **Logs complets** : messages supprimés/modifiés, arrivées/départs, bans/unbans
+- **Logs complets refaits** : messages supprimés/modifiés, arrivées/départs, bans/unbans, rôles, salons
 - **Protection anti-raid** : antiban, antirole, antiwebhook, antitoken
+- **Sécurité serveur** : SecurInvite (vérification des serveurs non autorisés)
 
 ### 🎫 Gestion
 - **Système de tickets** avec catégories personnalisables et transcripts
@@ -46,13 +47,33 @@
 - **Menu de rôles** réaction-based
 
 ### 📊 Niveaux & Économie
-- **Système de niveaux** XP par message
+- **Système de niveaux avancé** : XP par message, multiplicateurs par rôle, cooldowns par salon
+- **Commande +rank** : interface moderne avec barre de progression et classement
+- **Système XP des jeux** : gagne de l'XP en jouant aux mini-jeux
 - **Leaderboards** et récompenses de niveaux
+- **Rôles de niveau** : attribution automatique selon le niveau atteint
 
 ### 👑 Administration
 - **Commandes owner-only** : évaluation, diffusion de messages, gestion d'activité
-- **Multi-serveur** support
+- **Panel serveurs** : liste des serveurs avec création d'invitation et gestion à distance
+- **Notifications buyer** : alerte DM quand le bot rejoint un serveur
+- **Multi-serveur** support avec gestion centralisée
 - **Configuration par serveur** persistante en BDD
+
+### 🎮 Jeux & Fun
+- **+quiz** : quiz général avec 200+ questions, système de score et récompenses XP
+- **+guess** : jeu du Plus ou Moins avec chat interactif
+- **+blackjack** : jeu de cartes classique
+- **+roulette** : roulette casino avec multiplicateurs
+- **+coinflip** : pile ou face
+- **+roll** : lancer de dés
+- **+8ball** : boule magique
+- **+qi** : test de QI rapide
+
+### 💾 Backup & Sécurité
+- **Backup Supabase** : synchronisation automatique des données vers le cloud
+- **Purge automatique** : nettoyage des données des serveurs inactifs
+- **Sauvegarde locale** : base SQLite avec persistance des données
 
 ## Prérequis
 
@@ -94,6 +115,8 @@
 | `BUYER_ID` |  | ID Discord du propriétaire |
 | `DEV_GUILD_ID` |  | ID du serveur de développement (optionnel) |
 | `NODE_ENV` |  | `development` ou `production` |
+| `SUPABASE_URL` |  | URL Supabase pour backup cloud (optionnel) |
+| `SUPABASE_KEY` |  | Clé API Supabase (optionnel) |
 
 ### Configuration du bot (config.json)
 
@@ -108,6 +131,22 @@
 |--------|-------------|--------|
 | `prefix` | Préfixe des commandes textuelles | `+` |
 | `color` | Couleur des embeds | `#2B2D31` |
+| `ownerId` | ID Discord du propriétaire (backup) | - |
+
+### Configuration des logs (`logs.json`)
+
+```json
+{
+  "messageDelete": true,
+  "messageUpdate": true,
+  "memberAdd": true,
+  "memberRemove": true,
+  "roleCreate": true,
+  "roleDelete": true,
+  "channelCreate": true,
+  "channelDelete": true
+}
+```
 
 ## Démarrage
 
