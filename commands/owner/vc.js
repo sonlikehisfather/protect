@@ -150,6 +150,7 @@ async function _openConfigPanel(client, message, guildConfig, prefix, deleteRepl
       collector.stop('closed');
       embed.clearPrivateInteraction(panel);
       await interaction.deferUpdate().catch(() => {});
+      await message.delete().catch(() => {});
       await panel.delete().catch(() => {});
       return;
     }

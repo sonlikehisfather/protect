@@ -553,6 +553,10 @@ async function _handleModal(client, interaction) {
     return _handleCaptchaSubmit(client, interaction);
   }
 
+  if (id.startsWith('myvc:')) {
+    return;
+  }
+
   return embed.replyExpiredPanel(interaction);
 }
 

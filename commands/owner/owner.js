@@ -6,149 +6,76 @@ const perms = require('../../utils/permissions');
 
 exports.help = {
   name       : 'owner',
-  description: 'Gérer les owners globaux du bot.',
-  use        : 'owner <add|remove|list> [@membre|id]',
-  usage      : 'owner <add|remove|list> [@membre|id]',
-
+  description: 'Toggle owner global (buyer seulement). Sans argument : liste.',
+  use        : 'owner [@membre|id]',
+  usage      : 'owner [@membre|id]',
+  aliases    : ['owners'],
 };
 
 exports.run = async (client, message, args) => {
 
-  const authorId = message.author.id;
-  const sub = args[0]?.toLowerCase();
+  const authorId    = message.author.id;
+  const commandUsed = message.content.trim().split(/\s+/)[0].replace(/^./, '').toLowerCase();
 
-  if (!sub)
-    return _sendHelp(message);
+  if (commandUsed === 'owners' || args.length === 0) {
 
-  switch (sub) {
-
-    case 'add': {
-
-      if (!perms.isBuyer(authorId)) {
-
-        return embed.replyError(
-          message,
-          'Seul le buyer peut ajouter un owner.'
-        );
-
-      }
-
-      const targetId =
-        _resolveUserId(message, args[1]);
-
-      if (!targetId) {
-
-        return embed.replyError(
-          message,
-          'Utilisation : `owner add <@membre|id>`'
-        );
-
-      }
-
-      if (perms.isBuyer(targetId)) {
-
-        return embed.replyError(
-          message,
-          'Le buyer ne peut pas être ajouté comme owner.'
-        );
-
-      }
-
-      if (db.isGlobalOwner(targetId)) {
-
-        return embed.replyError(
-          message,
-          `<@${targetId}> est déjà owner.`
-        );
-
-      }
-
-      db.addGlobalOwner(targetId);
-
-      return embed.reply(
-        message,
-        `<@${targetId}> est maintenant owner global.`
-      );
-
+    if (
+      !perms.isBuyer(authorId) &&
+      !perms.isGlobalOwner(authorId)
+    ) {
+      return embed.replyError(message, 'Permission refusée.');
     }
 
-    case 'remove': {
-
-      if (!perms.isBuyer(authorId)) {
-
-        return embed.replyError(
-          message,
-          'Seul le buyer peut retirer un owner.'
-        );
-
-      }
-
-      const targetId =
-        _resolveUserId(message, args[1]);
-
-      if (!targetId) {
-
-        return embed.replyError(
-          message,
-          'Utilisation : `owner remove <@membre|id>`'
-        );
-
-      }
-
-      if (!db.isGlobalOwner(targetId)) {
-
-        return embed.replyError(
-          message,
-          `<@${targetId}> n'est pas owner.`
-        );
-
-      }
-
-      db.removeGlobalOwner(targetId);
-
-      return embed.reply(
-        message,
-        `<@${targetId}> n'est plus owner global.`
-      );
-
-    }
-
-    case 'list': {
-
-      if (
-        !perms.isBuyer(authorId) &&
-        !perms.isGlobalOwner(authorId)
-      ) {
-
-        return embed.replyError(
-          message,
-          'Permission refusée.'
-        );
-
-      }
-
-      return _list(message);
-
-    }
-
-    default:
-
-      return _sendHelp(message);
+    return _list(message);
 
   }
+
+  if (!perms.isBuyer(authorId)) {
+    return embed.replyError(message, 'Seul un buyer peut modifier les owners.');
+  }
+
+  const targetId = _resolveUserId(message, args[0]);
+
+  if (!targetId) {
+    return embed.replyError(message, 'Utilisation : `owner <@membre|id>`');
+  }
+
+  if (perms.isBuyer(targetId)) {
+    return embed.replyError(message, 'Le buyer ne peut pas être ajouté comme owner.');
+  }
+
+  if (db.isGlobalOwner(targetId)) {
+
+    db.removeGlobalOwner(targetId);
+
+    return embed.reply(message, `<@${targetId}> n'est plus owner global.`);
+
+  }
+
+  db.addGlobalOwner(targetId);
+
+  return embed.reply(message, `<@${targetId}> est maintenant owner global.`);
 
 };
 
 async function _list(message) {
 
-  const owners =
-    db.getGlobalOwners();
+  const owners = db.getGlobalOwners();
+  const buyers = db.getGlobalBuyers();
 
   const fields = [
 
     {
-      name  : 'Buyer',
-      value : `<@${perms.getBuyerId()}>`,
+      name  : 'Buyer Principal',
+      value : `<@${perms.getSuperAdminId()}>`,
+      inline: false,
+    },
+
+    {
+      name  : 'Buyers',
+      value : buyers.length
+        ? buyers.map(id => `<@${id}>`).join(', ')
+        : 'Aucun',
       inline: false,
     },
 
@@ -178,9 +105,7 @@ async function _list(message) {
 
     ],
 
-    allowedMentions: {
-      repliedUser: false
-    },
+    allowedMentions: { repliedUser: false },
 
   });
 
@@ -188,8 +113,7 @@ async function _list(message) {
 
 function _resolveUserId(message, raw) {
 
-  const mentioned =
-    message.mentions.users.first();
+  const mentioned = message.mentions.users.first();
 
   if (mentioned)
     return mentioned.id;
@@ -197,45 +121,10 @@ function _resolveUserId(message, raw) {
   if (!raw)
     return null;
 
-  const cleaned =
-    raw.replace(/[<@!>]/g, '');
+  const cleaned = raw.replace(/[<@!>]/g, '');
 
   return /^\d{17,20}$/.test(cleaned)
     ? cleaned
     : null;
-
-}
-
-function _sendHelp(message) {
-
-  return embed.reply(
-    message,
-    null,
-    {
-      title : 'Owner command',
-
-      fields: [
-
-        {
-          name : 'owner add <@membre|id>',
-          value: 'Ajoute un owner global (buyer seulement)'
-        },
-
-        {
-          name : 'owner remove <@membre|id>',
-          value: 'Retire un owner global (buyer seulement)'
-        },
-
-        {
-          name : 'owner list',
-          value: 'Affiche la liste des owners globaux'
-        },
-
-      ],
-
-      timestamp: false,
-
-    }
-  );
 
 }

@@ -118,8 +118,23 @@ exports.run = async (client, message) => {
   if (!sent) return;
 
   const collector = sent.createMessageComponentCollector({
-    filter: i => i.customId === 'mybot:get_invite' || i.customId === 'mybot:close',
+    filter: i => (
+      (i.customId === 'mybot:get_invite' || i.customId === 'mybot:close') &&
+      i.user.id === message.author.id
+    ),
     time: 60_000,
+  });
+
+  collector.on('ignore', async interaction => {
+    await interaction.reply({
+      embeds: [
+        embed.build(guildId, 'Seul le buyer du bot peut utiliser ces boutons.', {
+          title: 'Accès refusé',
+          timestamp: false,
+        }),
+      ],
+      flags: 64,
+    }).catch(() => {});
   });
 
   collector.on('collect', async interaction => {

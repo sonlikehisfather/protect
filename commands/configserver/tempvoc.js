@@ -11,6 +11,7 @@ const {
   MessageFlags,
   ModalBuilder,
   PermissionsBitField,
+  PermissionFlagsBits,
   RoleSelectMenuBuilder,
   SeparatorBuilder,
   TextDisplayBuilder,
@@ -130,17 +131,21 @@ module.exports = {
       }
 
       if (id === 'tv:reset') {
-        state.enabled           = false;
-        state.joinChannelId     = null;
-        state.categoryId        = null;
-        state.nameTemplate      = 'Vocal de {username}';
-        state.userLimit         = 0;
-        state.requiredRoles     = [];
-        state.blockedRoles      = [];
+        await _deleteInfoEmbed(client, state).catch(() => {});
+
+        state.enabled            = false;
+        state.joinChannelId      = null;
+        state.categoryId         = null;
+        state.nameTemplate       = 'Vocal de {username}';
+        state.userLimit          = 0;
+        state.requiredRoles      = [];
+        state.blockedRoles       = [];
         state.ownerManageChannel = false;
-        state.ownerManagePerms  = false;
-        state.ownerMoveMembers  = false;
-        state.defaultInvisible  = false;
+        state.ownerManagePerms   = false;
+        state.ownerMoveMembers   = false;
+        state.defaultInvisible   = false;
+        state.embedChannelId     = null;
+        state.embedMessageId     = null;
 
         for (const [k, v] of Object.entries({
           enabled: 0, joinChannelId: null, categoryId: null,
@@ -148,6 +153,7 @@ module.exports = {
           requiredRoles: '[]', blockedRoles: '[]',
           ownerManageChannel: 0, ownerManagePerms: 0,
           ownerMoveMembers: 0, defaultInvisible: 0,
+          embedChannelId: null, embedMessageId: null,
         })) db.setTempvocConfig(guildId, k, v);
 
         await interaction.deferUpdate().catch(() => {});
@@ -201,6 +207,74 @@ module.exports = {
           db.setTempvocConfig(guildId, 'categoryId', channel.parentId);
           state.categoryId = channel.parentId;
         }
+
+        if (state.embedChannelId) {
+          await _sendOrUpdateInfoEmbed(client, guild, state).catch(() => {});
+        }
+
+        await submit.deferUpdate().catch(() => {});
+        busy = false;
+        return _refresh(panel, guildId, state, guild);
+      }
+
+      if (id === 'tv:panel_channel') {
+        busy = true;
+        const modalId = `tv:pchan:${interaction.id}`;
+        const shown = await interaction.showModal(
+          _buildModal(modalId, 'Salon panel vocal', [
+            _input('channel', 'Salon texte (reset = retirer)', TextInputStyle.Short, {
+              value: state.embedChannelId ? `<#${state.embedChannelId}>` : '',
+              required: false, maxLength: 100, placeholder: '#salon, ID, nom ou reset',
+            }),
+          ])
+        ).then(() => true).catch(() => false);
+        busy = false;
+        if (!shown) return _ephemeral(interaction, guildId, 'Impossible d\'ouvrir le formulaire.');
+
+        const submit = await _awaitOwnModal(interaction, modalId);
+        if (!submit) return _refresh(panel, guildId, state, guild);
+        busy = true;
+
+        const value = submit.fields.getTextInputValue('channel').trim();
+
+        if (!value || value.toLowerCase() === 'reset') {
+          await _deleteInfoEmbed(client, state).catch(() => {});
+          state.embedChannelId = null;
+          state.embedMessageId = null;
+          db.setTempvocConfig(guildId, 'embedChannelId', null);
+          db.setTempvocConfig(guildId, 'embedMessageId', null);
+          await submit.deferUpdate().catch(() => {});
+          busy = false;
+          return _refresh(panel, guildId, state, guild);
+        }
+
+        const textChannel = await _resolveTextChannel(guild, value);
+        if (!textChannel) {
+          await _modalError(submit, guildId, 'Salon textuel introuvable ou invalide.');
+          busy = false;
+          return _refresh(panel, guildId, state, guild);
+        }
+
+        const meP = guild.members.me ?? await guild.members.fetchMe().catch(() => null);
+        const botPermsP = meP ? textChannel.permissionsFor(meP) : null;
+        if (
+          !botPermsP?.has(PermissionFlagsBits.ViewChannel) ||
+          !botPermsP?.has(PermissionFlagsBits.SendMessages) ||
+          !botPermsP?.has(PermissionFlagsBits.EmbedLinks)
+        ) {
+          await _modalError(submit, guildId, 'Je n\'ai pas les permissions nécessaires (Voir, Envoyer, Embeds).');
+          busy = false;
+          return _refresh(panel, guildId, state, guild);
+        }
+
+        if (state.embedChannelId && state.embedChannelId !== textChannel.id) {
+          await _deleteInfoEmbed(client, state).catch(() => {});
+          state.embedMessageId = null;
+        }
+
+        state.embedChannelId = textChannel.id;
+        db.setTempvocConfig(guildId, 'embedChannelId', textChannel.id);
+        await _sendOrUpdateInfoEmbed(client, guild, state).catch(() => {});
 
         await submit.deferUpdate().catch(() => {});
         busy = false;
@@ -424,6 +498,8 @@ function _stateFromConfig(tempvocConfig, guildConfig) {
     ownerMoveMembers   : Number(tempvocConfig?.ownerMoveMembers) === 1,
     defaultInvisible   : Number(tempvocConfig?.defaultInvisible) === 1,
     baseColor          : _safeColor(guildConfig?.color || '#2f3136'),
+    embedChannelId     : tempvocConfig?.embedChannelId || null,
+    embedMessageId     : tempvocConfig?.embedMessageId || null,
   };
 }
 
@@ -486,6 +562,16 @@ function _buildV2(guildId, state, guild) {
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
       '-# Variables nom : `{username}` `{user}` `{id}` `{server}` `{tag}`'
+    ),
+  );
+
+  const embedChanLine = state.embedChannelId ? `<#${state.embedChannelId}>` : 'Non configuré';
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(`**Salon panel vocal** ${embedChanLine}`),
+  );
+  container.addActionRowComponents(
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('tv:panel_channel').setLabel('Set').setStyle(ButtonStyle.Secondary),
     ),
   );
 
@@ -599,7 +685,8 @@ function _buildLegacy(guildId, state) {
     `**Gérer salon** : ${state.ownerManageChannel ? 'Oui' : 'Non'}\n` +
     `**Gérer perms** : ${state.ownerManagePerms ? 'Oui' : 'Non'}\n` +
     `**Déplacer** : ${state.ownerMoveMembers ? 'Oui' : 'Non'}\n` +
-    `**Invisible** : ${state.defaultInvisible ? 'Oui' : 'Non'}\n\n` +
+    `**Invisible** : ${state.defaultInvisible ? 'Oui' : 'Non'}\n` +
+    `**Salon panel vocal** : ${state.embedChannelId ? `<#${state.embedChannelId}>` : 'Non configuré'}\n\n` +
     `Variables : \`{username}\`, \`{user}\`, \`{id}\`, \`{server}\``;
 
   const rows = [
@@ -608,6 +695,9 @@ function _buildLegacy(guildId, state) {
       new ButtonBuilder().setCustomId('tv:name').setLabel('Nom').setStyle(ButtonStyle.Secondary),
       new ButtonBuilder().setCustomId('tv:category').setLabel('Catégorie').setStyle(ButtonStyle.Secondary),
       new ButtonBuilder().setCustomId('tv:limit').setLabel('Limite').setStyle(ButtonStyle.Secondary),
+    ),
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('tv:panel_channel').setLabel('Set').setStyle(ButtonStyle.Secondary),
     ),
     new ActionRowBuilder().addComponents(
       _toggleBtn('tv:t:manage_channel', 'Gérer salon',   state.ownerManageChannel),
@@ -671,6 +761,81 @@ async function _resolveVoiceChannel(guild, query) {
 async function _resolveCategory(guild, query) {
   const ch = await _resolveChannel(guild, query);
   return ch?.type === ChannelType.GuildCategory ? ch : null;
+}
+
+async function _resolveTextChannel(guild, query) {
+  const ch = await _resolveChannel(guild, query);
+  return ch?.type === ChannelType.GuildText ? ch : null;
+}
+
+function _buildInfoEmbed(guild, state) {
+  const joinMention = state.joinChannelId ? `<#${state.joinChannelId}>` : '`·`';
+  const desc =
+    `Crée ton propre vocal temporaire en rejoignant le salon **·** ${joinMention}\n` +
+    `*Une fois dedans, utilise les commandes ci-dessous pour gérer ton salon.*\n\n` +
+    `*__Commandes utiles :__*\n` +
+    `> \`+voc lock\` - fermer l'accès au vocal\n` +
+    `> \`+voc unlock\` - rouvrir l'accès\n` +
+    `> \`+voc hide\` - cacher le vocal\n` +
+    `> \`+voc unhide\` - afficher le vocal\n` +
+    `> \`+voc limit <0-99>\` - changer la limite\n` +
+    `> \`+voc name <nom>\` - renommer le vocal\n` +
+    `> \`+voc claim\` - récupérer le vocal si le propriétaire est absent\n\n` +
+    `*__Gestion des membres :__*\n` +
+    `> \`+voc permit <membre>\` - autoriser un membre\n` +
+    `> \`+voc reject <membre>\` - refuser un membre\n` +
+    `> \`+voc kick <membre>\` - expulser un membre\n` +
+    `> \`+voc owner <membre>\` - transférer le vocal`;
+
+  return new EmbedBuilder()
+    .setTitle('Vocaux temporaires')
+    .setDescription(desc)
+    .setFooter({ text: 'Le vocal est supprimé automatiquement quand il est vide.' })
+    .setColor(state.baseColor || '#2f3136');
+}
+
+async function _sendOrUpdateInfoEmbed(client, guild, state) {
+  const guildId = guild.id;
+
+  const channel = guild.channels.cache.get(state.embedChannelId)
+    ?? await guild.channels.fetch(state.embedChannelId).catch(() => null);
+
+  if (!channel) {
+    state.embedChannelId = null;
+    state.embedMessageId = null;
+    db.setTempvocConfig(guildId, 'embedChannelId', null);
+    db.setTempvocConfig(guildId, 'embedMessageId', null);
+    return null;
+  }
+
+  const infoEmbed = _buildInfoEmbed(guild, state);
+
+  if (state.embedMessageId) {
+    const existing = await channel.messages.fetch(state.embedMessageId).catch(() => null);
+    if (existing) {
+      await existing.edit({ embeds: [infoEmbed], allowedMentions: { parse: [] } }).catch(() => {});
+      return existing;
+    }
+  }
+
+  const sent = await channel.send({ embeds: [infoEmbed], allowedMentions: { parse: [] } }).catch(() => null);
+  if (sent) {
+    state.embedMessageId = sent.id;
+    db.setTempvocConfig(guildId, 'embedMessageId', sent.id);
+  }
+  return sent;
+}
+
+async function _deleteInfoEmbed(client, state) {
+  if (!state.embedChannelId || !state.embedMessageId) return;
+
+  for (const [, guild] of client.guilds.cache) {
+    const channel = guild.channels.cache.get(state.embedChannelId);
+    if (!channel) continue;
+    const msg = await channel.messages.fetch(state.embedMessageId).catch(() => null);
+    if (msg) await msg.delete().catch(() => {});
+    break;
+  }
 }
 
 async function _resolveChannel(guild, query) {

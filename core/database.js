@@ -273,6 +273,8 @@ const TEMPVOC_CONFIG_KEYS = new Set([
   'ownerManagePerms',
   'ownerMoveMembers',
   'defaultInvisible',
+  'embedChannelId',
+  'embedMessageId',
 ]);
 
 function assertAllowedColumn(keySet, key, tableName) {
@@ -2970,6 +2972,48 @@ up(db) {
   },
 },
 
+{
+  version: 86,
+  up(db) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS global_buyers (
+        userId    TEXT PRIMARY KEY,
+        createdAt INTEGER NOT NULL DEFAULT (unixepoch())
+      );
+    `);
+  },
+},
+{
+  version: 87,
+  up(db) {
+    const hasColumn = (table, col) =>
+      !!db.prepare(`SELECT 1 FROM pragma_table_info('${table}') WHERE name = ?`).get(col);
+    if (!hasColumn('tempvoc_config', 'embedChannelId'))
+      db.exec('ALTER TABLE tempvoc_config ADD COLUMN embedChannelId TEXT');
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS tempvoc_bans (
+        guildId   TEXT NOT NULL,
+        channelId TEXT NOT NULL,
+        userId    TEXT NOT NULL,
+        createdAt INTEGER NOT NULL DEFAULT (unixepoch()),
+        PRIMARY KEY (channelId, userId)
+      );
+      CREATE INDEX IF NOT EXISTS idx_tempvoc_bans_channel
+        ON tempvoc_bans(channelId);
+    `);
+  },
+},
+
+{
+  version: 88,
+  up(db) {
+    const hasColumn = (table, col) =>
+      !!db.prepare(`SELECT 1 FROM pragma_table_info('${table}') WHERE name = ?`).get(col);
+    if (!hasColumn('tempvoc_config', 'embedMessageId'))
+      db.exec('ALTER TABLE tempvoc_config ADD COLUMN embedMessageId TEXT');
+  },
+},
+
 ];
 
 
@@ -3044,6 +3088,11 @@ function prepareStatements(db) {
     insertGlobalOwner  : db.prepare('INSERT OR IGNORE INTO global_owners (userId) VALUES (?)'),
     deleteGlobalOwner  : db.prepare('DELETE FROM global_owners WHERE userId = ?'),
     isGlobalOwner      : db.prepare('SELECT 1 FROM global_owners WHERE userId = ?'),
+
+    getGlobalBuyers    : db.prepare('SELECT userId FROM global_buyers ORDER BY createdAt ASC'),
+    insertGlobalBuyer  : db.prepare('INSERT OR IGNORE INTO global_buyers (userId) VALUES (?)'),
+    deleteGlobalBuyer  : db.prepare('DELETE FROM global_buyers WHERE userId = ?'),
+    isGlobalBuyer      : db.prepare('SELECT 1 FROM global_buyers WHERE userId = ?'),
 
 
     getBuyerRecovery       : db.prepare('SELECT codeHash, createdAt FROM buyer_recovery LIMIT 1'),
@@ -3428,6 +3477,12 @@ function prepareStatements(db) {
     deleteTempvocChannel: db.prepare('DELETE FROM tempvoc_channels WHERE channelId = ?'),
     updateTempvocOwner  : db.prepare('UPDATE tempvoc_channels SET ownerId = ? WHERE channelId = ?'),
 
+    insertTempvocBan    : db.prepare('INSERT OR IGNORE INTO tempvoc_bans (guildId, channelId, userId) VALUES (?, ?, ?)'),
+    deleteTempvocBan    : db.prepare('DELETE FROM tempvoc_bans WHERE channelId = ? AND userId = ?'),
+    getTempvocBans      : db.prepare('SELECT * FROM tempvoc_bans WHERE channelId = ?'),
+    isTempvocBanned     : db.prepare('SELECT 1 FROM tempvoc_bans WHERE channelId = ? AND userId = ?'),
+    deleteTempvocBansByChannel: db.prepare('DELETE FROM tempvoc_bans WHERE channelId = ?'),
+
     insertRoleMenu: db.prepare(`
       INSERT INTO role_menus (guildId, channelId, title, description, placeholder, mode, minValues, maxValues, createdBy)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -3677,6 +3732,27 @@ const db = {
 
   getOwners() {
     return this.getGlobalOwners();
+  },
+
+
+  getGlobalBuyers() {
+    getDb();
+    return _stmts.getGlobalBuyers.all().map(r => r.userId);
+  },
+
+  addGlobalBuyer(userId) {
+    getDb();
+    _stmts.insertGlobalBuyer.run(userId);
+  },
+
+  removeGlobalBuyer(userId) {
+    getDb();
+    _stmts.deleteGlobalBuyer.run(userId);
+  },
+
+  isGlobalBuyer(userId) {
+    getDb();
+    return !!_stmts.isGlobalBuyer.get(userId);
   },
 
   addOwner(_guildId, userId) {
@@ -5256,6 +5332,31 @@ const db = {
   setTempvocOwner(channelId, ownerId) {
     getDb();
     _stmts.updateTempvocOwner.run(ownerId, channelId);
+  },
+
+  addTempvocBan(guildId, channelId, userId) {
+    getDb();
+    _stmts.insertTempvocBan.run(guildId, channelId, userId);
+  },
+
+  removeTempvocBan(channelId, userId) {
+    getDb();
+    _stmts.deleteTempvocBan.run(channelId, userId);
+  },
+
+  getTempvocBans(channelId) {
+    getDb();
+    return _stmts.getTempvocBans.all(channelId);
+  },
+
+  isTempvocBanned(channelId, userId) {
+    getDb();
+    return !!_stmts.isTempvocBanned.get(channelId, userId);
+  },
+
+  clearTempvocBans(channelId) {
+    getDb();
+    _stmts.deleteTempvocBansByChannel.run(channelId);
   },
 
 

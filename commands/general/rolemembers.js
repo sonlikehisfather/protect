@@ -191,6 +191,7 @@ const collector = sent.createMessageComponentCollector({
           await i.deferUpdate().catch(() => {});
           embed.clearPrivateInteraction(sent);
           collector.stop('closed');
+          await message.delete().catch(() => {});
           return sent.delete().catch(() => {});
         }
 

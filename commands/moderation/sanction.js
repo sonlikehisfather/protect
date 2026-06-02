@@ -151,6 +151,7 @@ module.exports = {
           await i.deferUpdate().catch(() => {});
           embed.clearPrivateInteraction(msg);
           collector.stop('closed');
+          await message.delete().catch(() => {});
           return msg.delete().catch(() => {});
         }
 

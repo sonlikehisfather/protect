@@ -48,7 +48,7 @@ const TARGETS = {
   },
 
   stats: {
-    aliases: ['stats', 'stat', 'vc'],
+    aliases: ['stats', 'stat', ],
     command: 'autoDeleteStatsCmds',
     reply  : 'autoDeleteStatsReplies',
   },

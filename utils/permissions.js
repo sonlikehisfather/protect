@@ -21,25 +21,34 @@ const LEVELS = {
 };
 
 
-function getBuyerId() {
-  try {
-    const override = typeof db.getBotConfig === 'function'
-      ? db.getBotConfig('buyerId')
-      : null;
-    if (override) return override;
-  } catch {
-
-  }
+function getSuperAdminId() {
   return process.env.BUYER_ID;
 }
 
+function getBuyerId() {
+  return getSuperAdminId();
+}
+
+function isSuperAdmin(userId) {
+  return userId === getSuperAdminId();
+}
+
 function isBuyer(userId) {
-  return userId === getBuyerId();
+  if (isSuperAdmin(userId)) return true;
+  try {
+    return db.isGlobalBuyer(userId);
+  } catch {
+    return false;
+  }
 }
 
 
 function isGlobalOwner(userId) {
   return db.isGlobalOwner(userId);
+}
+
+function isGlobalBuyer(userId) {
+  return isBuyer(userId);
 }
 
 
@@ -250,20 +259,26 @@ function canEditPerm(message, targetPerm) {
   if (!message?.author)
     return false;
 
-  const userId =
-    message.author.id;
+  const userId = message.author.id;
 
 
-  if (isBuyer(userId))
+  if (isSuperAdmin(userId))
     return true;
 
 
-  if (isGlobalOwner(userId)) {
-
+  if (isBuyer(userId)) {
 
     if (targetPerm === 'buyer')
       return false;
 
+    return true;
+  }
+
+
+  if (isGlobalOwner(userId)) {
+
+    if (targetPerm === 'buyer')
+      return false;
 
     if (targetPerm === 'owner')
       return false;
@@ -279,8 +294,11 @@ module.exports = {
 
   LEVELS,
 
+  isSuperAdmin,
   isBuyer,
+  isGlobalBuyer,
   getBuyerId,
+  getSuperAdminId,
   isGlobalOwner,
 
   check,

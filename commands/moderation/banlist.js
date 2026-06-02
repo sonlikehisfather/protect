@@ -93,27 +93,38 @@ module.exports = {
       );
     }
 
-    const pages = [];
-    for (let i = 0; i < entries.length; i += PAGE_SIZE) {
-      const chunk = entries.slice(i, i + PAGE_SIZE);
+    const chunks = [];
+    let current  = [];
+    let len      = 0;
 
-      pages.push(
-        embed.build(guildId, null, {
-          title  : 'Liste des membres bannis',
-          fields : [
-            {
-              name   : 'Membres',
-              value  : chunk.join('\n'),
-              inline : false,
-            },
-          ],
-          footer    : `Page ${Math.floor(i / PAGE_SIZE) + 1}/${Math.ceil(entries.length / PAGE_SIZE)} • Total : ${entries.length}`,
-          timestamp : false,
-        })
-      );
+    for (const entry of entries) {
+      const lineLen = entry.length + 1;
+      if (current.length > 0 && len + lineLen > 1024) {
+        chunks.push(current);
+        current = [];
+        len     = 0;
+      }
+      current.push(entry);
+      len += lineLen;
     }
+    if (current.length) chunks.push(current);
 
-    let current = 0;
+    const pages = chunks.map((chunk, idx) =>
+      embed.build(guildId, null, {
+        title  : 'Liste des membres bannis',
+        fields : [
+          {
+            name   : 'Membres',
+            value  : chunk.join('\n'),
+            inline : false,
+          },
+        ],
+        footer    : `Page ${idx + 1}/${chunks.length} • Total : ${entries.length}`,
+        timestamp : false,
+      })
+    );
+
+    let pageIndex = 0;
 
     const buildRows = (disabled = false) => [
       new ActionRowBuilder().addComponents(
@@ -121,13 +132,13 @@ module.exports = {
           .setCustomId('banlist:prev')
           .setLabel('\u25C0')
           .setStyle(ButtonStyle.Secondary)
-          .setDisabled(disabled || current === 0),
+          .setDisabled(disabled || pageIndex === 0),
 
         new ButtonBuilder()
           .setCustomId('banlist:next')
           .setLabel('\u25B6')
           .setStyle(ButtonStyle.Secondary)
-          .setDisabled(disabled || current === pages.length - 1),
+          .setDisabled(disabled || pageIndex === pages.length - 1),
 
         new ButtonBuilder()
           .setCustomId('banlist:close')
@@ -138,7 +149,7 @@ module.exports = {
     ];
 
     const msg = await message.channel.send({
-      embeds     : [pages[current]],
+      embeds     : [pages[pageIndex]],
       components : buildRows(),
       allowedMentions: { repliedUser: false },
     }).catch(() => null);
@@ -159,14 +170,15 @@ module.exports = {
           await i.deferUpdate().catch(() => {});
           embed.clearPrivateInteraction(msg);
           collector.stop('closed');
+          await message.delete().catch(() => {});
           return msg.delete().catch(() => {});
         }
 
-        if (i.customId === 'banlist:prev' && current > 0) current--;
-        if (i.customId === 'banlist:next' && current < pages.length - 1) current++;
+        if (i.customId === 'banlist:prev' && pageIndex > 0) pageIndex--;
+        if (i.customId === 'banlist:next' && pageIndex < pages.length - 1) pageIndex++;
 
         await i.update({
-          embeds     : [pages[current]],
+          embeds     : [pages[pageIndex]],
           components : buildRows(),
         });
       } catch (err) {
