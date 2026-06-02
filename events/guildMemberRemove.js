@@ -7,7 +7,7 @@ const db           = require('../core/database');
 const embed        = require('../utils/embed');
 const logger       = require('../utils/logger');
 const errorHandler = require('../utils/errorHandler');
-const tickets      = require('../modules/tickets');
+const tickets        = require('../modules/tickets');
 const { replaceVariables } = require('../utils/variables');
 
 module.exports = {
@@ -17,6 +17,12 @@ module.exports = {
   async execute(client, member) {
     const { guild } = member;
     const guildId   = guild.id;
+
+    if (!member.user.bot) {
+      try {
+        db.markInviteLeft(guildId, member.id);
+      } catch {}
+    }
 
     try {
       const config = db.getGuildConfig(guildId);

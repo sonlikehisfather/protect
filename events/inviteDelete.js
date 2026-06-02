@@ -1,7 +1,8 @@
 'use strict';
 
-const logger = require('../utils/logger');
-const embed = require('../utils/embed');
+const logger        = require('../utils/logger');
+const embed         = require('../utils/embed');
+const inviteTracker = require('../utils/inviteTracker');
 
 module.exports = {
   name: 'inviteDelete',
@@ -11,6 +12,8 @@ module.exports = {
     try {
       const guild = invite.guild;
       if (!guild) return;
+
+      inviteTracker.removeInvite(guild.id, invite.code);
 
       await logger.send(
         client,

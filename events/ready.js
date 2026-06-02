@@ -14,6 +14,7 @@ const tempvoc          = require('../modules/tempvoc');
 const customCommands   = require('../modules/customCommands');
 const tickets          = require('../modules/tickets');
 const counters         = require('../modules/counters');
+const inviteTracker    = require('../utils/inviteTracker');
 
 const TICK_MS             = 60 * 1000;
 const INACTIVE_TICK_MS    = 5 * 60 * 1000;
@@ -42,6 +43,10 @@ module.exports = {
   once : true,
 
   async execute(client) {
+    for (const [, guild] of client.guilds.cache) {
+      inviteTracker.loadGuild(guild).catch(() => {});
+    }
+
     const memberCount = client.guilds.cache.reduce((acc, g) => acc + g.memberCount, 0);
     const djsVersion  = require('discord.js').version;
 

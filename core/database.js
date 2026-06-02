@@ -3014,6 +3014,39 @@ up(db) {
   },
 },
 
+{
+  version: 89,
+  up(db) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS invite_tracking (
+        guildId   TEXT    NOT NULL,
+        userId    TEXT    NOT NULL,
+        inviterId TEXT,
+        joinedAt  INTEGER NOT NULL DEFAULT (unixepoch()),
+        leftAt    INTEGER,
+        PRIMARY KEY (guildId, userId)
+      );
+
+      CREATE TABLE IF NOT EXISTS invite_bonus (
+        guildId TEXT    NOT NULL,
+        userId  TEXT    NOT NULL,
+        bonus   INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (guildId, userId)
+      );
+
+      CREATE TABLE IF NOT EXISTS invite_rewards (
+        guildId   TEXT    NOT NULL,
+        threshold INTEGER NOT NULL,
+        roleId    TEXT    NOT NULL,
+        PRIMARY KEY (guildId, threshold)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_invite_tracking_inviter
+        ON invite_tracking(guildId, inviterId);
+    `);
+  },
+},
+
 ];
 
 
@@ -6192,6 +6225,103 @@ const db = {
   clearBotActivity() {
     getDb();
     _stmts.clearBotActivity.run();
+  },
+
+
+  getInviteStats(guildId, userId) {
+    const d = getDb();
+    const regular = d.prepare(
+      `SELECT COUNT(*) as count FROM invite_tracking WHERE guildId = ? AND inviterId = ? AND leftAt IS NULL`
+    ).get(guildId, userId)?.count ?? 0;
+    const left = d.prepare(
+      `SELECT COUNT(*) as count FROM invite_tracking WHERE guildId = ? AND inviterId = ? AND leftAt IS NOT NULL`
+    ).get(guildId, userId)?.count ?? 0;
+    const bonus = d.prepare(
+      `SELECT bonus FROM invite_bonus WHERE guildId = ? AND userId = ?`
+    ).get(guildId, userId)?.bonus ?? 0;
+    return { regular, left, bonus, total: regular + bonus };
+  },
+
+  getInviteLeaderboard(guildId, limit = 10) {
+    const d = getDb();
+    return d.prepare(`
+      SELECT
+        inviterId AS userId,
+        SUM(CASE WHEN leftAt IS NULL THEN 1 ELSE 0 END) AS regular,
+        SUM(CASE WHEN leftAt IS NOT NULL THEN 1 ELSE 0 END) AS left_count,
+        COALESCE((SELECT bonus FROM invite_bonus WHERE guildId = it.guildId AND userId = it.inviterId), 0) AS bonus
+      FROM invite_tracking it
+      WHERE guildId = ? AND inviterId IS NOT NULL
+      GROUP BY inviterId
+      ORDER BY (regular + bonus) DESC
+      LIMIT ?
+    `).all(guildId, limit);
+  },
+
+  setInviteBonus(guildId, userId, bonus) {
+    getDb().prepare(
+      `INSERT INTO invite_bonus (guildId, userId, bonus) VALUES (?, ?, ?)
+       ON CONFLICT(guildId, userId) DO UPDATE SET bonus = excluded.bonus`
+    ).run(guildId, userId, bonus);
+  },
+
+  addInviteBonus(guildId, userId, amount) {
+    const d = getDb();
+    d.prepare(
+      `INSERT INTO invite_bonus (guildId, userId, bonus) VALUES (?, ?, ?)
+       ON CONFLICT(guildId, userId) DO UPDATE SET bonus = bonus + excluded.bonus`
+    ).run(guildId, userId, amount);
+    return d.prepare(`SELECT bonus FROM invite_bonus WHERE guildId = ? AND userId = ?`).get(guildId, userId)?.bonus ?? amount;
+  },
+
+  clearInvites(guildId, userId) {
+    const d = getDb();
+    d.prepare(`UPDATE invite_tracking SET inviterId = NULL WHERE guildId = ? AND inviterId = ?`).run(guildId, userId);
+    d.prepare(`DELETE FROM invite_bonus WHERE guildId = ? AND userId = ?`).run(guildId, userId);
+  },
+
+  clearAllInvites(guildId) {
+    const d = getDb();
+    d.prepare(`UPDATE invite_tracking SET inviterId = NULL WHERE guildId = ?`).run(guildId);
+    d.prepare(`DELETE FROM invite_bonus WHERE guildId = ?`).run(guildId);
+  },
+
+  trackInvite(guildId, userId, inviterId) {
+    getDb().prepare(
+      `INSERT INTO invite_tracking (guildId, userId, inviterId) VALUES (?, ?, ?)
+       ON CONFLICT(guildId, userId) DO UPDATE SET inviterId = excluded.inviterId, joinedAt = unixepoch(), leftAt = NULL`
+    ).run(guildId, userId, inviterId ?? null);
+  },
+
+  markInviteLeft(guildId, userId) {
+    getDb().prepare(
+      `UPDATE invite_tracking SET leftAt = unixepoch() WHERE guildId = ? AND userId = ?`
+    ).run(guildId, userId);
+  },
+
+  getInviterOf(guildId, userId) {
+    return getDb().prepare(
+      `SELECT inviterId FROM invite_tracking WHERE guildId = ? AND userId = ?`
+    ).get(guildId, userId)?.inviterId ?? null;
+  },
+
+  getInviteRewards(guildId) {
+    return getDb().prepare(
+      `SELECT threshold, roleId FROM invite_rewards WHERE guildId = ? ORDER BY threshold ASC`
+    ).all(guildId);
+  },
+
+  setInviteReward(guildId, threshold, roleId) {
+    getDb().prepare(
+      `INSERT INTO invite_rewards (guildId, threshold, roleId) VALUES (?, ?, ?)
+       ON CONFLICT(guildId, threshold) DO UPDATE SET roleId = excluded.roleId`
+    ).run(guildId, threshold, roleId);
+  },
+
+  deleteInviteReward(guildId, threshold) {
+    getDb().prepare(
+      `DELETE FROM invite_rewards WHERE guildId = ? AND threshold = ?`
+    ).run(guildId, threshold);
   },
 
 };

@@ -8,6 +8,7 @@ const logger        = require('../utils/logger');
 const perms         = require('../utils/permissions');
 const errorHandler  = require('../utils/errorHandler');
 const welcomeSender = require('../utils/welcomeSender');
+const inviteTracker = require('../utils/inviteTracker');
 
 module.exports = {
   name : 'guildMemberAdd',
@@ -156,6 +157,19 @@ module.exports = {
         }
       }
 
+      if (!member.user.bot) {
+        try {
+          const inviterId = await inviteTracker.findInviter(client, guild);
+          db.trackInvite(guildId, member.id, inviterId ?? null);
+
+          if (inviterId) {
+            await _applyInviteRewards(guild, inviterId).catch(() => {});
+          }
+        } catch (err) {
+          errorHandler.handle(err, { source: 'guildMemberAdd.inviteTracker', guildId });
+        }
+      }
+
       await _applyAutoroles(guild, member);
 
       try {
@@ -286,6 +300,27 @@ async function _findBotAddExecutor(guild, botId) {
   );
 
   return entry?.executor ?? null;
+}
+
+async function _applyInviteRewards(guild, inviterId) {
+  const guildId = guild.id;
+  const stats   = db.getInviteStats(guildId, inviterId);
+  const total   = stats.total;
+  const rewards = db.getInviteRewards(guildId);
+  if (!rewards.length) return;
+
+  const inviterMember = guild.members.cache.get(inviterId)
+    ?? await guild.members.fetch(inviterId).catch(() => null);
+  if (!inviterMember) return;
+
+  const me = guild.members.me ?? await guild.members.fetchMe().catch(() => null);
+  if (!me?.permissions.has(PermissionsBitField.Flags.ManageRoles)) return;
+
+  for (const reward of rewards) {
+    if (total >= reward.threshold && !inviterMember.roles.cache.has(reward.roleId)) {
+      await inviterMember.roles.add(reward.roleId, `Récompense invite : ${reward.threshold} invitations`).catch(() => {});
+    }
+  }
 }
 
 async function _applyCreationLimitPunishment(client, guild, member, punishment) {
