@@ -13,7 +13,7 @@ const perms = require('../../utils/permissions');
 module.exports = {
   help: {
     name        : 'sync',
-    description : 'Synchronise les permissions d\'un salon avec sa catégorie.',
+    description : 'Synchronise les permissions des salons (textuels, vocaux, etc.) avec leur catégorie.',
     usage       : 'sync <salon/catégorie/all>',
     aliases     : [],
   },

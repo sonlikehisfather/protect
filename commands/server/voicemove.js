@@ -15,7 +15,7 @@ module.exports = {
     name        : 'voicemove',
     description : 'Déplace tous les membres d\'un salon vocal vers un autre.',
     usage       : 'voicemove [salon départ] <salon arrivée>',
-    aliases     : [],
+    aliases     : ['mv'],
   },
 
   async run(client, message, args) {
@@ -62,7 +62,8 @@ module.exports = {
     let targetChannel = null;
 
     if (args.length === 1) {
-      sourceChannel = message.member.voice.channel;
+      const authorVoiceState = guild.voiceStates.cache.get(message.author.id);
+      sourceChannel = authorVoiceState?.channel ?? null;
       targetChannel = await _resolveVoiceChannel(guild, args[0]);
     }
 

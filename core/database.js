@@ -168,6 +168,17 @@ const GUILD_CONFIG_KEYS = new Set([
   'verifyButtonStyle',
   'ticketRatingChannel',
   'ticketRatingEnabled',
+
+  'counterMembersChannel',
+  'counterOnlineChannel',
+  'counterVoiceChannel',
+  'counterChannelsChannel',
+  'counterTextchannelsChannel',
+  'counterVoicechannelsChannel',
+  'counterThreadsChannel',
+  'counterBoostsChannel',
+  'counterBoostlevelChannel',
+  'counterEmojisChannel',
 ]);
 
 const CUSTOM_COMMAND_KEYS = new Set([
@@ -2929,6 +2940,33 @@ up(db) {
       db.prepare('ALTER TABLE guild_config ADD COLUMN ticketRatingChannel TEXT').run();
     if (!hasColumn('guild_config', 'ticketRatingEnabled'))
       db.prepare('ALTER TABLE guild_config ADD COLUMN ticketRatingEnabled INTEGER NOT NULL DEFAULT 1').run();
+  },
+},
+
+{
+  version: 85,
+  up(db) {
+    const hasColumn = (table, col) =>
+      !!db.prepare(`SELECT 1 FROM pragma_table_info('${table}') WHERE name = ?`).get(col);
+
+    const counterColumns = [
+      'counterMembersChannel',
+      'counterOnlineChannel',
+      'counterVoiceChannel',
+      'counterChannelsChannel',
+      'counterTextchannelsChannel',
+      'counterVoicechannelsChannel',
+      'counterThreadsChannel',
+      'counterBoostsChannel',
+      'counterBoostlevelChannel',
+      'counterEmojisChannel',
+    ];
+
+    for (const col of counterColumns) {
+      if (!hasColumn('guild_config', col)) {
+        db.prepare(`ALTER TABLE guild_config ADD COLUMN ${col} TEXT`).run();
+      }
+    }
   },
 },
 

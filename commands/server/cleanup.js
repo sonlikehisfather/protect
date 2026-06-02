@@ -52,7 +52,8 @@ module.exports = {
     if (args.length) {
       channel = await _resolveVoiceChannel(guild, args.join(' '));
     } else {
-      channel = message.member.voice.channel;
+      const authorVoiceState = guild.voiceStates.cache.get(message.author.id);
+      channel = authorVoiceState?.channel ?? null;
     }
 
     if (!channel) {

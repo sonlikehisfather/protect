@@ -63,7 +63,8 @@ module.exports = {
     if (args.length) {
       targetChannel = await _resolveVoiceChannel(guild, args.join(' '));
     } else {
-      targetChannel = message.member.voice.channel;
+      const authorVoiceState = guild.voiceStates.cache.get(message.author.id);
+      targetChannel = authorVoiceState?.channel ?? null;
     }
 
     if (!targetChannel) {

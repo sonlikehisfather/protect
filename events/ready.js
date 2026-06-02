@@ -13,6 +13,7 @@ const modmail          = require('../modules/modmail');
 const tempvoc          = require('../modules/tempvoc');
 const customCommands   = require('../modules/customCommands');
 const tickets          = require('../modules/tickets');
+const counters         = require('../modules/counters');
 
 const TICK_MS             = 60 * 1000;
 const INACTIVE_TICK_MS    = 5 * 60 * 1000;
@@ -135,6 +136,7 @@ module.exports = {
     _safeInterval(() => tickets.processInactiveTickets(client), INACTIVE_TICK_MS);
     _safeInterval(() => _processDuePurges(client), GUILD_PURGE_TICK_MS);
     showpics.start(client);
+    counters.init(client);
 
     startAntidecoPoll(client);
 

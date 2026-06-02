@@ -516,7 +516,8 @@ async function _handleOwner(client, message, args, channel, row, guildId, delete
 }
 
 async function _getTempvocContext(message) {
-  const channel = message.member?.voice?.channel;
+  const voiceState = message.guild.voiceStates.cache.get(message.author.id);
+  const channel = voiceState?.channel ?? null;
 
   if (!channel || channel.type !== ChannelType.GuildVoice) {
     return null;
