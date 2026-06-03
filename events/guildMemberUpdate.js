@@ -23,6 +23,27 @@ module.exports = {
 
     if (newMember.user.bot) return;
 
+    // ── Prevnames : nickname ───────────────────────────────────────────────
+    try {
+      if (oldMember.nickname !== newMember.nickname && oldMember.nickname) {
+        db.addPrevName(newMember.id, guildId, 'nickname', oldMember.nickname);
+      }
+    } catch (err) {
+      errorHandler.handle(err, { source: 'guildMemberUpdate.prevnames', guildId, userId: newMember.id });
+    }
+
+    // ── Rolelog ────────────────────────────────────────────────────────────
+    try {
+      const oldRoleIds = oldMember.roles.cache;
+      const newRoleIds = newMember.roles.cache;
+      newRoleIds.filter(r => !oldRoleIds.has(r.id) && r.id !== guildId)
+        .forEach(r => db.addRolelog(newMember.id, guildId, r.id, 'add'));
+      oldRoleIds.filter(r => !newRoleIds.has(r.id) && r.id !== guildId)
+        .forEach(r => db.addRolelog(newMember.id, guildId, r.id, 'remove'));
+    } catch (err) {
+      errorHandler.handle(err, { source: 'guildMemberUpdate.rolelog', guildId, userId: newMember.id });
+    }
+
     try {
       const oldRoles = oldMember.roles.cache;
       const newRoles = newMember.roles.cache;

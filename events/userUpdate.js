@@ -14,6 +14,20 @@ module.exports = {
   once : false,
 
   async execute(client, oldUser, newUser) {
+
+    // ── Prevnames : username & globalName ─────────────────────────────────
+    try {
+      if (oldUser.username && oldUser.username !== newUser.username) {
+        db.addPrevName(newUser.id, null, 'username', oldUser.username);
+      }
+      if (oldUser.globalName !== newUser.globalName && oldUser.globalName) {
+        db.addPrevName(newUser.id, null, 'globalname', oldUser.globalName);
+      }
+    } catch (err) {
+      errorHandler.handle(err, { source: 'userUpdate.prevnames', userId: newUser?.id });
+    }
+
+    // ── Soutien tag sync ──────────────────────────────────────────────────
     try {
       const primaryGuild = newUser?.primaryGuild;
       if (!primaryGuild) {

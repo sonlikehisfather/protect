@@ -148,6 +148,9 @@ module.exports = {
           return interaction.deferUpdate().catch(() => {});
         }
 
+        if (cid.startsWith('kw:settarget:')) {
+          return;
+        }
 
         return embed.replyExpiredPanel(interaction);
       }
@@ -387,6 +390,16 @@ async function _handleButton(client, interaction) {
     return _handleServerLeaveButton(client, interaction, id);
   }
 
+  if (
+    id.startsWith('kw:') ||
+    id.startsWith('tm:') ||
+    id.startsWith('pn:') ||
+    id.startsWith('sr:') ||
+    id.startsWith('rl:')
+  ) {
+    return;
+  }
+
   return interaction.deferUpdate().catch(() => {});
 }
 
@@ -565,6 +578,13 @@ async function _handleModal(client, interaction) {
 
   if (id.startsWith('myvc:')) {
     return;
+  }
+
+  if (id.startsWith('kw:modal:')) {
+    let kwModule = null;
+    try { kwModule = require('../commands/general/keyword'); } catch {}
+    if (kwModule?.handleModalSubmit) return kwModule.handleModalSubmit(interaction);
+    return embed.replyExpiredPanel(interaction);
   }
 
   return embed.replyExpiredPanel(interaction);

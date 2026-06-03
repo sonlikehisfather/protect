@@ -161,6 +161,12 @@ module.exports = {
 
     const content = message.content.trimStart();
 
+    try {
+      const lastMsg = message.content ? message.content.slice(0, 200) : null;
+      db.updateSeen(message.author.id, guildId, message.channel.id, lastMsg);
+      db.incrementMsgcount(message.author.id, guildId);
+    } catch {}
+
     if (!content.startsWith(prefix)) {
       try {
         if (levels) {
@@ -181,6 +187,29 @@ module.exports = {
           userId : message.author.id,
         });
       }
+
+      try {
+        const lowerContent = message.content.toLowerCase();
+        const guildKws     = db.getGuildKeywords(guildId);
+        if (guildKws.length) {
+          const notified = new Set();
+          for (const { userId, keyword } of guildKws) {
+            if (userId === message.author.id) continue;
+            if (!lowerContent.includes(keyword)) continue;
+            const key = `${userId}:${keyword}`;
+            if (notified.has(key)) continue;
+            notified.add(key);
+            const user = await client.users.fetch(userId).catch(() => null);
+            if (!user) continue;
+            const preview = message.content.length > 200
+              ? message.content.slice(0, 200) + '…'
+              : message.content;
+            user.send({
+              content: `**Keyword \`${keyword}\` mentionné** dans <#${message.channel.id}> sur **${message.guild.name}**\n> ${preview}\n[Aller au message](${message.url})`,
+            }).catch(() => {});
+          }
+        }
+      } catch {}
 
       return;
     }

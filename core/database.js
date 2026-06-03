@@ -3046,6 +3046,151 @@ up(db) {
     `);
   },
 },
+  {
+    version: 90,
+    up(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS prevnames (
+          id        INTEGER PRIMARY KEY AUTOINCREMENT,
+          userId    TEXT    NOT NULL,
+          guildId   TEXT,
+          type      TEXT    NOT NULL CHECK(type IN ('username','globalname','nickname')),
+          name      TEXT    NOT NULL,
+          changedAt INTEGER NOT NULL DEFAULT (unixepoch())
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_prevnames_user
+          ON prevnames(userId, changedAt DESC);
+
+        CREATE INDEX IF NOT EXISTS idx_prevnames_guild_user
+          ON prevnames(guildId, userId, changedAt DESC);
+      `);
+    },
+  },
+
+  {
+    version: 91,
+    up(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS seen (
+          userId    TEXT    NOT NULL,
+          guildId   TEXT    NOT NULL,
+          seenAt    INTEGER NOT NULL DEFAULT (unixepoch()),
+          channelId TEXT,
+          PRIMARY KEY (userId, guildId)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_seen_guild
+          ON seen(guildId, seenAt DESC);
+      `);
+    },
+  },
+
+  {
+    version: 92,
+    up(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS rolelog (
+          id        INTEGER PRIMARY KEY AUTOINCREMENT,
+          userId    TEXT    NOT NULL,
+          guildId   TEXT    NOT NULL,
+          roleId    TEXT    NOT NULL,
+          action    TEXT    NOT NULL CHECK(action IN ('add','remove')),
+          changedAt INTEGER NOT NULL DEFAULT (unixepoch())
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_rolelog_user_guild
+          ON rolelog(userId, guildId, changedAt DESC);
+      `);
+    },
+  },
+
+  {
+    version: 93,
+    up(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS keywords (
+          id      INTEGER PRIMARY KEY AUTOINCREMENT,
+          userId  TEXT    NOT NULL,
+          guildId TEXT    NOT NULL,
+          keyword TEXT    NOT NULL COLLATE NOCASE,
+          UNIQUE(userId, guildId, keyword)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_keywords_guild
+          ON keywords(guildId);
+      `);
+    },
+  },
+
+  {
+    version: 94,
+    up(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS msgcount (
+          userId  TEXT    NOT NULL,
+          guildId TEXT    NOT NULL,
+          day     TEXT    NOT NULL,
+          count   INTEGER NOT NULL DEFAULT 0,
+          PRIMARY KEY (userId, guildId, day)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_msgcount_guild_day
+          ON msgcount(guildId, day);
+      `);
+    },
+  },
+
+  // ── Migration 95 : Seen lastMessage column ────────────────────────────────
+  {
+    version: 95,
+    up(db) {
+      const cols = db.prepare(`PRAGMA table_info(seen)`).all();
+      if (!cols.some(c => c.name === 'lastMessage')) {
+        db.exec(`ALTER TABLE seen ADD COLUMN lastMessage TEXT;`);
+      }
+    },
+  },
+
+  // ── Migration 96 : Keywords ownerId + targetUserId ────────────────────────
+  {
+    version: 96,
+    up(db) {
+      const cols = db.prepare(`PRAGMA table_info(keywords)`).all();
+      const names = cols.map(c => c.name);
+      if (!names.includes('ownerId')) {
+        db.exec(`ALTER TABLE keywords ADD COLUMN ownerId TEXT;`);
+        db.exec(`UPDATE keywords SET ownerId = userId WHERE ownerId IS NULL;`);
+      }
+      if (!names.includes('targetUserId')) {
+        db.exec(`ALTER TABLE keywords ADD COLUMN targetUserId TEXT;`);
+        db.exec(`UPDATE keywords SET targetUserId = userId WHERE targetUserId IS NULL;`);
+      }
+    },
+  },
+
+  {
+    version: 97,
+    up(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS keywords2 (
+          id           INTEGER PRIMARY KEY AUTOINCREMENT,
+          ownerId      TEXT    NOT NULL,
+          guildId      TEXT    NOT NULL,
+          keyword      TEXT    NOT NULL COLLATE NOCASE,
+          targetUserId TEXT    NOT NULL,
+          UNIQUE(ownerId, guildId, keyword, targetUserId)
+        );
+        CREATE INDEX IF NOT EXISTS idx_keywords2_guild ON keywords2(guildId);
+        CREATE INDEX IF NOT EXISTS idx_keywords2_owner ON keywords2(ownerId, guildId);
+      `);
+      db.exec(`
+        INSERT OR IGNORE INTO keywords2 (ownerId, guildId, keyword, targetUserId)
+        SELECT COALESCE(ownerId, userId), guildId, keyword, COALESCE(targetUserId, userId)
+        FROM keywords;
+      `);
+    },
+  },
 
 ];
 
@@ -3077,6 +3222,142 @@ function prepareStatements(db) {
 
     getGuildConfig   : db.prepare('SELECT * FROM guild_config WHERE guildId = ?'),
     insertGuildConfig: db.prepare('INSERT OR IGNORE INTO guild_config (guildId) VALUES (?)'),
+
+    insertPrevName : db.prepare(`
+      INSERT INTO prevnames (userId, guildId, type, name)
+      VALUES (?, ?, ?, ?)
+    `),
+    getPrevNamesGlobal : db.prepare(`
+      SELECT * FROM prevnames
+      WHERE userId = ? AND type IN ('username','globalname')
+      ORDER BY changedAt DESC
+      LIMIT ?
+    `),
+    getPrevNamesNick : db.prepare(`
+      SELECT * FROM prevnames
+      WHERE userId = ? AND guildId = ? AND type = 'nickname'
+      ORDER BY changedAt DESC
+      LIMIT ?
+    `),
+    getPrevNamesAll : db.prepare(`
+      SELECT * FROM prevnames
+      WHERE userId = ? AND (type IN ('username','globalname') OR (type = 'nickname' AND guildId = ?))
+      ORDER BY changedAt DESC
+      LIMIT ?
+    `),
+    getLastPrevName : db.prepare(`
+      SELECT name FROM prevnames
+      WHERE userId = ? AND type = ?
+      ORDER BY changedAt DESC
+      LIMIT 1
+    `),
+    getLastPrevNameNick : db.prepare(`
+      SELECT name FROM prevnames
+      WHERE userId = ? AND guildId = ? AND type = 'nickname'
+      ORDER BY changedAt DESC
+      LIMIT 1
+    `),
+    countPrevNamesGlobal : db.prepare(`
+      SELECT COUNT(*) as c FROM prevnames
+      WHERE userId = ? AND type IN ('username','globalname')
+    `),
+    prunePrevNames : db.prepare(`
+      DELETE FROM prevnames
+      WHERE userId = ? AND type = ? AND id NOT IN (
+        SELECT id FROM prevnames WHERE userId = ? AND type = ?
+        ORDER BY changedAt DESC LIMIT 50
+      )
+    `),
+    prunePrevNamesNick : db.prepare(`
+      DELETE FROM prevnames
+      WHERE userId = ? AND guildId = ? AND type = 'nickname' AND id NOT IN (
+        SELECT id FROM prevnames WHERE userId = ? AND guildId = ? AND type = 'nickname'
+        ORDER BY changedAt DESC LIMIT 50
+      )
+    `),
+
+    clearPrevNamesAll : db.prepare(`
+      DELETE FROM prevnames WHERE userId = ?
+    `),
+    clearPrevNamesGuild : db.prepare(`
+      DELETE FROM prevnames WHERE userId = ? AND (guildId = ? OR guildId IS NULL)
+    `),
+    clearPrevNamesType : db.prepare(`
+      DELETE FROM prevnames WHERE userId = ? AND type = ?
+    `),
+    clearPrevNamesTypeGuild : db.prepare(`
+      DELETE FROM prevnames WHERE userId = ? AND guildId = ? AND type = ?
+    `),
+
+    upsertSeen : db.prepare(`
+      INSERT INTO seen (userId, guildId, seenAt, channelId, lastMessage)
+      VALUES (?, ?, unixepoch(), ?, ?)
+      ON CONFLICT(userId, guildId) DO UPDATE SET seenAt = unixepoch(), channelId = excluded.channelId, lastMessage = excluded.lastMessage
+    `),
+    getSeen : db.prepare(`
+      SELECT seenAt, channelId, lastMessage FROM seen WHERE userId = ? AND guildId = ?
+    `),
+
+    insertRolelog : db.prepare(`
+      INSERT INTO rolelog (userId, guildId, roleId, action) VALUES (?, ?, ?, ?)
+    `),
+    getRolelog : db.prepare(`
+      SELECT roleId, action, changedAt FROM rolelog
+      WHERE userId = ? AND guildId = ?
+      ORDER BY changedAt DESC
+      LIMIT ?
+    `),
+    pruneRolelog : db.prepare(`
+      DELETE FROM rolelog
+      WHERE userId = ? AND guildId = ? AND id NOT IN (
+        SELECT id FROM rolelog WHERE userId = ? AND guildId = ?
+        ORDER BY changedAt DESC LIMIT 200
+      )
+    `),
+
+    insertKeyword : db.prepare(`
+      INSERT OR IGNORE INTO keywords2 (ownerId, guildId, keyword, targetUserId) VALUES (?, ?, ?, ?)
+    `),
+    deleteKeyword : db.prepare(`
+      DELETE FROM keywords2 WHERE ownerId = ? AND guildId = ? AND keyword = ? COLLATE NOCASE
+    `),
+    deleteKeywordTarget : db.prepare(`
+      DELETE FROM keywords2 WHERE ownerId = ? AND guildId = ? AND keyword = ? COLLATE NOCASE AND targetUserId = ?
+    `),
+    getKeywords : db.prepare(`
+      SELECT keyword, GROUP_CONCAT(targetUserId) as targets
+      FROM keywords2 WHERE ownerId = ? AND guildId = ?
+      GROUP BY keyword ORDER BY keyword
+    `),
+    countKeywords : db.prepare(`
+      SELECT COUNT(DISTINCT keyword) as c FROM keywords2 WHERE ownerId = ? AND guildId = ?
+    `),
+    getGuildKeywords : db.prepare(`
+      SELECT targetUserId as userId, keyword FROM keywords2 WHERE guildId = ?
+    `),
+    clearKeywords : db.prepare(`
+      DELETE FROM keywords2 WHERE ownerId = ? AND guildId = ?
+    `),
+    setKeywordTargets : db.prepare(`
+      DELETE FROM keywords2 WHERE ownerId = ? AND guildId = ? AND keyword = ? COLLATE NOCASE
+    `),
+    insertKeywordTarget : db.prepare(`
+      INSERT OR IGNORE INTO keywords2 (ownerId, guildId, keyword, targetUserId) VALUES (?, ?, ?, ?)
+    `),
+
+    upsertMsgcount : db.prepare(`
+      INSERT INTO msgcount (userId, guildId, day, count)
+      VALUES (?, ?, ?, 1)
+      ON CONFLICT(userId, guildId, day) DO UPDATE SET count = count + 1
+    `),
+    getTopMsgs : db.prepare(`
+      SELECT userId, SUM(count) as total
+      FROM msgcount
+      WHERE guildId = ? AND day >= ?
+      GROUP BY userId
+      ORDER BY total DESC
+      LIMIT ?
+    `),
 
     insertSanction     : db.prepare('INSERT INTO sanctions (guildId, userId, moderatorId, type, reason, duration, expiresAt, channelId) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'),
     getSanctions       : db.prepare('SELECT * FROM sanctions WHERE guildId = ? AND userId = ? AND deletedAt IS NULL ORDER BY createdAt DESC'),
@@ -6198,6 +6479,153 @@ const db = {
     return info.changes || 0;
   },
 
+
+  /**
+   * @param {string} userId
+   * @param {string|null} guildId  
+   * @param {'username'|'globalname'|'nickname'} type
+   * @param {string} name         
+   */
+  addPrevName(userId, guildId, type, name) {
+    if (!userId || !type || !name) return;
+    getDb();
+
+    const last = type === 'nickname'
+      ? _stmts.getLastPrevNameNick.get(userId, guildId)
+      : _stmts.getLastPrevName.get(userId, type);
+
+    if (last?.name === name) return; 
+
+    _stmts.insertPrevName.run(userId, guildId ?? null, type, name);
+
+    if (type === 'nickname') {
+      _stmts.prunePrevNamesNick.run(userId, guildId, userId, guildId);
+    } else {
+      _stmts.prunePrevNames.run(userId, type, userId, type);
+    }
+  },
+
+  /**
+   * @param {string} userId
+   * @param {string|null} guildId 
+   * @param {number} limit
+   * @returns {Array}
+   */
+  getPrevNames(userId, guildId = null, limit = 0) {
+    if (!userId) return [];
+    getDb();
+    const cap = limit > 0 ? Math.min(limit, 10000) : 10000;
+    if (guildId) {
+      return _stmts.getPrevNamesAll.all(userId, guildId, cap);
+    }
+    return _stmts.getPrevNamesGlobal.all(userId, cap);
+  },
+
+  getPrevNicknames(userId, guildId, limit = 30) {
+    if (!userId || !guildId) return [];
+    getDb();
+    return _stmts.getPrevNamesNick.all(userId, guildId, Math.min(limit, 100));
+  },
+
+  clearPrevNames(userId, guildId = null) {
+    if (!userId) return;
+    getDb();
+    if (guildId) {
+      _stmts.clearPrevNamesGuild.run(userId, guildId);
+    } else {
+      _stmts.clearPrevNamesAll.run(userId);
+    }
+  },
+
+  updateSeen(userId, guildId, channelId, lastMessage) {
+    if (!userId || !guildId) return;
+    getDb();
+    _stmts.upsertSeen.run(userId, guildId, channelId ?? null, lastMessage ?? null);
+  },
+
+  getSeen(userId, guildId) {
+    if (!userId || !guildId) return null;
+    getDb();
+    return _stmts.getSeen.get(userId, guildId) || null;
+  },
+
+  addRolelog(userId, guildId, roleId, action) {
+    if (!userId || !guildId || !roleId || !action) return;
+    getDb();
+    _stmts.insertRolelog.run(userId, guildId, roleId, action);
+    _stmts.pruneRolelog.run(userId, guildId, userId, guildId);
+  },
+
+  getRolelog(userId, guildId, limit = 0) {
+    if (!userId || !guildId) return [];
+    getDb();
+    const cap = limit > 0 ? Math.min(limit, 500) : 500;
+    return _stmts.getRolelog.all(userId, guildId, cap);
+  },
+
+  addKeyword(ownerId, guildId, keyword, targetUserId = null) {
+    if (!ownerId || !guildId || !keyword) return false;
+    getDb();
+    const target = targetUserId ?? ownerId;
+    const kw = keyword.toLowerCase().trim();
+    const info = _stmts.insertKeyword.run(ownerId, guildId, kw, target);
+    return info.changes > 0;
+  },
+
+  removeKeyword(ownerId, guildId, keyword) {
+    if (!ownerId || !guildId || !keyword) return false;
+    getDb();
+    const info = _stmts.deleteKeyword.run(ownerId, guildId, keyword.toLowerCase().trim());
+    return info.changes > 0;
+  },
+
+  setKeywordTargets(ownerId, guildId, keyword, targetUserIds = []) {
+    if (!ownerId || !guildId || !keyword) return;
+    getDb();
+    const kw = keyword.toLowerCase().trim();
+    const targets = targetUserIds.length ? targetUserIds : [ownerId];
+    getDb().transaction(() => {
+      _stmts.setKeywordTargets.run(ownerId, guildId, kw);
+      for (const t of targets) {
+        _stmts.insertKeywordTarget.run(ownerId, guildId, kw, t);
+      }
+    })();
+  },
+
+  getKeywords(ownerId, guildId) {
+    if (!ownerId || !guildId) return [];
+    getDb();
+    return _stmts.getKeywords.all(ownerId, guildId).map(r => ({
+      keyword : r.keyword,
+      targets : r.targets ? r.targets.split(',') : [ownerId],
+    }));
+  },
+
+  getGuildKeywords(guildId) {
+    if (!guildId) return [];
+    getDb();
+    return _stmts.getGuildKeywords.all(guildId);
+  },
+
+  clearKeywords(ownerId, guildId) {
+    if (!ownerId || !guildId) return;
+    getDb();
+    _stmts.clearKeywords.run(ownerId, guildId);
+  },
+
+  incrementMsgcount(userId, guildId) {
+    if (!userId || !guildId) return;
+    getDb();
+    const day = new Date().toISOString().slice(0, 10);
+    _stmts.upsertMsgcount.run(userId, guildId, day);
+  },
+
+  getTopMsgs(guildId, days = 7, limit = 10) {
+    if (!guildId) return [];
+    getDb();
+    const since = new Date(Date.now() - days * 86400_000).toISOString().slice(0, 10);
+    return _stmts.getTopMsgs.all(guildId, since, Math.min(limit, 25));
+  },
 
   transaction(fn) {
     return getDb().transaction(fn)();
