@@ -23,7 +23,7 @@ module.exports = {
     name        : 'removeinvites',
     description : 'Retire des invitations bonus à un membre.',
     usage       : 'removeinvites <@membre|ID|nom> <nombre>',
-    aliases     : [],
+    aliases     : ['delinvites'],
   },
 
   async run(client, message, args) {

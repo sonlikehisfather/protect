@@ -241,6 +241,11 @@ async function _handleButton(client, interaction) {
   }
 
 
+  if (id.startsWith('al:') || id.startsWith('inv:') || id.startsWith('cap:') || id.startsWith('local:capture:') || id.startsWith('eload:')) {
+    return;
+  }
+
+
   if (id.startsWith('rolemembers:')) {
     return embed.replyExpiredPanel(interaction);
   }
@@ -492,6 +497,11 @@ async function _handleSelectMenu(client, interaction) {
 
   if (id.startsWith('help:')) {
     return embed.replyExpiredPanel(interaction);
+  }
+
+
+  if (id.startsWith('al:') || id.startsWith('cap:') || id.startsWith('local:capture:') || id.startsWith('eload:')) {
+    return;
   }
 
 

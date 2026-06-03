@@ -29,7 +29,7 @@
                              typeof SeparatorBuilder   === 'function';
 
   const RESERVED_NAMES = new Set([
-    'edit', 'copy', 'list', 'delete', 'del', 'remove', 'save', 'sauvegarder',
+    'edit', 'copy', 'list', 'delete', 'del', 'remove', 'save', 'sauvegarder', 'capture',
   ]);
 
   function _hexToInt(hex) {
@@ -42,7 +42,7 @@
     help: {
       name        : 'embed',
       description : 'Affiche un générateur d\'embed interactif.',
-      usage       : 'embed [edit|copy|list|delete <nom>|<nom>]',
+      usage       : 'embed [edit|copy|list|delete|capture <lien> <nom>|<nom>]',
       aliases     : [],
     },
 
@@ -147,6 +147,349 @@
         return;
       }
 
+      if (sub === 'capture') {
+        const CAPTURE_TIMEOUT = 300_000;
+
+        const captureState = {
+          channelId : null,
+          messageId : null,
+          embedData : null,
+          saveData  : null,
+          status    : '',
+        };
+
+        const _buildPanel = (disabled = false) => {
+          const hasEmbed = Boolean(captureState.embedData);
+          const rd       = captureState.embedData;
+
+          let text;
+          if (captureState.status) {
+            text = captureState.status;
+          } else if (hasEmbed) {
+            text = [
+              `## Capture d'embed`,
+              ``,
+              `**Salon source** : <#${captureState.channelId}>`,
+              `**Titre** : ${rd.title ? `\`${String(rd.title).slice(0, 80)}\`` : '*Aucun*'}`,
+              `**Champs** : ${Array.isArray(rd.fields) ? rd.fields.length : 0}`,
+              ``,
+              `-# Clique sur **Aperçu** pour voir l'embed • **Enregistrer** pour sauvegarder`,
+            ].join('\n');
+          } else {
+            text = [
+              `## Capture d'embed`,
+              ``,
+              `Utilise le bouton **Ajouter** pour charger un embed depuis un message.`,
+              ``,
+              `-# Renseigne le salon et l'ID du message cible`,
+            ].join('\n');
+          }
+
+          const container = new ContainerBuilder()
+            .addTextDisplayComponents(new TextDisplayBuilder().setContent(text))
+            .addSeparatorComponents(new SeparatorBuilder().setSpacing(1))
+            .addActionRowComponents(
+              new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                  .setCustomId('cap:add')
+                  .setLabel('Ajouter')
+                  .setStyle(ButtonStyle.Primary)
+                  .setDisabled(disabled),
+                new ButtonBuilder()
+                  .setCustomId('cap:preview')
+                  .setLabel('Aperçu')
+                  .setStyle(ButtonStyle.Primary)
+                  .setDisabled(disabled || !hasEmbed),
+                new ButtonBuilder()
+                  .setCustomId('cap:save')
+                  .setLabel('Enregistrer')
+                  .setStyle(ButtonStyle.Success)
+                  .setDisabled(disabled || !hasEmbed),
+                new ButtonBuilder()
+                  .setCustomId('cap:list')
+                  .setLabel('Liste')
+                  .setStyle(ButtonStyle.Secondary)
+                  .setDisabled(disabled),
+                new ButtonBuilder()
+                  .setCustomId('cap:close')
+                  .setLabel('\u2716')
+                  .setStyle(ButtonStyle.Danger)
+                  .setDisabled(disabled),
+              )
+            );
+
+          return {
+            components      : [container],
+            flags           : COMPONENTS_V2_FLAG,
+            allowedMentions : { parse: [] },
+          };
+        };
+
+        const panelMsg = await message.channel.send(_buildPanel()).catch(() => null);
+        if (!panelMsg) return;
+
+        embed.registerPrivateInteraction(panelMsg, message.author.id, CAPTURE_TIMEOUT);
+
+        const collector = panelMsg.createMessageComponentCollector({
+          filter : i => i.user.id === message.author.id,
+          time   : CAPTURE_TIMEOUT,
+        });
+
+        collector.on('collect', async (i) => {
+          if (i.customId === 'cap:close') {
+            collector.stop('closed');
+            await i.deferUpdate().catch(() => {});
+            panelMsg.delete().catch(() => {});
+            return;
+          }
+
+          if (i.customId === 'cap:list') {
+            const templates = db.listEmbeds(guildId);
+            const listText  = templates.length
+              ? templates.map(t => `\`${t.name}\` — par <@${t.createdBy}>`).join('\n')
+              : '*Aucun template sauvegardé.*';
+
+            const listContainer = new ContainerBuilder()
+              .addTextDisplayComponents(new TextDisplayBuilder().setContent(
+                `## Templates sauvegardés\n\n${listText}`
+              ));
+
+            await i.reply({
+              components      : [listContainer],
+              flags           : COMPONENTS_V2_FLAG | 64,
+              allowedMentions : { parse: [] },
+            }).catch(() => {});
+            return;
+          }
+
+          if (i.customId === 'cap:preview') {
+            if (!captureState.saveData) {
+              await i.deferUpdate().catch(() => {});
+              return;
+            }
+            const rd = captureState.embedData;
+            const previewEmbed = new EmbedBuilder();
+            if (rd.title)       previewEmbed.setTitle(rd.title);
+            if (rd.description) previewEmbed.setDescription(rd.description);
+            if (rd.color)       previewEmbed.setColor(rd.color);
+            if (rd.url)         previewEmbed.setURL(rd.url);
+            if (rd.timestamp)   previewEmbed.setTimestamp(new Date(rd.timestamp));
+            if (rd.author)      previewEmbed.setAuthor({ name: rd.author.name ?? rd.author, iconURL: rd.author.icon_url ?? rd.authorIcon ?? undefined, url: rd.author.url ?? rd.authorUrl ?? undefined });
+            if (rd.footer)      previewEmbed.setFooter({ text: rd.footer.text ?? rd.footer, iconURL: rd.footer.icon_url ?? rd.footerIcon ?? undefined });
+            if (rd.thumbnail)   previewEmbed.setThumbnail(rd.thumbnail.url ?? rd.thumbnail);
+            if (rd.image)       previewEmbed.setImage(rd.image.url ?? rd.image);
+            if (Array.isArray(rd.fields) && rd.fields.length) {
+              previewEmbed.addFields(rd.fields.map(f => ({ name: f.name, value: f.value, inline: f.inline ?? false })));
+            }
+            await i.reply({
+              embeds          : [previewEmbed],
+              flags           : 64,
+              allowedMentions : { parse: [] },
+            }).catch(() => {});
+            return;
+          }
+
+          if (i.customId === 'cap:add') {
+            const modal = new ModalBuilder()
+              .setCustomId('cap:modal:add')
+              .setTitle("Charger un embed")
+              .addComponents(
+                new ActionRowBuilder().addComponents(
+                  new TextInputBuilder()
+                    .setCustomId('cap:input:channel')
+                    .setLabel('Salon (ID, mention ou nom)')
+                    .setStyle(TextInputStyle.Short)
+                    .setRequired(true)
+                    .setPlaceholder('#général ou 123456789'),
+                ),
+                new ActionRowBuilder().addComponents(
+                  new TextInputBuilder()
+                    .setCustomId('cap:input:msgid')
+                    .setLabel('ID du message')
+                    .setStyle(TextInputStyle.Short)
+                    .setRequired(true)
+                    .setPlaceholder('123456789012345678'),
+                ),
+              );
+
+            await i.showModal(modal).catch(() => {});
+
+            const submit = await i.awaitModalSubmit({ time: 120_000 }).catch(() => null);
+            if (!submit) return;
+
+            console.log('[capture:add] modal soumis');
+            const deferRes = await submit.deferReply({ flags: 64 }).catch(e => { console.error('[capture:add] deferReply err:', e); return null; });
+            console.log('[capture:add] deferReply ok:', deferRes !== null);
+
+            const channelQuery = submit.fields.getTextInputValue('cap:input:channel').trim();
+            const msgIdRaw     = submit.fields.getTextInputValue('cap:input:msgid').trim();
+            console.log('[capture:add] channel query:', channelQuery, '| msgId:', msgIdRaw);
+
+            const resolvedCh = await _resolveTextChannel(guild, channelQuery);
+            console.log('[capture:add] resolvedCh:', resolvedCh?.id ?? 'null');
+            if (!resolvedCh) {
+              captureState.status = `## Salon introuvable\n\`${channelQuery}\` est introuvable ou inaccessible.`;
+              await panelMsg.edit(_buildPanel()).catch(e => console.error('[capture:add] edit err (no ch):', e));
+              setTimeout(async () => {
+                captureState.status = '';
+                await panelMsg.edit(_buildPanel()).catch(() => {});
+              }, 5_000);
+              return;
+            }
+
+            if (!/^\d{17,20}$/.test(msgIdRaw)) {
+              captureState.status = `## ID invalide\n\`${msgIdRaw}\` n'est pas un ID de message valide.`;
+              await panelMsg.edit(_buildPanel()).catch(e => console.error('[capture:add] edit err (bad id):', e));
+              setTimeout(async () => {
+                captureState.status = '';
+                await panelMsg.edit(_buildPanel()).catch(() => {});
+              }, 5_000);
+              return;
+            }
+
+            const targetMsg = await resolvedCh.messages.fetch(msgIdRaw).catch(e => { console.error('[capture:add] fetch msg err:', e); return null; });
+            console.log('[capture:add] targetMsg:', targetMsg?.id ?? 'null', '| embeds:', targetMsg?.embeds?.length ?? 0);
+            if (!targetMsg) {
+              captureState.status = `## Message introuvable\nAucun message avec l'ID \`${msgIdRaw}\` dans <#${resolvedCh.id}>.`;
+              await panelMsg.edit(_buildPanel()).catch(e => console.error('[capture:add] edit err (no msg):', e));
+              setTimeout(async () => {
+                captureState.status = '';
+                await panelMsg.edit(_buildPanel()).catch(() => {});
+              }, 5_000);
+              return;
+            }
+
+            if (!targetMsg.embeds?.length) {
+              captureState.status = `## Aucun embed\nCe message ne contient pas d'embed.`;
+              await panelMsg.edit(_buildPanel()).catch(e => console.error('[capture:add] edit err (no embed):', e));
+              setTimeout(async () => {
+                captureState.status = '';
+                await panelMsg.edit(_buildPanel()).catch(() => {});
+              }, 5_000);
+              return;
+            }
+
+            const raw     = targetMsg.embeds[0];
+            const rawData = raw?.data || raw?.toJSON?.() || {};
+
+            captureState.channelId = resolvedCh.id;
+            captureState.messageId = msgIdRaw;
+            captureState.embedData = rawData;
+            captureState.saveData  = {
+              title       : rawData.title       || null,
+              description : rawData.description || null,
+              author      : rawData.author?.name || null,
+              authorIcon  : rawData.author?.icon_url || null,
+              authorUrl   : rawData.author?.url || null,
+              footer      : rawData.footer?.text || null,
+              footerIcon  : rawData.footer?.icon_url || null,
+              thumbnail   : rawData.thumbnail?.url || null,
+              image       : rawData.image?.url || null,
+              url         : rawData.url || null,
+              color       : rawData.color ? `#${rawData.color.toString(16).padStart(6, '0')}` : null,
+              timestamp   : Boolean(rawData.timestamp),
+              fields      : Array.isArray(rawData.fields)
+                ? rawData.fields.slice(0, 25).map(f => ({ name: f.name || '', value: f.value || '', inline: f.inline ?? false }))
+                : [],
+            };
+
+            console.log('[capture:add] tout ok, edition du panel');
+            await panelMsg.edit(_buildPanel()).catch(e => console.error('[capture:add] edit final err:', e));
+            submit.deleteReply().catch(() => {});
+            console.log('[capture:add] done');
+            return;
+          }
+
+          if (i.customId === 'cap:save') {
+            if (!captureState.saveData) {
+              await i.deferUpdate().catch(() => {});
+              return;
+            }
+
+            const tplCount = db.listEmbeds(guildId).length;
+            if (tplCount >= 25) {
+              captureState.status = `## Limite atteinte\n**25 templates** maximum par serveur.`;
+              await i.deferUpdate().catch(() => {});
+              await panelMsg.edit(_buildPanel()).catch(() => {});
+              setTimeout(async () => {
+                captureState.status = '';
+                await panelMsg.edit(_buildPanel()).catch(() => {});
+              }, 5_000);
+              return;
+            }
+
+            const saveModal = new ModalBuilder()
+              .setCustomId('cap:modal:save')
+              .setTitle('Nommer le template')
+              .addComponents(
+                new ActionRowBuilder().addComponents(
+                  new TextInputBuilder()
+                    .setCustomId('cap:input:name')
+                    .setLabel('Nom du template')
+                    .setStyle(TextInputStyle.Short)
+                    .setRequired(true)
+                    .setMinLength(1)
+                    .setMaxLength(32)
+                    .setPlaceholder('ex: bienvenue, annonce…'),
+                ),
+              );
+
+            await i.showModal(saveModal).catch(() => {});
+
+            const saveSubmit = await i.awaitModalSubmit({ time: 120_000 }).catch(() => null);
+            if (!saveSubmit) return;
+
+            await saveSubmit.deferReply({ flags: 64 }).catch(() => {});
+
+            const rawName = _normalizeTemplateName(saveSubmit.fields.getTextInputValue('cap:input:name'));
+
+            if (!rawName || RESERVED_NAMES.has(rawName)) {
+              captureState.status = `## Nom invalide\n\`${rawName || '(vide)'}\` est invalide ou réservé.`;
+              await panelMsg.edit(_buildPanel()).catch(() => {});
+              setTimeout(async () => {
+                captureState.status = '';
+                await panelMsg.edit(_buildPanel()).catch(() => {});
+              }, 5_000);
+              return;
+            }
+
+            if (db.getEmbed(guildId, rawName)) {
+              captureState.status = `## Nom déjà utilisé\nUn template \`${rawName}\` existe déjà.\nSupprime-le avec \`+embed delete ${rawName}\`.`;
+              await panelMsg.edit(_buildPanel()).catch(() => {});
+              setTimeout(async () => {
+                captureState.status = '';
+                await panelMsg.edit(_buildPanel()).catch(() => {});
+              }, 5_000);
+              return;
+            }
+
+            db.saveEmbed(guildId, rawName, captureState.saveData, message.author.id);
+            saveSubmit.deleteReply().catch(() => {});
+
+            collector.stop('saved');
+            const doneContainer = new ContainerBuilder()
+              .addTextDisplayComponents(new TextDisplayBuilder().setContent(
+                `## Template \`${rawName}\` sauvegardé !\n\nUtilise \`+embed ${rawName}\` pour l'envoyer.`
+              ));
+            await panelMsg.edit({
+              components      : [doneContainer],
+              flags           : COMPONENTS_V2_FLAG,
+              embeds          : [],
+              allowedMentions : { parse: [] },
+            }).catch(() => {});
+            if (deleteReply) embed.scheduleDelete(panelMsg, deleteDelay);
+          }
+        });
+
+        collector.on('end', (_, reason) => {
+          embed.clearPrivateInteraction(panelMsg);
+          if (reason === 'closed' || reason === 'saved') return;
+          panelMsg.edit({ ..._buildPanel(true), embeds: [] }).catch(() => {});
+        });
+
+        return;
+      }
+
       if (sub === 'delete' || sub === 'del' || sub === 'remove') {
         const rawName = _normalizeTemplateName(args?.[1]);
         if (!rawName) {
@@ -202,16 +545,13 @@
         return;
       }
 
-      let templateData = null;
       if (sub && !RESERVED_NAMES.has(sub)) {
-        const saved = db.getEmbed(guildId, sub);
-        if (!saved) {
-          const s = await embed.replyError(message, `Template introuvable : \`${sub}\`.`, { timestamp: false }).catch(() => null);
-          if (s && deleteReply) embed.scheduleDelete(s, deleteDelay);
-          return;
-        }
-        templateData = saved.data;
+        const s = await embed.replyError(message, `Pour charger un template, utilise \`+embed\` puis le bouton **Load**.`, { timestamp: false }).catch(() => null);
+        if (s && deleteReply) embed.scheduleDelete(s, deleteDelay);
+        return;
       }
+
+      const templateData = null;
 
       const state = sourceEmbed
         ? _stateFromEmbed(sourceEmbed, defaultColor)
@@ -356,6 +696,122 @@
           state.view        = 'tools';
           await interaction.deferUpdate().catch(() => {});
           await _refresh(panel, state, mode);
+          return;
+        }
+
+        if (id === 'embed:load') {
+          const templates = db.listEmbeds(guildId);
+          if (!templates.length) {
+            await _ephemeral(interaction, guildId, 'Aucun template sauvegardé. Utilise `+embed capture` pour en créer.');
+            return;
+          }
+
+          const PAGE_SIZE = 5;
+          const pages     = Math.ceil(templates.length / PAGE_SIZE);
+          let   page      = 0;
+
+          const _buildLoadPanel = (pg) => {
+            const slice = templates.slice(pg * PAGE_SIZE, pg * PAGE_SIZE + PAGE_SIZE);
+            const lines = slice.map((t, i) => `**${pg * PAGE_SIZE + i + 1}.** \`${t.name}\``);
+            const text  = `## Templates sauvegardés\n\n${lines.join('\n')}`;
+
+            const container = new ContainerBuilder()
+              .addTextDisplayComponents(new TextDisplayBuilder().setContent(text))
+              .addSeparatorComponents(new SeparatorBuilder().setSpacing(1));
+
+            const numRow = new ActionRowBuilder();
+            slice.forEach((t, i) => {
+              numRow.addComponents(
+                new ButtonBuilder()
+                  .setCustomId(`eload:pick:${pg * PAGE_SIZE + i}`)
+                  .setLabel(String(pg * PAGE_SIZE + i + 1))
+                  .setStyle(ButtonStyle.Primary),
+              );
+            });
+            container.addActionRowComponents(numRow);
+
+            if (pages > 1) {
+              container.addActionRowComponents(
+                new ActionRowBuilder().addComponents(
+                  new ButtonBuilder().setCustomId('eload:prev').setLabel('◀').setStyle(ButtonStyle.Secondary).setDisabled(pg === 0),
+                  new ButtonBuilder().setCustomId('eload:next').setLabel('▶').setStyle(ButtonStyle.Secondary).setDisabled(pg >= pages - 1),
+                  new ButtonBuilder().setCustomId('eload:close').setLabel('✖').setStyle(ButtonStyle.Danger),
+                )
+              );
+            } else {
+              container.addActionRowComponents(
+                new ActionRowBuilder().addComponents(
+                  new ButtonBuilder().setCustomId('eload:close').setLabel('✖').setStyle(ButtonStyle.Danger),
+                )
+              );
+            }
+
+            return {
+              components      : [container],
+              flags           : COMPONENTS_V2_FLAG | 64,
+              allowedMentions : { parse: [] },
+            };
+          };
+
+          await interaction.reply(_buildLoadPanel(0)).catch(() => {});
+
+          const loadMsg = await interaction.fetchReply().catch(() => null);
+          if (!loadMsg) return;
+
+          const loadCollector = loadMsg.createMessageComponentCollector({
+            filter : x => x.user.id === interaction.user.id,
+            time   : 60_000,
+          });
+
+          loadCollector.on('collect', async (x) => {
+            if (x.customId === 'eload:close') {
+              loadCollector.stop('closed');
+              await x.deferUpdate().catch(() => {});
+              interaction.deleteReply().catch(() => {});
+              return;
+            }
+            if (x.customId === 'eload:prev') {
+              page = Math.max(0, page - 1);
+              await x.deferUpdate().catch(() => {});
+              await interaction.editReply(_buildLoadPanel(page)).catch(() => {});
+              return;
+            }
+            if (x.customId === 'eload:next') {
+              page = Math.min(pages - 1, page + 1);
+              await x.deferUpdate().catch(() => {});
+              await interaction.editReply(_buildLoadPanel(page)).catch(() => {});
+              return;
+            }
+            if (x.customId.startsWith('eload:pick:')) {
+              const idx    = parseInt(x.customId.slice('eload:pick:'.length), 10);
+              const picked = templates[idx];
+              if (!picked) { await x.deferUpdate().catch(() => {}); return; }
+
+              loadCollector.stop('picked');
+              await x.deferUpdate().catch(() => {});
+              interaction.deleteReply().catch(() => {});
+
+              const saved = db.getEmbed(guildId, picked.name);
+              if (!saved) return;
+
+              busy = true;
+              _loadTemplateIntoState(state, saved.data, defaultColor);
+              state.view = 'main';
+              await x.followUp({
+                content         : `Template \`${picked.name}\` chargé.`,
+                flags           : 64,
+                allowedMentions : { parse: [] },
+              }).catch(() => {});
+              busy = false;
+              await _refresh(panel, state, mode);
+            }
+          });
+
+          loadCollector.on('end', (_, reason) => {
+            if (reason === 'closed' || reason === 'picked') return;
+            interaction.deleteReply().catch(() => {});
+          });
+
           return;
         }
 
@@ -831,8 +1287,8 @@
           .setLabel(sendLabel)
           .setStyle(ButtonStyle.Success),
         new ButtonBuilder()
-          .setCustomId('embed:copy')
-          .setLabel('Copier')
+          .setCustomId('embed:load')
+          .setLabel('Load')
           .setStyle(ButtonStyle.Secondary),
         new ButtonBuilder()
           .setCustomId('embed:save')
@@ -1347,8 +1803,8 @@
             new ActionRowBuilder().addComponents(
               new ButtonBuilder().setCustomId('embed:send').setLabel(sendLabel).setStyle(ButtonStyle.Success),
               new ButtonBuilder().setCustomId('embed:apercu').setLabel('Apercu').setStyle(ButtonStyle.Primary),
+              new ButtonBuilder().setCustomId('embed:load').setLabel('Load').setStyle(ButtonStyle.Secondary),
               new ButtonBuilder().setCustomId('embed:close').setLabel('Fermer').setStyle(ButtonStyle.Danger),
-              new ButtonBuilder().setCustomId('embed:copy').setLabel('Copier').setStyle(ButtonStyle.Secondary),
             ),
           );
         } else if (view === 'content') {
