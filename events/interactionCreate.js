@@ -152,6 +152,10 @@ module.exports = {
           return;
         }
 
+        if (cid.startsWith('cf:chansel:')) {
+          return;
+        }
+
         return embed.replyExpiredPanel(interaction);
       }
 
@@ -400,6 +404,35 @@ async function _handleButton(client, interaction) {
     return;
   }
 
+  if (id === 'cf:setblacklist') {
+    const guildId = interaction.guild?.id;
+    const db = require('../core/database');
+    const cfg = db.getConfessionConfig(guildId);
+    const { ModalBuilder, ActionRowBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
+    const modal = new ModalBuilder()
+      .setCustomId(`cf:modal:blacklist:${interaction.message?.id ?? '0'}`)
+      .setTitle('Blacklist de mots');
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId('blacklist')
+          .setLabel('Mots interdits séparés par des virgules')
+          .setStyle(TextInputStyle.Paragraph)
+          .setRequired(false)
+          .setValue(cfg?.blacklist ?? '')
+          .setPlaceholder('Ex: insulte1, insulte2, ...'),
+      ),
+    );
+    return interaction.showModal(modal).catch(() => {});
+  }
+
+  if (id.startsWith('cf:')) {
+    let confMod = null;
+    try { confMod = require('../commands/general/confession'); } catch {}
+    if (confMod?.handleButton) return confMod.handleButton(client, interaction);
+    return;
+  }
+
   return interaction.deferUpdate().catch(() => {});
 }
 
@@ -584,6 +617,21 @@ async function _handleModal(client, interaction) {
     let kwModule = null;
     try { kwModule = require('../commands/general/keyword'); } catch {}
     if (kwModule?.handleModalSubmit) return kwModule.handleModalSubmit(interaction);
+    return embed.replyExpiredPanel(interaction);
+  }
+
+  if (id.startsWith('cf:modal:')) {
+    const parts = id.split(':');
+    const action = parts[2];
+    if (action === 'submit' || action === 'reply') {
+      let confMod = null;
+      try { confMod = require('../commands/general/confession'); } catch {}
+      if (confMod?.handleModalSubmit) return confMod.handleModalSubmit(client, interaction);
+    } else {
+      let confConfigMod = null;
+      try { confConfigMod = require('../commands/general/confconfig'); } catch {}
+      if (confConfigMod?.handleModalSubmit) return confConfigMod.handleModalSubmit(interaction);
+    }
     return embed.replyExpiredPanel(interaction);
   }
 

@@ -3192,6 +3192,44 @@ up(db) {
     },
   },
 
+  // ── Migration 98 : Confessions ────────────────────────────────────────────
+  {
+    version: 98,
+    up(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS confession_config (
+          guildId           TEXT    PRIMARY KEY,
+          enabled           INTEGER NOT NULL DEFAULT 0,
+          channelId         TEXT,
+          reviewChannelId   TEXT,
+          reviewEnabled     INTEGER NOT NULL DEFAULT 0,
+          revealAllowed     INTEGER NOT NULL DEFAULT 1,
+          reactionsEnabled  INTEGER NOT NULL DEFAULT 1,
+          replyEnabled      INTEGER NOT NULL DEFAULT 1,
+          cooldownSeconds   INTEGER NOT NULL DEFAULT 300,
+          blacklist         TEXT    NOT NULL DEFAULT '',
+          buttonMsgId       TEXT,
+          allowAnonymousReply INTEGER NOT NULL DEFAULT 1
+        );
+
+        CREATE TABLE IF NOT EXISTS confessions (
+          id          INTEGER PRIMARY KEY AUTOINCREMENT,
+          guildId     TEXT    NOT NULL,
+          authorId    TEXT    NOT NULL,
+          content     TEXT    NOT NULL,
+          status      TEXT    NOT NULL DEFAULT 'pending',
+          messageId   TEXT,
+          reviewMsgId TEXT,
+          createdAt   INTEGER NOT NULL DEFAULT (unixepoch()),
+          number      INTEGER
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_confessions_guild
+          ON confessions(guildId, status);
+      `);
+    },
+  },
+
 ];
 
 
@@ -3344,6 +3382,23 @@ function prepareStatements(db) {
     insertKeywordTarget : db.prepare(`
       INSERT OR IGNORE INTO keywords2 (ownerId, guildId, keyword, targetUserId) VALUES (?, ?, ?, ?)
     `),
+
+    getConfessionConfig : db.prepare(`SELECT * FROM confession_config WHERE guildId = ?`),
+    upsertConfessionConfig : db.prepare(`
+      INSERT INTO confession_config (guildId) VALUES (?)
+      ON CONFLICT(guildId) DO NOTHING
+    `),
+    setConfessionField : db.prepare(`UPDATE confession_config SET enabled=?, channelId=?, reviewChannelId=?, reviewEnabled=?, revealAllowed=?, reactionsEnabled=?, replyEnabled=?, cooldownSeconds=?, blacklist=?, buttonMsgId=?, allowAnonymousReply=? WHERE guildId=?`),
+    insertConfession : db.prepare(`
+      INSERT INTO confessions (guildId, authorId, content, status, number)
+      VALUES (?, ?, ?, 'pending', (SELECT COALESCE(MAX(number),0)+1 FROM confessions WHERE guildId=?))
+    `),
+    getConfession : db.prepare(`SELECT * FROM confessions WHERE id = ?`),
+    getConfessionByMsgId : db.prepare(`SELECT * FROM confessions WHERE messageId = ? OR reviewMsgId = ?`),
+    updateConfessionStatus : db.prepare(`UPDATE confessions SET status=?, messageId=?, reviewMsgId=? WHERE id=?`),
+    getLastConfessionTime : db.prepare(`SELECT MAX(createdAt) as last FROM confessions WHERE guildId=? AND authorId=?`),
+    getLastApprovedConfession : db.prepare(`SELECT * FROM confessions WHERE guildId=? AND status='approved' ORDER BY id DESC LIMIT 1 OFFSET 1`),
+    countConfessions : db.prepare(`SELECT COUNT(*) as c FROM confessions WHERE guildId=? AND status='approved'`),
 
     upsertMsgcount : db.prepare(`
       INSERT INTO msgcount (userId, guildId, day, count)
@@ -6611,6 +6666,84 @@ const db = {
     if (!ownerId || !guildId) return;
     getDb();
     _stmts.clearKeywords.run(ownerId, guildId);
+  },
+
+  getConfessionConfig(guildId) {
+    if (!guildId) return null;
+    getDb();
+    _stmts.upsertConfessionConfig.run(guildId);
+    return _stmts.getConfessionConfig.get(guildId);
+  },
+
+  saveConfessionConfig(guildId, fields) {
+    if (!guildId) return;
+    getDb();
+    _stmts.upsertConfessionConfig.run(guildId);
+    const cfg = _stmts.getConfessionConfig.get(guildId);
+    const merged = { ...cfg, ...fields };
+    _stmts.setConfessionField.run(
+      merged.enabled ? 1 : 0,
+      merged.channelId ?? null,
+      merged.reviewChannelId ?? null,
+      merged.reviewEnabled ? 1 : 0,
+      merged.revealAllowed ? 1 : 0,
+      merged.reactionsEnabled ? 1 : 0,
+      merged.replyEnabled ? 1 : 0,
+      merged.cooldownSeconds ?? 300,
+      merged.blacklist ?? '',
+      merged.buttonMsgId ?? null,
+      merged.allowAnonymousReply ? 1 : 0,
+      guildId,
+    );
+  },
+
+  createConfession(guildId, authorId, content) {
+    if (!guildId || !authorId || !content) return null;
+    getDb();
+    const info = _stmts.insertConfession.run(guildId, authorId, content, guildId);
+    return info.lastInsertRowid;
+  },
+
+  getConfession(id) {
+    if (!id) return null;
+    getDb();
+    return _stmts.getConfession.get(id);
+  },
+
+  getConfessionByMsgId(messageId) {
+    if (!messageId) return null;
+    getDb();
+    return _stmts.getConfessionByMsgId.get(messageId, messageId);
+  },
+
+  updateConfessionStatus(id, status, messageId = null, reviewMsgId = null) {
+    if (!id) return;
+    getDb();
+    const cur = _stmts.getConfession.get(id);
+    _stmts.updateConfessionStatus.run(
+      status,
+      messageId ?? cur?.messageId ?? null,
+      reviewMsgId ?? cur?.reviewMsgId ?? null,
+      id,
+    );
+  },
+
+  getLastApprovedConfession(guildId) {
+    if (!guildId) return null;
+    getDb();
+    return _stmts.getLastApprovedConfession.get(guildId);
+  },
+
+  getLastConfessionTime(guildId, authorId) {
+    if (!guildId || !authorId) return 0;
+    getDb();
+    return _stmts.getLastConfessionTime.get(guildId, authorId)?.last ?? 0;
+  },
+
+  countApprovedConfessions(guildId) {
+    if (!guildId) return 0;
+    getDb();
+    return _stmts.countConfessions.get(guildId)?.c ?? 0;
   },
 
   incrementMsgcount(userId, guildId) {
