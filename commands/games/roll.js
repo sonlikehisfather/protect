@@ -1,8 +1,18 @@
 'use strict';
 
-
+const {
+  ContainerBuilder,
+  MessageFlags,
+  SeparatorBuilder,
+  TextDisplayBuilder,
+} = require('discord.js');
 const embed = require('../../utils/embed');
-const db = require('../../core/database');
+const db    = require('../../core/database');
+
+const COMPONENTS_V2_FLAG = MessageFlags?.IsComponentsV2 ?? (1 << 15);
+const V2_AVAILABLE       = typeof ContainerBuilder    === 'function' &&
+                           typeof TextDisplayBuilder === 'function' &&
+                           typeof SeparatorBuilder   === 'function';
 
 exports.help = {
   name        : 'roll',
@@ -56,19 +66,36 @@ exports.run = async (client, message, args) => {
 
   fields.push({ name: 'Résultat', value: rollDisplay, inline: false });
 
-  const sent = await message.reply({
-    embeds: [
-      embed.build(guildId, null, {
-        title  : '🎲 Lancer de dés',
-        fields : fields,
-        color  : '#5865F2',
-        timestamp: false,
-      }),
-    ],
-    allowedMentions: { parse: [] },
-  }).catch(() => null);
+  let sent;
+  if (V2_AVAILABLE) {
+    const lines = [
+      `## 🎲 Lancer de dés`,
+      ``,
+      `**Lancer** : ${count} dé${count > 1 ? 's' : ''} à ${faces} faces`,
+    ];
+    if (count > 1) lines.push(`**Total** : \`${total}\``);
+    lines.push(``, `**Résultat**`, rollDisplay);
+    const container = new ContainerBuilder()
+      .addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join('\n')));
+    sent = await message.reply({
+      components      : [container],
+      flags           : COMPONENTS_V2_FLAG,
+      allowedMentions : { parse: [] },
+    }).catch(() => null);
+  } else {
+    sent = await message.reply({
+      embeds: [
+        embed.build(guildId, null, {
+          title  : '🎲 Lancer de dés',
+          fields : fields,
+          color  : '#5865F2',
+          timestamp: false,
+        }),
+      ],
+      allowedMentions: { parse: [] },
+    }).catch(() => null);
+  }
 
-  // Ajouter XP pour le lancer
   db.addXp(guildId, message.author.id, 5);
 
   if (sent && deleteReply) {

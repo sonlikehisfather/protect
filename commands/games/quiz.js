@@ -1,9 +1,21 @@
 'use strict';
 
-
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ContainerBuilder,
+  MessageFlags,
+  SeparatorBuilder,
+  TextDisplayBuilder,
+} = require('discord.js');
 const embed = require('../../utils/embed');
-const db = require('../../core/database');
+const db    = require('../../core/database');
+
+const COMPONENTS_V2_FLAG = MessageFlags?.IsComponentsV2 ?? (1 << 15);
+const V2_AVAILABLE       = typeof ContainerBuilder    === 'function' &&
+                           typeof TextDisplayBuilder === 'function' &&
+                           typeof SeparatorBuilder   === 'function';
 
 const QUESTIONS = [
   // ==== SCIENCES ====
@@ -252,52 +264,55 @@ exports.help = {
 };
 
 exports.run = async (client, message, args) => {
-  const guildId = message.guild.id;
-
-  const guildConfig = require('../../core/database').getGuildConfig(guildId);
+  const guildId     = message.guild.id;
+  const guildConfig = db.getGuildConfig(guildId);
   const deleteCmd   = Boolean(guildConfig?.autoDeleteInfoCmds);
   const deleteReply = Boolean(guildConfig?.autoDeleteInfoReplies);
   const deleteDelay = Number(guildConfig?.autoDeleteDelay ?? 5);
 
-  if (deleteCmd) {
-    await message.delete().catch(() => {});
-  }
+  if (deleteCmd) await message.delete().catch(() => {});
 
   const questions = QUESTIONS.sort(() => Math.random() - 0.5).slice(0, 5);
   let current = 0;
-  let score = 0;
+  let score   = 0;
 
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('quiz:true')
-      .setLabel('✅ VRAI')
-      .setStyle(ButtonStyle.Success),
-    new ButtonBuilder()
-      .setCustomId('quiz:false')
-      .setLabel('❌ FAUX')
-      .setStyle(ButtonStyle.Danger)
+  const _btnRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('quiz:true').setLabel('✅ VRAI').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('quiz:false').setLabel('❌ FAUX').setStyle(ButtonStyle.Danger),
   );
 
-  async function showQuestion() {
-    const q = questions[current];
-    return embed.build(guildId, null, {
-      title  : `❓ Question ${current + 1}/5`,
-      fields : [
-        { name: '📜 Question', value: `**${q.q}**`, inline: false },
-        { name: '💡 Indice', value: '*Cette affirmation est VRAIE ou FAUSSE ?*', inline: false },
-        { name: '🎯 Score actuel', value: `${score}/${current} bonne${score > 1 ? 's' : ''} réponse${score > 1 ? 's' : ''}`, inline: true },
-        { name: '⏳ Temps restant', value: '60s par question', inline: true },
-      ],
-      color  : '#9B59B6',
-      timestamp: false,
-    });
-  }
+  const _buildV2Question = () => {
+    const q    = questions[current];
+    const body = [
+      `## ❓ Question ${current + 1}/5`,
+      ``,
+      `**${q.q}**`,
+      ``,
+      `*Cette affirmation est VRAIE ou FAUSSE ?*`,
+      ``,
+      `🎯 Score : **${score}/${current}**`,
+    ].join('\n');
+    const container = new ContainerBuilder()
+      .addTextDisplayComponents(new TextDisplayBuilder().setContent(body))
+      .addSeparatorComponents(new SeparatorBuilder().setSpacing(1))
+      .addActionRowComponents(_btnRow);
+    return { components: [container], flags: COMPONENTS_V2_FLAG, allowedMentions: { parse: [] } };
+  };
 
-  const sent = await message.reply({
-    embeds: [await showQuestion()],
-    components: [row],
-    allowedMentions: { parse: [] },
-  }).catch(() => null);
+  const sent = V2_AVAILABLE
+    ? await message.reply(_buildV2Question()).catch(() => null)
+    : await message.reply({
+        embeds: [embed.build(guildId, null, {
+          title : `❓ Question 1/5`,
+          fields: [
+            { name: '📜 Question',    value: `**${questions[0].q}**`,                            inline: false },
+            { name: '🎯 Score',       value: `${score}/${current}`,                              inline: true  },
+          ],
+          color: '#9B59B6', timestamp: false,
+        })],
+        components: [_btnRow],
+        allowedMentions: { parse: [] },
+      }).catch(() => null);
 
   if (!sent) return;
 
@@ -307,99 +322,70 @@ exports.run = async (client, message, args) => {
   });
 
   collector.on('collect', async interaction => {
-    const q = questions[current];
-    const correct = q.a;
-    const answered = interaction.customId === 'quiz:true';
-    const isCorrect = answered === correct;
+    await interaction.deferUpdate().catch(() => {});
+
+    const q         = questions[current];
+    const answered  = interaction.customId === 'quiz:true';
+    const isCorrect = answered === q.a;
+    const answer    = q.a ? 'VRAI' : 'FAUX';
 
     if (isCorrect) score++;
-
-    const resultEmoji = isCorrect ? '✅' : '❌';
-    const resultText = isCorrect ? 'BONNE RÉPONSE !' : 'MAUVAISE RÉPONSE !';
-    const correctAnswer = correct ? 'VRAI' : 'FAUX';
-
-    await interaction.reply({
-      embeds: [
-        embed.build(guildId, null, {
-          title: `${resultEmoji} ${resultText}`,
-          description: isCorrect
-            ? `✅ **${q.q}** est bien **${correctAnswer}** !`
-            : `❌ **${q.q}** est **${correctAnswer}**, pas ${answered ? 'VRAI' : 'FAUX'} !`,
-          color: isCorrect ? '#57F287' : '#ED4245',
-          timestamp: false,
-        }),
-      ],
-      flags: 64,
-    }).catch(() => {});
-
     current++;
+
+    if (V2_AVAILABLE) {
+      const feedbackBody = isCorrect
+        ? `✅ **Bonne réponse !**\n> **${q.q}** est bien **${answer}** !`
+        : `❌ **Mauvaise réponse !**\n> La réponse était **${answer}**.`;
+      const feedbackContainer = new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(feedbackBody));
+      await sent.edit({ components: [feedbackContainer], flags: COMPONENTS_V2_FLAG }).catch(() => {});
+      await new Promise(r => setTimeout(r, 1200));
+    }
 
     if (current >= questions.length) {
       collector.stop('done');
       return;
     }
 
-    await sent.edit({
-      embeds: [await showQuestion()],
-    }).catch(() => {});
+    if (V2_AVAILABLE) {
+      await sent.edit(_buildV2Question()).catch(() => {});
+    } else {
+      const q2 = questions[current];
+      await sent.edit({
+        embeds: [embed.build(guildId, null, {
+          title : `❓ Question ${current + 1}/5`,
+          fields: [
+            { name: '📜 Question', value: `**${q2.q}**`,      inline: false },
+            { name: '🎯 Score',    value: `${score}/${current}`, inline: true  },
+          ],
+          color: '#9B59B6', timestamp: false,
+        })],
+      }).catch(() => {});
+    }
   });
 
   collector.on('end', async (_, reason) => {
-    let finalTitle, finalColor, finalDesc, finalEmoji;
-    let xpGain = 0;
+    let emoji, title, desc, xpGain;
+    if (score === 5)       { emoji = '🥇'; title = 'PARFAIT !';         desc = `**5/5** — Incroyable !`;          xpGain = 100; }
+    else if (score === 4)  { emoji = '🌟'; title = 'EXCELLENT !';       desc = `**4/5** — Presque parfait !`;     xpGain = 80;  }
+    else if (score === 3)  { emoji = '👍'; title = 'PAS MAL !';         desc = `**3/5** — Bonne culture générale.`; xpGain = 60; }
+    else if (score >= 1)   { emoji = '📖'; title = 'PEUT MIEUX FAIRE';  desc = `**${score}/5** — Continue !`;    xpGain = 40;  }
+    else                   { emoji = '🤦'; title = 'CATASTROPHE';       desc = `**0/5** — Ouvre un livre !`;     xpGain = 10;  }
 
-    if (score === 5) {
-      finalTitle = '🏆 PARFAIT !';
-      finalEmoji = '🥇';
-      finalColor = '#FFD700';
-      finalDesc = `**5/5** — Incroyable ! Tu maîtrises la culture générale !\n🧠 T\'es un vrai génie !`;
-      xpGain = 100;
-    } else if (score === 4) {
-      finalTitle = '🥈 EXCELLENT !';
-      finalEmoji = '🌟';
-      finalColor = '#57F287';
-      finalDesc = `**4/5** — Très bon score ! Presque parfait !`;
-      xpGain = 80;
-    } else if (score === 3) {
-      finalTitle = '🥉 PAS MAL !';
-      finalEmoji = '👍';
-      finalColor = '#3498DB';
-      finalDesc = `**3/5** — Solide. Tu as une bonne culture générale.`;
-      xpGain = 60;
-    } else if (score >= 1) {
-      finalTitle = '📚 PEUT MIEUX FAIRE';
-      finalEmoji = '📖';
-      finalColor = '#E67E22';
-      finalDesc = `**${score}/5** — Allez, relis tes classiques !`;
-      xpGain = 40;
+    db.addXp(guildId, message.author.id, xpGain);
+    desc += `\n\n✨ **+${xpGain} XP** gagnés !`;
+
+    if (V2_AVAILABLE) {
+      const container = new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${emoji} ${title}\n\n${desc}`));
+      await sent.edit({ components: [container], flags: COMPONENTS_V2_FLAG }).catch(() => {});
     } else {
-      finalTitle = '💀 CATASTROPHE';
-      finalEmoji = '🤦';
-      finalColor = '#ED4245';
-      finalDesc = `**0/5** — Va falloir ouvrir un livre un jour...`;
-      xpGain = 10;
+      await sent.edit({
+        embeds: [embed.build(guildId, desc, { title: `${emoji} ${title}`, timestamp: false })],
+        components: [],
+      }).catch(() => {});
     }
-
-    // Ajouter les XP au joueur
-    if (xpGain > 0) {
-      db.addXp(guildId, message.author.id, xpGain);
-      finalDesc += `\n\n✨ **+${xpGain} XP** gagnés !`;
-    }
-
-    await sent.edit({
-      embeds: [
-        embed.build(guildId, null, {
-          title  : `${finalEmoji} ${finalTitle}`,
-          description: finalDesc,
-          color  : finalColor,
-          timestamp: false,
-        }),
-      ],
-      components: [],
-    }).catch(() => {});
   });
 
-  if (deleteReply) {
-    embed.scheduleDelete(sent, deleteDelay);
-  }
+  if (deleteReply) embed.scheduleDelete(sent, deleteDelay);
 };

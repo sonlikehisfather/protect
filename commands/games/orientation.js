@@ -1,7 +1,18 @@
 'use strict';
 
+const {
+  ContainerBuilder,
+  MessageFlags,
+  SeparatorBuilder,
+  TextDisplayBuilder,
+} = require('discord.js');
 const embed = require('../../utils/embed');
 const db    = require('../../core/database');
+
+const COMPONENTS_V2_FLAG = MessageFlags?.IsComponentsV2 ?? (1 << 15);
+const V2_AVAILABLE       = typeof ContainerBuilder    === 'function' &&
+                           typeof TextDisplayBuilder === 'function' &&
+                           typeof SeparatorBuilder   === 'function';
 
 const ORIENTATIONS = [
   { key: 'Homosexuel',    emoji: '🏳️‍🌈' },
@@ -67,19 +78,36 @@ exports.run = async (client, message, args) => {
 
   const lines = results.map(r => `${r.emoji} · **${r.pct}%** ${r.key}`).join('\n');
 
-  const sent = await message.reply({
-    embeds: [
-      embed.build(guildId, null, {
-        title     : 'Calculateur d\'orientation sexuelle',
-        fields    : [
-          { name: '\u200b', value: `**<@${target.id}> est :**\n${lines}`, inline: true },
-        ],
-        thumbnail : avatar,
-        timestamp : false,
-      }),
-    ],
-    allowedMentions: { parse: [] },
-  }).catch(() => null);
+  let sent;
+  if (V2_AVAILABLE) {
+    const body = [
+      `## Calculateur d'orientation`,
+      ``,
+      `**<@${target.id}> est :**`,
+      lines,
+    ].join('\n');
+    const container = new ContainerBuilder()
+      .addTextDisplayComponents(new TextDisplayBuilder().setContent(body));
+    sent = await message.reply({
+      components      : [container],
+      flags           : COMPONENTS_V2_FLAG,
+      allowedMentions : { parse: [] },
+    }).catch(() => null);
+  } else {
+    sent = await message.reply({
+      embeds: [
+        embed.build(guildId, null, {
+          title     : "Calculateur d'orientation sexuelle",
+          fields    : [
+            { name: '\u200b', value: `**<@${target.id}> est :**\n${lines}`, inline: true },
+          ],
+          thumbnail : avatar,
+          timestamp : false,
+        }),
+      ],
+      allowedMentions: { parse: [] },
+    }).catch(() => null);
+  }
 
   if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
 };

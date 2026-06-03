@@ -124,7 +124,7 @@ module.exports = {
     description : 'Affiche une blague aléatoire.',
     usage       : 'joke',
     aliases     : ['blague', 'j'],
-    category    : 'general',
+    category    : 'games',
   },
 
   async run(client, message, args) {

@@ -1,8 +1,18 @@
 'use strict';
 
-
+const {
+  ContainerBuilder,
+  MessageFlags,
+  SeparatorBuilder,
+  TextDisplayBuilder,
+} = require('discord.js');
 const embed = require('../../utils/embed');
 const db = require('../../core/database');
+
+const COMPONENTS_V2_FLAG = MessageFlags?.IsComponentsV2 ?? (1 << 15);
+const V2_AVAILABLE       = typeof ContainerBuilder    === 'function' &&
+                           typeof TextDisplayBuilder === 'function' &&
+                           typeof SeparatorBuilder   === 'function';
 
 const RESPONSES = [
   { text: 'C\'est certain.',           color: '#57F287', emoji: '✅' },
@@ -60,20 +70,40 @@ exports.run = async (client, message, args) => {
 
   const response = RESPONSES[Math.floor(Math.random() * RESPONSES.length)];
 
-  const sent = await message.reply({
-    embeds: [
-      embed.build(guildId, null, {
-        title  : '🎱 8-Ball',
-        fields : [
-          { name: 'Question', value: question.slice(0, 1000), inline: false },
-          { name: 'Réponse',  value: `${response.emoji} ${response.text}`, inline: false },
-        ],
-        color  : response.color,
-        timestamp: false,
-      }),
-    ],
-    allowedMentions: { parse: [] },
-  }).catch(() => null);
+  let sent;
+  if (V2_AVAILABLE) {
+    const body = [
+      `## 🎱 8-Ball`,
+      ``,
+      `**Question**`,
+      question.slice(0, 900),
+      ``,
+      `**Réponse**`,
+      `${response.emoji} ${response.text}`,
+    ].join('\n');
+    const container = new ContainerBuilder()
+      .addTextDisplayComponents(new TextDisplayBuilder().setContent(body));
+    sent = await message.reply({
+      components      : [container],
+      flags           : COMPONENTS_V2_FLAG,
+      allowedMentions : { parse: [] },
+    }).catch(() => null);
+  } else {
+    sent = await message.reply({
+      embeds: [
+        embed.build(guildId, null, {
+          title  : '🎱 8-Ball',
+          fields : [
+            { name: 'Question', value: question.slice(0, 1000), inline: false },
+            { name: 'Réponse',  value: `${response.emoji} ${response.text}`, inline: false },
+          ],
+          color  : response.color,
+          timestamp: false,
+        }),
+      ],
+      allowedMentions: { parse: [] },
+    }).catch(() => null);
+  }
 
   // Ajouter XP pour la participation
   db.addXp(guildId, message.author.id, 5);
