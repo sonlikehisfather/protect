@@ -241,7 +241,7 @@ async function _handleButton(client, interaction) {
   }
 
 
-  if (id.startsWith('al:') || id.startsWith('inv:') || id.startsWith('cap:') || id.startsWith('local:capture:') || id.startsWith('eload:')) {
+  if (id.startsWith('al:') || id.startsWith('inv:') || id.startsWith('cap:') || id.startsWith('local:capture:') || id.startsWith('eload:') || id.startsWith('local:translate:') || id.startsWith('local:joke:')) {
     return;
   }
 
@@ -500,7 +500,7 @@ async function _handleSelectMenu(client, interaction) {
   }
 
 
-  if (id.startsWith('al:') || id.startsWith('cap:') || id.startsWith('local:capture:') || id.startsWith('eload:')) {
+  if (id.startsWith('al:') || id.startsWith('cap:') || id.startsWith('local:capture:') || id.startsWith('eload:') || id.startsWith('local:translate:') || id.startsWith('local:joke:')) {
     return;
   }
 
