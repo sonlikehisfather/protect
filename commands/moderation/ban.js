@@ -51,13 +51,22 @@ module.exports = {
       return;
     }
 
-    const target = await resolveMember(message, [args[0]]);
+    const target =
+      await resolveMember(message, [args[0]]);
 
-    if (!target) {
+    const targetId =
+      target?.id ??
+      args[0]?.replace(/[<@!>]/g, '');
+
+    const targetUser =
+      target?.user ??
+      await client.users.fetch(targetId).catch(() => null);
+
+    if (!targetUser || !targetId) {
 
       const sent = await embed.replyError(
         message,
-        'Membre introuvable.',
+        'Utilisateur introuvable.',
         { timestamp: false }
       ).catch(() => null);
 
@@ -67,7 +76,7 @@ module.exports = {
       return;
     }
 
-    if (target.id === message.author.id) {
+    if (targetId === message.author.id) {
 
       const sent = await embed.replyError(
         message,
@@ -81,7 +90,7 @@ module.exports = {
       return;
     }
 
-    if (target.id === client.user.id) {
+    if (targetId === client.user.id) {
 
       const sent = await embed.replyError(
         message,
@@ -95,7 +104,7 @@ module.exports = {
       return;
     }
 
-    if (perms.isProtected(target.id, guildId, target)) {
+    if (perms.isProtected(targetId, guildId, target)) {
 
       const sent = await embed.replyError(
         message,
@@ -112,7 +121,7 @@ module.exports = {
     const isBuyer       = perms.isBuyer(message.author.id);
     const isOwner = perms.isOwner(guildId, message.author.id);
 
-    if (!isBuyer && !isOwner && target.roles.highest.position >= message.member.roles.highest.position) {
+    if (target && !isBuyer && !isOwner && target.roles.highest.position >= message.member.roles.highest.position) {
       const sent = await embed.replyError(
         message,
         'Vous ne pouvez pas bannir ce membre.',
@@ -141,8 +150,10 @@ module.exports = {
       return;
     }
 
-    if (!target.bannable ||
-        target.roles.highest.position >= me.roles.highest.position) {
+    if (target && (
+        !target.bannable ||
+        target.roles.highest.position >= me.roles.highest.position
+    )) {
 
       const sent = await embed.replyError(
         message,
@@ -163,15 +174,17 @@ module.exports = {
     if (deleteCmd)
       await message.delete().catch(() => {});
 
-    await modDm.send(client, guild, target, {
+    if (target) {
+      await modDm.send(client, guild, target, {
       type: 'ban',
       reason,
       modDmEnabled,
       moderator: message.member ?? message.author,
-    });
+      });
+    }
 
     const banned =
-      await target.ban({ reason, deleteMessageSeconds: 86400 })
+      await guild.members.ban(targetId, { reason, deleteMessageSeconds: 86400 })
       .catch(() => null);
 
     if (!banned) {
@@ -190,7 +203,7 @@ module.exports = {
 
     db.addSanction(
       guildId,
-      target.id,
+      targetId,
       message.author.id,
       'ban',
       reason,
@@ -201,7 +214,7 @@ module.exports = {
       embeds: [
         embed.build(
           guildId,
-          `**${target.user.tag}** a été banni.`,
+          `**${targetUser.tag}** a été banni.`,
           {
             fields: [
               {
@@ -222,8 +235,8 @@ module.exports = {
 
     const e = embed.sanction(guildId, {
       type        : 'ban',
-      targetTag   : target.user.tag,
-      targetId    : target.id,
+      targetTag   : targetUser.tag,
+      targetId,
       moderatorTag: message.author.tag,
       reason,
     });
