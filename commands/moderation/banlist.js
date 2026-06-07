@@ -1,5 +1,9 @@
 'use strict';
 
+/**
+ * commands/moderation/banlist.js
+ * Affiche la liste des membres actuellement bannis.
+ */
 
 const {
   ActionRowBuilder,
@@ -9,8 +13,9 @@ const {
 
 const db    = require('../../core/database');
 const embed = require('../../utils/embed');
+const perms = require('../../utils/permissions');
 
-const PAGE_SIZE  = 10;
+const PAGE_SIZE  = 5;
 const IDLE_MS    = 300_000;
 const TIMEOUT_MS = 900_000;
 
@@ -20,9 +25,16 @@ module.exports = {
     description : 'Affiche la liste des membres actuellement bannis.',
     usage       : 'banlist',
     aliases     : ['blist', 'listban'],
+    permission  : {
+      level  : 'owner',
+      label  : 'Moderation',
+      discord: ['BanMembers'],
+    },
   },
 
   async run(client, message) {
+    if (!perms.check(message, module.exports.help.name)) return;
+
     const guild   = message.guild;
     const guildId = guild.id;
     const config  = db.getGuildConfig(guildId);
@@ -30,6 +42,21 @@ module.exports = {
     const deleteCmd   = Boolean(config?.autoDeleteModCmds);
     const deleteReply = Boolean(config?.autoDeleteModReplies);
     const deleteDelay = config?.autoDeleteDelay ?? 5;
+
+    const me = guild.members.me ?? await guild.members.fetchMe().catch(() => null);
+    const botPerms = me ? guild.members.me?.permissions ?? me.permissions : null;
+    if (!botPerms?.has('BanMembers')) {
+      const sent = await embed.replyError(
+        message,
+        "Je n'ai pas la permission `Bannir des membres`.",
+        { timestamp: false }
+      ).catch(() => null);
+
+      if (sent && deleteReply) {
+        embed.scheduleDelete(sent, deleteDelay);
+      }
+      return;
+    }
 
     if (deleteCmd) {
       await message.delete().catch(() => {});
@@ -44,7 +71,7 @@ module.exports = {
             timestamp: false,
           }),
         ],
-        allowedMentions: { repliedUser: false },
+        allowedMentions: { parse: [], repliedUser: false },
       }).catch(() => null);
 
       if (sent && deleteReply) {
@@ -56,13 +83,25 @@ module.exports = {
 
     const entries = [];
 
+    const sanitizeInline = (str) => (str || '').replace(/`/g, 'ˋ').trim();
+    const normalizeReason = (str) => {
+      const base = (str || '').replace(/\s+/g, ' ').trim();
+      const reason = base || 'Aucune raison';
+      const MAX = 256;
+      return reason.length > MAX ? `${reason.slice(0, MAX - 3)}...` : reason;
+    };
+
+    let idx = 1;
     for (const ban of bans.values()) {
       const user   = ban.user;
       const userId = user?.id ?? null;
-      const tag    = user?.tag ?? 'Utilisateur inconnu';
 
-      let status = 'ban permanent';
+      const displayUser = userId
+        ? `<@${userId}>`
+        : 'Utilisateur inconnu';
+
       let reason = ban.reason?.trim() || null;
+      let duration = 'Permanente';
 
       if (userId) {
         const activeTempBans = db.getActiveSanctionsByType(guildId, userId, 'tempban');
@@ -73,7 +112,7 @@ module.exports = {
             .sort((a, b) => (b.expiresAt || 0) - (a.expiresAt || 0))[0];
 
           if (tempBan?.expiresAt) {
-            status = `tempban jusqu'à <t:${tempBan.expiresAt}:f>`;
+            duration = `Expire le <t:${tempBan.expiresAt}:f>`;
           }
 
           if (!reason && tempBan?.reason?.trim()) {
@@ -82,49 +121,35 @@ module.exports = {
         }
       }
 
-      if (!reason) {
-        reason = 'Aucune raison';
-      }
+      const safeReason = normalizeReason(reason);
+      const safeId = userId ? `\`${userId}\`` : '`Inconnu`';
 
       entries.push(
-        userId
-          ? `• <@${userId}> **${tag}** (\`${userId}\`) - ${status} • ${reason}`
-          : `• **${tag}** (\`Inconnu\`) - ${status} • ${reason}`
+        `**${idx}.** ${displayUser}\n` +
+        `> **ID :** ${safeId}\n` +
+        `> **Durée :** ${duration}\n` +
+        `> **Raison :** ${safeReason}`
+      );
+      idx++;
+    }
+
+    const totalPages = Math.ceil(entries.length / PAGE_SIZE);
+    const pages = [];
+    for (let i = 0; i < entries.length; i += PAGE_SIZE) {
+      const chunk = entries.slice(i, i + PAGE_SIZE);
+      const pageNumber = Math.floor(i / PAGE_SIZE) + 1;
+      const description = chunk.join('\n\n');
+
+      pages.push(
+        embed.build(guildId, description, {
+          title     : 'Liste des membres bannis',
+          footer    : `Page ${pageNumber}/${totalPages} - ${entries.length} bannis`,
+          timestamp : false,
+        })
       );
     }
 
-    const chunks = [];
-    let current  = [];
-    let len      = 0;
-
-    for (const entry of entries) {
-      const lineLen = entry.length + 1;
-      if (current.length > 0 && len + lineLen > 1024) {
-        chunks.push(current);
-        current = [];
-        len     = 0;
-      }
-      current.push(entry);
-      len += lineLen;
-    }
-    if (current.length) chunks.push(current);
-
-    const pages = chunks.map((chunk, idx) =>
-      embed.build(guildId, null, {
-        title  : 'Liste des membres bannis',
-        fields : [
-          {
-            name   : 'Membres',
-            value  : chunk.join('\n'),
-            inline : false,
-          },
-        ],
-        footer    : `Page ${idx + 1}/${chunks.length} • Total : ${entries.length}`,
-        timestamp : false,
-      })
-    );
-
-    let pageIndex = 0;
+    let current = 0;
 
     const buildRows = (disabled = false) => [
       new ActionRowBuilder().addComponents(
@@ -132,13 +157,13 @@ module.exports = {
           .setCustomId('banlist:prev')
           .setLabel('\u25C0')
           .setStyle(ButtonStyle.Secondary)
-          .setDisabled(disabled || pageIndex === 0),
+          .setDisabled(disabled || current === 0),
 
         new ButtonBuilder()
           .setCustomId('banlist:next')
           .setLabel('\u25B6')
           .setStyle(ButtonStyle.Secondary)
-          .setDisabled(disabled || pageIndex === pages.length - 1),
+          .setDisabled(disabled || current === pages.length - 1),
 
         new ButtonBuilder()
           .setCustomId('banlist:close')
@@ -149,9 +174,9 @@ module.exports = {
     ];
 
     const msg = await message.channel.send({
-      embeds     : [pages[pageIndex]],
+      embeds     : [pages[current]],
       components : buildRows(),
-      allowedMentions: { repliedUser: false },
+      allowedMentions: { parse: [], repliedUser: false },
     }).catch(() => null);
 
     if (!msg) return;
@@ -170,15 +195,14 @@ module.exports = {
           await i.deferUpdate().catch(() => {});
           embed.clearPrivateInteraction(msg);
           collector.stop('closed');
-          await message.delete().catch(() => {});
           return msg.delete().catch(() => {});
         }
 
-        if (i.customId === 'banlist:prev' && pageIndex > 0) pageIndex--;
-        if (i.customId === 'banlist:next' && pageIndex < pages.length - 1) pageIndex++;
+        if (i.customId === 'banlist:prev' && current > 0) current--;
+        if (i.customId === 'banlist:next' && current < pages.length - 1) current++;
 
         await i.update({
-          embeds     : [pages[pageIndex]],
+          embeds     : [pages[current]],
           components : buildRows(),
         });
       } catch (err) {
@@ -196,7 +220,12 @@ module.exports = {
   },
 };
 
-
+// Discord API : GET /guilds/:id/bans est paginé à 1000 max. Sans pagination,
+// un serveur avec >1000 bans renvoie une liste tronquée. On itère via le
+// curseur `after` (le plus grand userId du batch précédent). Snowflakes
+// comparés en BigInt car les longueurs peuvent varier (17-20 chiffres).
+// Garde anti-boucle : MAX_PAGES * 1000 = 50_000 bans (largement au-dessus
+// de tout serveur réaliste).
 async function _fetchAllBans(guild) {
   const MAX_PAGES = 50;
   const PAGE_LIMIT = 1000;
@@ -214,12 +243,12 @@ async function _fetchAllBans(guild) {
 
     if (batch.size < PAGE_LIMIT) break;
 
-
+    // Plus grand snowflake du batch comme curseur pour le suivant.
     let maxId = after;
     for (const id of batch.keys()) {
       if (!maxId || BigInt(id) > BigInt(maxId)) maxId = id;
     }
-    if (!maxId || maxId === after) break;
+    if (!maxId || maxId === after) break; // garde de sécurité
     after = maxId;
   }
 
