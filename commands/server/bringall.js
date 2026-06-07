@@ -119,7 +119,7 @@ module.exports = {
     let protectedCnt = 0;
 
     const isBuyer = perms.isBuyer(message.author.id);
-    const isGlobalOwner = perms.isGlobalOwner(message.author.id);
+    const isOwner = perms.isOwner(guildId, message.author.id);
 
     for (const member of members) {
       if (perms.isProtected(member.id, guildId, member)) {
@@ -129,7 +129,7 @@ module.exports = {
 
       if (
         !isBuyer &&
-        !isGlobalOwner &&
+        !isOwner &&
         message.member.id !== guild.ownerId &&
         member.roles.highest.position >= message.member.roles.highest.position
       ) {

@@ -513,10 +513,7 @@ async function handleAutoClaimMessage(client, message) {
   const staffRoles = _parseJsonArray(option.staffRoles);
 
   const isBuyerAutoclaim = permissions.isBuyer(message.author.id);
-  const isGlobalOwner    =
-    typeof db.isGlobalOwner === 'function'
-      ? db.isGlobalOwner(message.author.id)
-      : false;
+  const isGlobalOwner    = db.isOwner(guildId, message.author.id);
 
   const hasStaffRole =
     message.member?.roles?.cache?.some(role => staffRoles.includes(role.id)) || false;
@@ -911,13 +908,14 @@ function isTicketStaff(ctx, ticket) {
 }
 
 function _isStaffCtx(ctx, ticket, userId) {
-  const member = ctx.member;
+  const member  = ctx.member;
+  const guildId = ctx.guild?.id ?? ctx.guildId;
 
   if (permissions.isBuyer(userId)) return true;
 
   if (member?.permissions?.has(PermissionsBitField.Flags.Administrator)) return true;
 
-  const isOwner = typeof db.isGlobalOwner === 'function' && db.isGlobalOwner(userId);
+  const isOwner = guildId ? db.isOwner(guildId, userId) : false;
   if (isOwner) return true;
 
   if (!ticket?.optionId) return false;

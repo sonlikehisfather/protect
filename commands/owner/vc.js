@@ -88,7 +88,7 @@ module.exports = {
     const sub = args[0]?.toLowerCase();
 
     if (sub === 'config') {
-      if (!perms.isBuyer(message.author.id) && !perms.isGlobalOwner(message.author.id)) {
+      if (!perms.isBuyer(message.author.id) && !perms.isOwner(guildId, message.author.id)) {
         return _sendError(
           message,
           "Vous n'avez pas la permission de configurer cet embed.",

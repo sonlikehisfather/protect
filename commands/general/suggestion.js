@@ -213,7 +213,7 @@ async function handleButton(client, interaction) {
 
   const isStaff =
     perms.isBuyer(interaction.user.id) ||
-    perms.isGlobalOwner(interaction.user.id) ||
+    perms.isOwner(guildId,interaction.user.id) ||
     perms.check({
       member  : interaction.member,
       guild   : interaction.guild,

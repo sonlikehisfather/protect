@@ -155,7 +155,7 @@ async function _createIfJoinChannel(client, newState) {
       return;
     }
 
-    if (!perms.isBuyer(member.id) && !perms.isGlobalOwner(member.id)) {
+    if (!perms.isBuyer(member.id) && !perms.isOwner(guildId,member.id)) {
       const requiredRoles = _parseJsonArray(config.requiredRoles);
       const blockedRoles  = _parseJsonArray(config.blockedRoles);
 

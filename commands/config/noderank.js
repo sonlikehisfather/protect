@@ -18,7 +18,7 @@ module.exports = {
     const guildId  = message.guild.id;
     const authorId = message.author.id;
 
-    if (!perms.isBuyer(authorId) && !perms.isGlobalOwner(authorId)) {
+    if (!perms.isBuyer(authorId) && !perms.isOwner(guildId,authorId)) {
       return embed.replyError(message, "Vous n'avez pas la permission d'utiliser cette commande.");
     }
 

@@ -52,7 +52,7 @@ module.exports = {
   async run(client, message, args) {
     const guildId = message.guild.id;
 
-    if (!perms.isBuyer(message.author.id) && !perms.isGlobalOwner(message.author.id)) {
+    if (!perms.isBuyer(message.author.id) && !perms.isOwner(guildId, message.author.id)) {
       return embed.replyError(
         message,
         "Vous n'avez pas la permission d'utiliser cette commande.",

@@ -14,10 +14,11 @@ exports.help = {
 
 exports.run = async (client, message, args) => {
   const authorId = message.author.id;
+  const guildId  = message.guild.id;
 
   if (
     !perms.isBuyer(authorId) &&
-    !perms.isGlobalOwner(authorId)
+    !perms.isOwner(guildId, authorId)
   ) {
     return embed.replyError(message, 'Permission refusée.');
   }

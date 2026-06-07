@@ -210,6 +210,11 @@ async function _handleButton(client, interaction) {
   const id = interaction.customId;
 
 
+  if (id.startsWith('rr:')) {
+    return;
+  }
+
+
   if (id.startsWith('embed:')) {
     return embed.replyExpiredPanel(interaction);
   }
@@ -515,6 +520,11 @@ async function _handleSelectMenu(client, interaction) {
   const id = interaction.customId;
 
 
+  if (id.startsWith('rr:')) {
+    return;
+  }
+
+
   if (id.startsWith('embed:')) {
     return embed.replyExpiredPanel(interaction);
   }
@@ -687,7 +697,7 @@ async function _handleRolemenuButton(interaction) {
     return _replyRolemenuError(interaction, guildId, 'Membre introuvable.');
   }
 
-  if (!perms.isBuyer(interaction.user.id) && !perms.isGlobalOwner(interaction.user.id)) {
+  if (!perms.isBuyer(interaction.user.id) && !perms.isOwner(guildId,interaction.user.id)) {
     const restrictionError = _checkRolemenuRestrictions(member, menu, interaction.guild);
     if (restrictionError) {
       return _replyRolemenuError(interaction, guildId, restrictionError);
@@ -766,7 +776,7 @@ async function _handleRolemenuSelect(interaction) {
     return;
   }
 
-  if (!perms.isBuyer(interaction.user.id) && !perms.isGlobalOwner(interaction.user.id)) {
+  if (!perms.isBuyer(interaction.user.id) && !perms.isOwner(guildId,interaction.user.id)) {
     const restrictionError = _checkRolemenuRestrictions(member, menu, interaction.guild);
     if (restrictionError) {
       await interaction.followUp({

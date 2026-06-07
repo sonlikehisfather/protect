@@ -23,7 +23,7 @@ exports.run = async (client, message, args) => {
 
   if (
     !perms.isBuyer(authorId) &&
-    !perms.isGlobalOwner(authorId)
+    !perms.isOwner(guildId,authorId)
   ) {
     const sent = await embed.replyError(
       message,

@@ -68,7 +68,7 @@ module.exports = {
     }
 
     const isBuyer       = perms.isBuyer(message.author.id);
-    const isGlobalOwner = db.isGlobalOwner(message.author.id);
+    const isGlobalOwner = db.isOwner(guildId,message.author.id);
 
     if (!isBuyer && !isGlobalOwner && target.roles.highest.position >= message.member.roles.highest.position) {
       const sent = await embed.replyError(message, 'Vous ne pouvez pas unmute ce membre.', { timestamp: false }).catch(() => null);

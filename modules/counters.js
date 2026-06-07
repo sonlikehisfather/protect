@@ -41,11 +41,12 @@ function init(client) {
     clearInterval(_updateInterval);
   }
 
+  console.log('[Counters] Module initialisé, mise à jour toutes les 30 secondes');
+
   _updateInterval = setInterval(() => {
     _updateAllCounters(client).catch(() => {});
   }, UPDATE_INTERVAL_MS);
 
-  console.log('[Counters] Module initialisé, mise à jour toutes les 30 secondes');
 }
 
 function stop() {
@@ -114,7 +115,7 @@ async function _updateGuildCounters(guild) {
       _lastUpdates.set(lastUpdateKey, now);
       _lastValues.set(lastUpdateKey, stats[type]);
       console.log(`[Counters] ${type}: renamed to "${newName}"`);
-    } catch (err) {
+      } catch (err) {
       if (err.code === 50035) {
         console.warn(`[Counters] Rate limit atteint pour ${channelId}`);
       }

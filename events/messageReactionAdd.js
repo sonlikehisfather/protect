@@ -66,7 +66,7 @@ module.exports = {
         const componentType = menu.componentType || menu.panelType || 'reaction';
         if (componentType !== 'reaction') return;
 
-        if (!perms.isBuyer(user.id) && !perms.isGlobalOwner(user.id)) {
+        if (!perms.isBuyer(user.id) && !perms.isOwner(guildId,user.id)) {
           if (!_passesRolemenuRestrictions(member, menu, guild)) {
             await _removeUserReactionByEmoji(reaction.message, emojiKey, user.id);
             return;

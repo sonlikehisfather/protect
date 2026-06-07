@@ -6,7 +6,7 @@ const perms = require('../../utils/permissions');
 
 exports.help = {
   name       : 'owner',
-  description: 'Toggle owner global (buyer seulement). Sans argument : liste.',
+  description: 'Toggle owner par serveur (buyer seulement). Sans argument : liste.',
   use        : 'owner [@membre|id]',
   usage      : 'owner [@membre|id]',
   aliases    : ['owners'],
@@ -15,18 +15,19 @@ exports.help = {
 exports.run = async (client, message, args) => {
 
   const authorId    = message.author.id;
+  const guildId     = message.guild.id;
   const commandUsed = message.content.trim().split(/\s+/)[0].replace(/^./, '').toLowerCase();
 
   if (commandUsed === 'owners' || args.length === 0) {
 
     if (
       !perms.isBuyer(authorId) &&
-      !perms.isGlobalOwner(authorId)
+      !perms.isOwner(guildId, authorId)
     ) {
       return embed.replyError(message, 'Permission refusée.');
     }
 
-    return _list(message);
+    return _list(message, guildId);
 
   }
 
@@ -44,23 +45,23 @@ exports.run = async (client, message, args) => {
     return embed.replyError(message, 'Le buyer ne peut pas être ajouté comme owner.');
   }
 
-  if (db.isGlobalOwner(targetId)) {
+  if (db.isOwner(guildId, targetId)) {
 
-    db.removeGlobalOwner(targetId);
+    db.removeOwner(guildId, targetId);
 
-    return embed.reply(message, `<@${targetId}> n'est plus owner global.`);
+    return embed.reply(message, `<@${targetId}> n'est plus owner sur ce serveur.`);
 
   }
 
-  db.addGlobalOwner(targetId);
+  db.addOwner(guildId, targetId);
 
-  return embed.reply(message, `<@${targetId}> est maintenant owner global.`);
+  return embed.reply(message, `<@${targetId}> est maintenant owner sur ce serveur.`);
 
 };
 
-async function _list(message) {
+async function _list(message, guildId) {
 
-  const owners = db.getGlobalOwners();
+  const owners = db.getOwners(guildId);
   const buyers = db.getGlobalBuyers();
 
   const fields = [
@@ -80,7 +81,7 @@ async function _list(message) {
     },
 
     {
-      name  : 'Owners',
+      name  : 'Owners (ce serveur)',
       value : owners.length
         ? owners.map(id => `<@${id}>`).join(', ')
         : 'Aucun',
@@ -90,9 +91,7 @@ async function _list(message) {
   ];
 
   return message.reply({
-
     embeds: [
-
       embed.build(
         message.guild.id,
         null,
@@ -102,11 +101,8 @@ async function _list(message) {
           timestamp: false,
         }
       ),
-
     ],
-
     allowedMentions: { repliedUser: false },
-
   });
 
 }

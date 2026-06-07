@@ -100,9 +100,9 @@ module.exports = {
     }
 
     const isBuyer       = perms.isBuyer(message.author.id);
-    const isGlobalOwner = perms.isGlobalOwner(message.author.id);
+    const isOwner = perms.isOwner(guildId, message.author.id);
 
-    if (!isBuyer && !isGlobalOwner) {
+    if (!isBuyer && !isOwner) {
 
       if (
         member.id !== message.author.id &&

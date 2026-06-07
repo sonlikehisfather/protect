@@ -32,7 +32,7 @@ module.exports = {
 
     const isPrivileged =
       perms.isBuyer(message.author.id) ||
-      db.isGlobalOwner(message.author.id);
+      db.isOwner(guildId,message.author.id);
 
     if (deleteCmd && !isPrivileged) {
       await message.delete().catch(() => {});
@@ -325,7 +325,7 @@ async function _handleClaim(client, message, channel, row, guildId, deleteReply,
 
   const canBypass =
     perms.isBuyer(message.author.id) ||
-    db.isGlobalOwner(message.author.id);
+    db.isOwner(guildId,message.author.id);
 
   if (currentOwnerInChannel && row.ownerId !== message.author.id && !canBypass) {
     return _sendError(
@@ -535,7 +535,7 @@ async function _getTempvocContext(message) {
 async function _canControlTempvoc(message, row) {
   if (row.ownerId === message.author.id) return true;
   if (perms.isBuyer(message.author.id)) return true;
-  if (db.isGlobalOwner(message.author.id)) return true;
+  if (db.isOwner(guildId,message.author.id)) return true;
 
   return false;
 }

@@ -137,6 +137,8 @@ module.exports = {
     let prefix = config.prefix ?? '+';
     if (guildConfig?.prefix) prefix = guildConfig.prefix;
 
+    const prefixes = Array.isArray(prefix) ? prefix : [prefix];
+    const allowedPrefixes = Array.from(new Set(prefixes));
 
     if (Number(guildConfig?.autopublishEnabled) === 1) {
       try {
@@ -167,7 +169,9 @@ module.exports = {
       db.incrementMsgcount(message.author.id, guildId);
     } catch {}
 
-    if (!content.startsWith(prefix)) {
+    // detect which prefix (if any) is used from allowedPrefixes
+    const usedPrefix = allowedPrefixes.find(p => content.startsWith(p));
+    if (!usedPrefix) {
       try {
         if (levels) {
           await levels.process(client, message);
@@ -215,7 +219,7 @@ module.exports = {
     }
 
 
-    const withoutPrefix = content.slice(prefix.length);
+    const withoutPrefix = content.slice(usedPrefix.length);
 
     if (!withoutPrefix.trim() || /^\s/.test(withoutPrefix)) {
       return;
@@ -234,7 +238,6 @@ module.exports = {
 
 
     const command = client.commands.get(commandName);
-
     if (command) {
       const cmdName = command?.help?.name;
       const selfManaged = Boolean(command?.help?.selfManaged);
@@ -337,9 +340,9 @@ module.exports = {
                          typeof SectionBuilder === 'function' &&
                          typeof TextDisplayBuilder === 'function';
 
-      const suggestionText = suggestions.map(s => `\`+${s.name}\``).join(', ');
+      const suggestionText = suggestions.map(s => `\`${usedPrefix}${s.name}\``).join(', ');
 
-      const desc = `La commande \`+${commandName}\` n'existe pas.\n\nVous voulez plutôt essayer :\n${suggestionText}`;
+      const desc = `La commande \`${usedPrefix}${commandName}\` n'existe pas.\n\nVous voulez plutôt essayer :\n${suggestionText}`;
 
       let sent;
 
@@ -407,7 +410,7 @@ module.exports = {
     } else {
       const sent = await embed.replyError(
         message,
-        `La commande \`+${commandName}\` n'existe pas.`,
+        `La commande \`${usedPrefix}${commandName}\` n'existe pas.`,
         { timestamp: false }
       ).catch(() => null);
 

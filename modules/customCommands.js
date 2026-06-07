@@ -126,7 +126,7 @@ function _canUseCustom(guild, member, userId, custom, channelId) {
   if (!custom.enabled) return { ok: false, reason: 'disabled', silent: true };
 
 
-  const _hasBypass = permissions.isBuyer(userId) || permissions.isGlobalOwner(userId);
+  const _hasBypass = permissions.isBuyer(userId) || permissions.isOwner(guildId,userId);
   if (_hasBypass) return { ok: true };
 
   const perm = (custom.customPerm || 'everyone').toLowerCase();
@@ -219,7 +219,7 @@ async function execute(client, message, commandName) {
   }
 
 
-  const _bypassCd = permissions.isBuyer(message.author.id) || permissions.isGlobalOwner(message.author.id)
+  const _bypassCd = permissions.isBuyer(message.author.id) || permissions.isOwner(guildId,message.author.id)
     || (message.member && permissions.hasLevel(message.member, guildId, 9));
   const cdSeconds = Number(custom.cooldown ?? 0);
 
@@ -1053,7 +1053,7 @@ async function executeFromInteraction(client, interaction, targetKeyword, mode) 
     return _ephemeral(interaction, check2.reason || 'Action indisponible.');
   }
 
-  const _bypassCd2 = permissions.isBuyer(interaction.user.id) || permissions.isGlobalOwner(interaction.user.id)
+  const _bypassCd2 = permissions.isBuyer(interaction.user.id) || permissions.isOwner(guildId,interaction.user.id)
     || (interaction.member && permissions.hasLevel(interaction.member, guildId, 9));
   const cdSeconds = Number(custom.cooldown ?? 0);
 
@@ -1236,7 +1236,7 @@ async function executeComponentAction(client, interaction) {
   }
 
 
-  const _bypassCd3 = permissions.isBuyer(interaction.user.id) || permissions.isGlobalOwner(interaction.user.id)
+  const _bypassCd3 = permissions.isBuyer(interaction.user.id) || permissions.isOwner(guildId,interaction.user.id)
     || (interaction.member && permissions.hasLevel(interaction.member, guildId, 9));
   const cdSeconds = Number(custom.cooldown ?? 0);
   if (cdSeconds > 0 && !_bypassCd3) {

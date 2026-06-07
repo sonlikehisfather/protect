@@ -297,7 +297,7 @@ async function handleButton(client, interaction) {
     }).catch(() => {});
   } else {
 
-    if (perms.isBuyer(userId) || perms.isGlobalOwner(userId)) {
+    if (perms.isBuyer(userId) || perms.isOwner(guildId,userId)) {
       db.addGiveawayEntry(giveawayId, userId);
 
       await interaction.reply({
@@ -372,7 +372,7 @@ async function handleReactionAdd(client, reaction, user) {
   }
 
 
-  if (perms.isBuyer(user.id) || perms.isGlobalOwner(user.id)) {
+  if (perms.isBuyer(user.id) || perms.isOwner(guildId,user.id)) {
     db.addGiveawayEntry(gw.id, user.id);
     await _refreshGiveawayMessage(client, gw).catch(() => {});
     return true;
@@ -650,7 +650,7 @@ async function _filterEligibleEntries(guild, userIds, gw, client = null) {
   const eligible = [];
 
   for (const userId of userIds) {
-    if (perms.isBuyer(userId) || perms.isGlobalOwner(userId)) {
+    if (perms.isBuyer(userId) || perms.isOwner(guildId,userId)) {
       eligible.push(userId);
       continue;
     }

@@ -17,6 +17,7 @@ const counters         = require('../modules/counters');
 const inviteTracker    = require('../utils/inviteTracker');
 
 const TICK_MS             = 60 * 1000;
+const RAINBOW_TICK_MS     = 10 * 1000;
 const INACTIVE_TICK_MS    = 5 * 60 * 1000;
 const PRESENCE_ROTATE_MS  = 5 * 60 * 1000;
 const SOUTIEN_RESYNC_MS   = 10 * 60 * 1000;
@@ -138,6 +139,7 @@ module.exports = {
     _safeInterval(() => _processSanctions(client), TICK_MS);
     _safeInterval(() => _processTempRoles(client), TICK_MS);
     _safeInterval(() => _processReminders(client), TICK_MS);
+    _safeInterval(() => _processRainbowRoles(client), RAINBOW_TICK_MS);
     _safeInterval(() => tickets.processInactiveTickets(client), INACTIVE_TICK_MS);
     _safeInterval(() => _processDuePurges(client), GUILD_PURGE_TICK_MS);
     showpics.start(client);
@@ -579,6 +581,160 @@ async function _processReminders(client) {
   } catch (err) {
     errorHandler.handle(err, { source: 'reminderTicker' });
   }
+}
+
+
+async function _processRainbowRoles(client) {
+  try {
+    const now = Date.now();
+    for (const guild of client.guilds.cache.values()) {
+      const rows = db.getActiveRainbowRoles(guild.id);
+      if (!rows.length) continue;
+
+      for (const row of rows) {
+        const nextRun = row.nextRun ? Date.parse(row.nextRun) : 0;
+        if (Number.isNaN(nextRun) || nextRun > now) continue;
+        await _applyRainbowRole(guild, row);
+      }
+    }
+  } catch (err) {
+    errorHandler.handle(err, { source: 'rainbowRoleTicker' });
+  }
+}
+
+
+async function _applyRainbowRole(guild, row) {
+  try {
+    const role = guild.roles.cache.get(row.roleId);
+    if (!role) {
+      db.removeRainbowRole(guild.id, row.roleId);
+      return;
+    }
+
+    if (!role.editable) {
+      db.updateRainbowRole(guild.id, row.roleId, { active: 0 });
+      return;
+    }
+
+    const nextInterval = Number(row.interval) || 60;
+    const nextRun = new Date(Date.now() + nextInterval * 1000).toISOString();
+    const nextColors = _getNextRainbowColors(row.color, row.mode, row.paletteSize);
+    const nextColor = nextColors[0];
+
+    try {
+      const toInt = (c) => typeof c === 'string' ? Number(`0x${c.replace('#', '')}`) : c;
+      const colorsObj = {
+        primaryColor: toInt(nextColors[0]),
+        secondaryColor: nextColors[1] !== undefined ? toInt(nextColors[1]) : undefined,
+      };
+      await role.edit({ colors: colorsObj, reason: 'Rainbow role update' });
+      db.updateRainbowRole(guild.id, row.roleId, {
+        nextRun,
+        color: nextColor,
+      });
+    } catch (err) {
+      if (err?.code === 50013) {
+        db.updateRainbowRole(guild.id, row.roleId, { active: 0 });
+      }
+      errorHandler.handle(err, {
+        source  : 'applyRainbowRole',
+        guildId : guild.id,
+        roleId  : row.roleId,
+      });
+    }
+  } catch (err) {
+    errorHandler.handle(err, {
+      source  : 'applyRainbowRole',
+      guildId : guild.id,
+      roleId  : row.roleId,
+    });
+  }
+}
+
+
+function _getNextRainbowColor(previous = null, mode = 'rainbow', paletteSize = 7) {
+  const normalizedMode = ['rainbow', 'gradient', 'base'].includes(mode) ? mode : 'base';
+
+  const previousHsl = previous ? _hexToHsl(previous) : { h: Math.floor(Math.random() * 360), s: 75, l: 55 };
+  const direction = Math.random() < 0.5 ? -1 : 1;
+  const hueShiftMin = 90;
+  const hueShiftMax = 180;
+  const hueShift = hueShiftMin + Math.random() * (hueShiftMax - hueShiftMin);
+  const hue = (previousHsl.h + hueShift * direction + 360) % 360;
+
+  if (normalizedMode === 'base') {
+    const saturation = 40 + Math.random() * 45;
+    const light = 20 + Math.random() * 55;
+    return _hslToHex(hue, saturation, light);
+  }
+
+  if (normalizedMode === 'gradient') {
+    const saturation = Math.max(55, Math.min(92, previousHsl.s + (Math.random() < 0.5 ? -1 : 1) * 8));
+    const light = Math.max(30, Math.min(80, previousHsl.l + (Math.random() < 0.5 ? -1 : 1) * 8));
+    return _hslToHex(hue, saturation, light);
+  }
+
+  const saturation = 45 + Math.random() * 40;
+  const light = Math.max(20, Math.min(75, previousHsl.l + (Math.random() < 0.5 ? -1 : 1) * 12));
+
+  return _hslToHex(hue, saturation, light);
+}
+
+function _getNextRainbowColors(previous = null, mode = 'rainbow', paletteSize = 7) {
+  const normalizedMode = ['rainbow', 'gradient', 'base'].includes(mode) ? mode : 'base';
+  const primary = _getNextRainbowColor(previous, normalizedMode, paletteSize);
+
+  if (normalizedMode === 'gradient') {
+    const primaryHsl = _hexToHsl(primary);
+    const hueShift = 120 + Math.random() * 60;
+    const secondaryHue = (primaryHsl.h + hueShift + 360) % 360;
+    const saturation = Math.max(55, Math.min(92, primaryHsl.s + (Math.random() < 0.5 ? -1 : 1) * 10));
+    const light = Math.max(35, Math.min(75, primaryHsl.l + (Math.random() < 0.5 ? -1 : 1) * 10));
+    const secondary = _hslToHex(secondaryHue, saturation, light);
+    return [primary, secondary];
+  }
+
+  return [primary];
+}
+
+function _hexToHsl(hex) {
+  const normalized = hex.replace('#', '');
+  const r = parseInt(normalized.slice(0, 2), 16) / 255;
+  const g = parseInt(normalized.slice(2, 4), 16) / 255;
+  const b = parseInt(normalized.slice(4, 6), 16) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  let h = 0;
+  let s = 0;
+  const l = (max + min) / 2;
+
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r:
+        h = (g - b) / d + (g < b ? 6 : 0);
+        break;
+      case g:
+        h = (b - r) / d + 2;
+        break;
+      case b:
+        h = (r - g) / d + 4;
+        break;
+    }
+    h *= 60;
+  }
+
+  return { h, s: s * 100, l: l * 100 };
+}
+
+function _hslToHex(h, s, l) {
+  s /= 100;
+  l /= 100;
+  const k = n => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  return `#${[f(0), f(8), f(4)].map((v) => Math.round(v * 255).toString(16).padStart(2, '0')).join('')}`;
 }
 
 

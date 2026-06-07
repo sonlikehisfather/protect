@@ -27,6 +27,48 @@ function getDb() {
       createdAt INTEGER NOT NULL DEFAULT (unixepoch()),
       PRIMARY KEY (guildId, channelId, roleId)
     );
+
+    CREATE TABLE IF NOT EXISTS streaks (
+      guildId    TEXT    NOT NULL,
+      userId     TEXT    NOT NULL,
+      streak     INTEGER NOT NULL DEFAULT 0,
+      lastDate   TEXT,
+      updatedAt  INTEGER NOT NULL DEFAULT (unixepoch()),
+      PRIMARY KEY (guildId, userId)
+    );
+
+    CREATE TABLE IF NOT EXISTS birthdays (
+      guildId         TEXT    NOT NULL,
+      userId          TEXT    NOT NULL,
+      day             INTEGER NOT NULL,
+      month           INTEGER NOT NULL,
+      timezone        TEXT,
+      lastNotifiedAt  INTEGER,
+      createdAt       INTEGER NOT NULL DEFAULT (unixepoch()),
+      updatedAt       INTEGER NOT NULL DEFAULT (unixepoch()),
+      PRIMARY KEY (guildId, userId)
+    );
+
+    CREATE TABLE IF NOT EXISTS rainbow_roles (
+      guildId      TEXT    NOT NULL,
+      roleId       TEXT    NOT NULL,
+      mode         TEXT    NOT NULL DEFAULT 'rainbow',
+      paletteSize  INTEGER NOT NULL DEFAULT 7,
+      active       INTEGER NOT NULL DEFAULT 1,
+      interval     INTEGER NOT NULL DEFAULT 60,
+      nextRun      TEXT,
+      color        TEXT,
+      createdAt    INTEGER NOT NULL DEFAULT (unixepoch()),
+      updatedAt    INTEGER NOT NULL DEFAULT (unixepoch()),
+      PRIMARY KEY (guildId, roleId)
+    );
+
+    CREATE TABLE IF NOT EXISTS owners (
+      guildId   TEXT NOT NULL,
+      userId    TEXT NOT NULL,
+      createdAt INTEGER NOT NULL DEFAULT (unixepoch()),
+      PRIMARY KEY (guildId, userId)
+    );
   `);
 
   prepareStatements(_db);
@@ -856,7 +898,7 @@ const MIGRATIONS = [
   },
 
   {
-    version: 6,
+    version: 7,
     up(db) {
       db.exec(`
         ALTER TABLE ticket_options ADD COLUMN description  TEXT;
@@ -3230,6 +3272,110 @@ up(db) {
     },
   },
 
+  {
+    version: 99,
+    up(db) {
+      const streakCols = db.prepare("PRAGMA table_info(streaks)").all().map(r => r.name);
+      if (streakCols.length && (!streakCols.includes('streak') || !streakCols.includes('lastDate'))) {
+        db.exec(`
+          CREATE TABLE IF NOT EXISTS streaks_new (
+            guildId   TEXT    NOT NULL,
+            userId    TEXT    NOT NULL,
+            streak    INTEGER NOT NULL DEFAULT 0,
+            lastDate  TEXT,
+            updatedAt INTEGER NOT NULL DEFAULT (unixepoch()),
+            PRIMARY KEY (guildId, userId)
+          );
+          INSERT INTO streaks_new (guildId, userId, streak, lastDate, updatedAt)
+          SELECT guildId, userId,
+            COALESCE(currentStreak, 0),
+            CASE
+              WHEN lastUsedAt IS NOT NULL THEN date(lastUsedAt, 'unixepoch')
+              ELSE NULL
+            END,
+            COALESCE(lastUsedAt, unixepoch())
+          FROM streaks;
+          DROP TABLE streaks;
+          ALTER TABLE streaks_new RENAME TO streaks;
+        `);
+      }
+
+      const birthdayCols = db.prepare("PRAGMA table_info(birthdays)").all().map(r => r.name);
+      if (birthdayCols.length) {
+        if (!birthdayCols.includes('timezone')) {
+          db.exec('ALTER TABLE birthdays ADD COLUMN timezone TEXT');
+        }
+        if (!birthdayCols.includes('updatedAt')) {
+          db.exec('ALTER TABLE birthdays ADD COLUMN updatedAt INTEGER');
+          db.exec('UPDATE birthdays SET updatedAt = COALESCE(createdAt, unixepoch())');
+        }
+      }
+
+      const rainbowCols = db.prepare("PRAGMA table_info(rainbow_roles)").all().map(r => r.name);
+      if (rainbowCols.length) {
+        if (!rainbowCols.includes('paletteSize')) {
+          db.exec('ALTER TABLE rainbow_roles ADD COLUMN paletteSize INTEGER NOT NULL DEFAULT 7');
+          rainbowCols.push('paletteSize');
+        }
+
+        if (!rainbowCols.includes('active') || !rainbowCols.includes('interval') || !rainbowCols.includes('nextRun') || !rainbowCols.includes('color')) {
+          db.exec(`
+            CREATE TABLE IF NOT EXISTS rainbow_roles_new (
+              guildId      TEXT    NOT NULL,
+              roleId       TEXT    NOT NULL,
+              mode         TEXT    NOT NULL DEFAULT 'rainbow',
+              paletteSize  INTEGER NOT NULL DEFAULT 7,
+              active       INTEGER NOT NULL DEFAULT 1,
+              interval     INTEGER NOT NULL DEFAULT 60,
+              nextRun      TEXT,
+              color        TEXT,
+              createdAt    INTEGER NOT NULL DEFAULT (unixepoch()),
+              updatedAt    INTEGER NOT NULL DEFAULT (unixepoch()),
+              PRIMARY KEY (guildId, roleId)
+            );
+            INSERT INTO rainbow_roles_new (guildId, roleId, mode, paletteSize, active, interval, nextRun, color, createdAt, updatedAt)
+            SELECT guildId, roleId,
+              COALESCE(mode, 'rainbow'),
+              7,
+              1,
+              COALESCE(speedSeconds, 60),
+              datetime(lastUpdatedAt, 'unixepoch', '+' || COALESCE(speedSeconds, 60) || ' seconds'),
+              NULL,
+              COALESCE(lastUpdatedAt, unixepoch()),
+              COALESCE(lastUpdatedAt, unixepoch())
+            FROM rainbow_roles;
+            DROP TABLE rainbow_roles;
+            ALTER TABLE rainbow_roles_new RENAME TO rainbow_roles;
+          `);
+        }
+      }
+    },
+  },
+
+  {
+    version: 100,
+    up(db) {
+      const rainbowCols = db.prepare("PRAGMA table_info(rainbow_roles)").all().map(r => r.name);
+      if (rainbowCols.length && !rainbowCols.includes('paletteSize')) {
+        db.exec('ALTER TABLE rainbow_roles ADD COLUMN paletteSize INTEGER NOT NULL DEFAULT 7');
+      }
+    },
+  },
+
+  {
+    version: 101,
+    up(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS owners (
+          guildId   TEXT NOT NULL,
+          userId    TEXT NOT NULL,
+          createdAt INTEGER NOT NULL DEFAULT (unixepoch()),
+          PRIMARY KEY (guildId, userId)
+        );
+      `);
+    },
+  },
+
 ];
 
 
@@ -3414,6 +3560,65 @@ function prepareStatements(db) {
       LIMIT ?
     `),
 
+    insertStreak : db.prepare(`
+      INSERT INTO streaks (guildId, userId, streak, lastDate, updatedAt)
+      VALUES (?, ?, ?, ?, unixepoch())
+      ON CONFLICT(guildId, userId) DO UPDATE SET
+        streak    = excluded.streak,
+        lastDate  = excluded.lastDate,
+        updatedAt = unixepoch()
+    `),
+    getStreak : db.prepare('SELECT * FROM streaks WHERE guildId = ? AND userId = ?'),
+
+    getBirthdayByUser : db.prepare('SELECT * FROM birthdays WHERE guildId = ? AND userId = ?'),
+    getBirthdaysByGuild : db.prepare(`
+      SELECT * FROM birthdays
+      WHERE guildId = ?
+      ORDER BY month, day, userId
+    `),
+    getBirthdaysByDate : db.prepare(`
+      SELECT * FROM birthdays
+      WHERE guildId = ? AND month = ? AND day = ?
+    `),
+    insertBirthday : db.prepare(`
+      INSERT INTO birthdays (guildId, userId, month, day, timezone, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, unixepoch(), unixepoch())
+      ON CONFLICT(guildId, userId) DO UPDATE SET
+        month     = excluded.month,
+        day       = excluded.day,
+        timezone  = excluded.timezone,
+        updatedAt = unixepoch()
+    `),
+    deleteBirthday : db.prepare('DELETE FROM birthdays WHERE guildId = ? AND userId = ?'),
+
+    insertRainbowRole : db.prepare(`
+      INSERT INTO rainbow_roles (guildId, roleId, mode, paletteSize, active, interval, nextRun, color, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, unixepoch(), unixepoch())
+      ON CONFLICT(guildId, roleId) DO UPDATE SET
+        mode        = excluded.mode,
+        paletteSize = excluded.paletteSize,
+        active      = excluded.active,
+        interval    = excluded.interval,
+        nextRun     = excluded.nextRun,
+        color       = excluded.color,
+        updatedAt   = unixepoch()
+    `),
+    getRainbowRole : db.prepare('SELECT * FROM rainbow_roles WHERE guildId = ? AND roleId = ?'),
+    getRainbowRolesByGuild : db.prepare('SELECT * FROM rainbow_roles WHERE guildId = ? ORDER BY roleId ASC'),
+    getActiveRainbowRoles : db.prepare('SELECT * FROM rainbow_roles WHERE guildId = ? AND active = 1 ORDER BY roleId ASC'),
+    updateRainbowRole : db.prepare(`
+      UPDATE rainbow_roles
+      SET mode        = COALESCE(?, mode),
+          paletteSize = COALESCE(?, paletteSize),
+          active      = COALESCE(?, active),
+          interval    = COALESCE(?, interval),
+          nextRun     = COALESCE(?, nextRun),
+          color       = COALESCE(?, color),
+          updatedAt   = unixepoch()
+      WHERE guildId = ? AND roleId = ?
+    `),
+    deleteRainbowRole : db.prepare('DELETE FROM rainbow_roles WHERE guildId = ? AND roleId = ?'),
+
     insertSanction     : db.prepare('INSERT INTO sanctions (guildId, userId, moderatorId, type, reason, duration, expiresAt, channelId) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'),
     getSanctions       : db.prepare('SELECT * FROM sanctions WHERE guildId = ? AND userId = ? AND deletedAt IS NULL ORDER BY createdAt DESC'),
     getActiveSanction  : db.prepare('SELECT * FROM sanctions WHERE guildId = ? AND userId = ? AND type = ? AND active = 1 AND deletedAt IS NULL'),
@@ -3457,6 +3662,12 @@ function prepareStatements(db) {
     insertGlobalOwner  : db.prepare('INSERT OR IGNORE INTO global_owners (userId) VALUES (?)'),
     deleteGlobalOwner  : db.prepare('DELETE FROM global_owners WHERE userId = ?'),
     isGlobalOwner      : db.prepare('SELECT 1 FROM global_owners WHERE userId = ?'),
+
+    getOwners          : db.prepare('SELECT userId FROM owners WHERE guildId = ? ORDER BY createdAt ASC'),
+    insertOwner        : db.prepare('INSERT OR IGNORE INTO owners (guildId, userId) VALUES (?, ?)'),
+    deleteOwner        : db.prepare('DELETE FROM owners WHERE guildId = ? AND userId = ?'),
+    deleteGuildOwners  : db.prepare('DELETE FROM owners WHERE guildId = ?'),
+    isOwner            : db.prepare('SELECT 1 FROM owners WHERE guildId = ? AND userId = ?'),
 
     getGlobalBuyers    : db.prepare('SELECT userId FROM global_buyers ORDER BY createdAt ASC'),
     insertGlobalBuyer  : db.prepare('INSERT OR IGNORE INTO global_buyers (userId) VALUES (?)'),
@@ -4099,8 +4310,9 @@ const db = {
     return !!_stmts.isGlobalOwner.get(userId);
   },
 
-  getOwners() {
-    return this.getGlobalOwners();
+  getOwners(guildId) {
+    getDb();
+    return _stmts.getOwners.all(guildId).map(r => r.userId);
   },
 
 
@@ -4124,16 +4336,19 @@ const db = {
     return !!_stmts.isGlobalBuyer.get(userId);
   },
 
-  addOwner(_guildId, userId) {
-    this.addGlobalOwner(userId);
+  addOwner(guildId, userId) {
+    getDb();
+    _stmts.insertOwner.run(guildId, userId);
   },
 
-  removeOwner(_guildId, userId) {
-    this.removeGlobalOwner(userId);
+  removeOwner(guildId, userId) {
+    getDb();
+    _stmts.deleteOwner.run(guildId, userId);
   },
 
-  isOwner(_guildId, userId) {
-    return this.isGlobalOwner(userId);
+  isOwner(guildId, userId) {
+    getDb();
+    return !!_stmts.isOwner.get(guildId, userId);
   },
 
   getBlacklistRanks(guildId) {
@@ -6788,6 +7003,111 @@ const db = {
     _stmts.clearBotActivity.run();
   },
 
+  updateStreak(userId, guildId) {
+    if (!userId || !guildId) return null;
+    getDb();
+    const today = new Date().toISOString().slice(0, 10);
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+    const row = _stmts.getStreak.get(guildId, userId);
+    if (row?.lastDate === today) {
+      return row;
+    }
+
+    const streak = row?.lastDate === yesterday ? (row.streak || 0) + 1 : 1;
+    _stmts.insertStreak.run(guildId, userId, streak, today);
+    return _stmts.getStreak.get(guildId, userId);
+  },
+
+  getStreak(userId, guildId) {
+    if (!userId || !guildId) return null;
+    getDb();
+    return _stmts.getStreak.get(guildId, userId) || null;
+  },
+
+  getBirthday(guildId, userId) {
+    if (!guildId || !userId) return null;
+    getDb();
+    return _stmts.getBirthdayByUser.get(guildId, userId) || null;
+  },
+
+  getBirthdays(guildId) {
+    if (!guildId) return [];
+    getDb();
+    return _stmts.getBirthdaysByGuild.all(guildId) || [];
+  },
+
+  getBirthdaysForDate(guildId, month, day) {
+    if (!guildId || !month || !day) return [];
+    getDb();
+    return _stmts.getBirthdaysByDate.all(guildId, month, day) || [];
+  },
+
+  setBirthday(guildId, userId, month, day, timezone = null) {
+    if (!guildId || !userId || !month || !day) return null;
+    getDb();
+    _stmts.insertBirthday.run(guildId, userId, month, day, timezone);
+    return _stmts.getBirthdayByUser.get(guildId, userId) || null;
+  },
+
+  deleteBirthday(guildId, userId) {
+    if (!guildId || !userId) return;
+    getDb();
+    _stmts.deleteBirthday.run(guildId, userId);
+  },
+
+  getRainbowRole(guildId, roleId) {
+    if (!guildId || !roleId) return null;
+    getDb();
+    return _stmts.getRainbowRole.get(guildId, roleId) || null;
+  },
+
+  getRainbowRoles(guildId) {
+    if (!guildId) return [];
+    getDb();
+    return _stmts.getRainbowRolesByGuild.all(guildId) || [];
+  },
+
+  getActiveRainbowRoles(guildId) {
+    if (!guildId) return [];
+    getDb();
+    return _stmts.getActiveRainbowRoles.all(guildId) || [];
+  },
+
+  setRainbowRole(guildId, roleId, options = {}) {
+    if (!guildId || !roleId) return null;
+    getDb();
+    const existing = _stmts.getRainbowRole.get(guildId, roleId);
+    const mode = options.mode || 'rainbow';
+    const paletteSize = Number(options.paletteSize) || 7;
+    const active = options.active === false ? 0 : 1;
+    const interval = Number(options.interval) || 60;
+    const nextRun = options.nextRun || new Date(Date.now() + interval * 1000).toISOString();
+    const color = options.color !== undefined ? options.color : existing?.color ?? null;
+    _stmts.insertRainbowRole.run(guildId, roleId, mode, paletteSize, active, interval, nextRun, color);
+    return _stmts.getRainbowRole.get(guildId, roleId) || null;
+  },
+
+  updateRainbowRole(guildId, roleId, options = {}) {
+    if (!guildId || !roleId) return null;
+    getDb();
+    _stmts.updateRainbowRole.run(
+      options.mode ?? null,
+      options.paletteSize ?? null,
+      options.active !== undefined && options.active !== null ? Number(options.active) : null,
+      options.interval ?? null,
+      options.nextRun ?? null,
+      options.color ?? null,
+      guildId,
+      roleId
+    );
+    return _stmts.getRainbowRole.get(guildId, roleId) || null;
+  },
+
+  removeRainbowRole(guildId, roleId) {
+    if (!guildId || !roleId) return;
+    getDb();
+    _stmts.deleteRainbowRole.run(guildId, roleId);
+  },
 
   getInviteStats(guildId, userId) {
     const d = getDb();

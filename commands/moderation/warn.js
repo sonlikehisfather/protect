@@ -77,7 +77,7 @@ module.exports = {
     }
 
     const isBuyer       = perms.isBuyer(message.author.id);
-    const isGlobalOwner = db.isGlobalOwner(message.author.id);
+    const isGlobalOwner = db.isOwner(guildId,message.author.id);
     const thresholds    = db.getWarnThresholds(guildId);
 
     const warned           = [];

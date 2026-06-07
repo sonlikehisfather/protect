@@ -60,6 +60,7 @@ const SETUP_CHANNELS = [
   { id: 'str:emoji',    label: 'Emoji',      configKey: 'emojiLogChannel' },
   { id: 'str:ticket',   label: 'Ticket',     configKey: 'ticketLogChannel' },
   { id: 'str:voice',    label: 'Vocal',      configKey: 'voiceLogChannel' },
+  { id: 'gen:error',    label: 'Erreur',     configKey: 'errorLogChannel' },
 ];
 
 exports.help = {

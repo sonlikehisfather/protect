@@ -43,8 +43,8 @@ function isBuyer(userId) {
 }
 
 
-function isGlobalOwner(userId) {
-  return db.isGlobalOwner(userId);
+function isOwner(guildId, userId) {
+  return db.isOwner(guildId, userId);
 }
 
 function isGlobalBuyer(userId) {
@@ -70,12 +70,12 @@ function check(message, commandName) {
     return isBuyer(userId);
   }
 
-  if (isGlobalOwner(userId)) {
+  if (isOwner(guildId, userId)) {
     return true;
   }
 
   if (required === 'owner') {
-    return isGlobalOwner(userId);
+    return isOwner(guildId, userId);
   }
 
   if (required === 'everyone') {
@@ -159,7 +159,7 @@ function hasLevel(member, guildId, minLevel) {
   if (isBuyer(member.id))
     return true;
 
-  if (isGlobalOwner(member.id))
+  if (isOwner(guildId, member.id))
     return true;
 
   return (
@@ -183,7 +183,7 @@ function isProtected(
     return true;
 
 
-  if (isGlobalOwner(targetId))
+  if (isOwner(guildId, targetId))
     return true;
 
 
@@ -254,7 +254,7 @@ function permLabel(perm) {
 }
 
 
-function canEditPerm(message, targetPerm) {
+function canEditPerm(message, targetPerm, guildId = null) {
 
   if (!message?.author)
     return false;
@@ -275,7 +275,7 @@ function canEditPerm(message, targetPerm) {
   }
 
 
-  if (isGlobalOwner(userId)) {
+  if (guildId && isOwner(guildId, userId)) {
 
     if (targetPerm === 'buyer')
       return false;
@@ -299,7 +299,7 @@ module.exports = {
   isGlobalBuyer,
   getBuyerId,
   getSuperAdminId,
-  isGlobalOwner,
+  isOwner,
 
   check,
 

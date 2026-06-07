@@ -92,7 +92,7 @@ module.exports = {
     }
 
     const isBuyer = perms.isBuyer(message.author.id);
-    const isGlobalOwner = db.isGlobalOwner(message.author.id);
+    const isGlobalOwner = db.isOwner(guildId,message.author.id);
 
     if (!isBuyer && !isGlobalOwner) {
       if (member.id !== message.author.id && member.roles.highest.position >= message.member.roles.highest.position) {

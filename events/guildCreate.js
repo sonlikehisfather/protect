@@ -23,7 +23,7 @@ module.exports = {
 
       const ownerId = guild.ownerId;
 
-      if (ownerId && (perms.isBuyer(ownerId) || perms.isGlobalOwner(ownerId))) {
+      if (ownerId && (perms.isBuyer(ownerId) || perms.isOwner(guildId,ownerId))) {
         console.log(`[SecurInvite] Serveur autorisé : ${guild.name} (${guild.id}) - owner autorisé (${ownerId})`);
         return;
       }

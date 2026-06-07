@@ -359,7 +359,7 @@ async function _showConfig(message, guildId) {
 }
 
 async function _handleInvite(message, args, deleteReply, deleteDelay) {
-  if (!perms.isBuyer(message.author.id) && !perms.isGlobalOwner(message.author.id)) {
+  if (!perms.isBuyer(message.author.id) && !perms.isOwner(guildId,message.author.id)) {
     const sent = await embed.replyError(
       message,
       'Seul le buyer ou un owner global peut configurer le secur invite (réglage global).',

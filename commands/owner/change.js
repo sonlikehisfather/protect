@@ -29,7 +29,7 @@ exports.run = async (client, message, args) => {
   const guildId  = message.guild.id;
   const authorId = message.author.id;
 
-  if (!perms.isBuyer(authorId) && !perms.isGlobalOwner(authorId)) {
+  if (!perms.isBuyer(authorId) && !perms.isOwner(guildId, authorId)) {
     return embed.replyError(message, "Vous n'avez pas la permission d'utiliser cette commande.");
   }
 
@@ -41,7 +41,7 @@ exports.run = async (client, message, args) => {
   }
 
   if (target === 'reset') {
-    if (!perms.isBuyer(authorId) && !perms.isGlobalOwner(authorId)) {
+    if (!perms.isBuyer(authorId) && !perms.isOwner(guildId, authorId)) {
       return embed.replyError(
         message,
         'Seul le buyer ou un owner peut réinitialiser toutes les permissions.'
@@ -79,7 +79,7 @@ exports.run = async (client, message, args) => {
   }
 
   if (Object.prototype.hasOwnProperty.call(CONFIG_TOGGLES, target)) {
-    if (!perms.isBuyer(authorId) && !perms.isGlobalOwner(authorId)) {
+    if (!perms.isBuyer(authorId) && !perms.isOwner(guildId, authorId)) {
       return embed.replyError(
         message,
         'Permission refusée.'
@@ -117,7 +117,7 @@ exports.run = async (client, message, args) => {
   }
 
   if (target === 'autodeletedelay') {
-    if (!perms.isBuyer(authorId) && !perms.isGlobalOwner(authorId)) {
+    if (!perms.isBuyer(authorId) && !perms.isOwner(guildId, authorId)) {
       return embed.replyError(
         message,
         'Permission refusée.'

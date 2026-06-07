@@ -110,9 +110,9 @@ module.exports = {
     }
 
     const isBuyer       = perms.isBuyer(message.author.id);
-    const isGlobalOwner = perms.isGlobalOwner(message.author.id);
+    const isOwner = perms.isOwner(guildId, message.author.id);
 
-    if (!isBuyer && !isGlobalOwner && target.roles.highest.position >= message.member.roles.highest.position) {
+    if (!isBuyer && !isOwner && target.roles.highest.position >= message.member.roles.highest.position) {
       const sent = await embed.replyError(
         message,
         'Vous ne pouvez pas bannir ce membre.',

@@ -87,7 +87,7 @@ exports.run = async (client, message, args) => {
     case 'cmdreset': {
       if (
         !perms.isBuyer(message.author.id) &&
-        !perms.isGlobalOwner(message.author.id)
+        !perms.isOwner(guildId, message.author.id)
       ) {
         return embed.replyError(
           message,

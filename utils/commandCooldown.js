@@ -145,7 +145,7 @@ function shouldBypass(message) {
       return true;
     }
 
-    if (typeof perms.isGlobalOwner === 'function' && perms.isGlobalOwner(userId)) {
+    if (typeof perms.isOwner === 'function' && perms.isOwner(guildId, userId)) {
       return true;
     }
 
