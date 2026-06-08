@@ -219,6 +219,8 @@ module.exports = {
     }
 
 
+    message.prefix = usedPrefix;
+
     const withoutPrefix = content.slice(usedPrefix.length);
 
     if (!withoutPrefix.trim() || /^\s/.test(withoutPrefix)) {
@@ -237,7 +239,15 @@ module.exports = {
     const deleteDelay = guildConfig?.autoDeleteDelay ?? 5;
 
 
-    const command = client.commands.get(commandName);
+    let command = client.commands.get(commandName);
+
+    if (!command) {
+      const customAlias = db.getCmdAlias(guildId, commandName);
+      if (customAlias?.commandName) {
+        command = client.commands.get(customAlias.commandName);
+      }
+    }
+
     if (command) {
       const cmdName = command?.help?.name;
       const selfManaged = Boolean(command?.help?.selfManaged);

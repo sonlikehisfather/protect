@@ -82,6 +82,16 @@ function check(message, commandName) {
     return true;
   }
 
+  const cmdTargets = db.getCmdTargets(guildId, commandName);
+  if (cmdTargets.length) {
+    const memberRoleIds = member.roles.cache.map(r => r.id);
+    const hasTarget = cmdTargets.some(t =>
+      (t.targetType === 'user' && t.targetId === userId) ||
+      (t.targetType === 'role' && memberRoleIds.includes(t.targetId))
+    );
+    if (hasTarget) return true;
+  }
+
   if (required === 'public') {
 
     const config = db.getGuildConfig(guildId);

@@ -142,7 +142,7 @@ module.exports = {
 
       pages.push(
         embed.build(guildId, description, {
-          title     : 'Liste des membres bannis',
+          title     : '☰ Liste des membres bannis',
           footer    : `Page ${pageNumber}/${totalPages} - ${entries.length} bannis`,
           timestamp : false,
         })
@@ -220,12 +220,6 @@ module.exports = {
   },
 };
 
-// Discord API : GET /guilds/:id/bans est paginé à 1000 max. Sans pagination,
-// un serveur avec >1000 bans renvoie une liste tronquée. On itère via le
-// curseur `after` (le plus grand userId du batch précédent). Snowflakes
-// comparés en BigInt car les longueurs peuvent varier (17-20 chiffres).
-// Garde anti-boucle : MAX_PAGES * 1000 = 50_000 bans (largement au-dessus
-// de tout serveur réaliste).
 async function _fetchAllBans(guild) {
   const MAX_PAGES = 50;
   const PAGE_LIMIT = 1000;
@@ -243,12 +237,11 @@ async function _fetchAllBans(guild) {
 
     if (batch.size < PAGE_LIMIT) break;
 
-    // Plus grand snowflake du batch comme curseur pour le suivant.
     let maxId = after;
     for (const id of batch.keys()) {
       if (!maxId || BigInt(id) > BigInt(maxId)) maxId = id;
     }
-    if (!maxId || maxId === after) break; // garde de sécurité
+    if (!maxId || maxId === after) break; 
     after = maxId;
   }
 

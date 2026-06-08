@@ -69,6 +69,14 @@ function getDb() {
       createdAt INTEGER NOT NULL DEFAULT (unixepoch()),
       PRIMARY KEY (guildId, userId)
     );
+
+    CREATE TABLE IF NOT EXISTS cmd_aliases (
+      guildId     TEXT NOT NULL,
+      alias       TEXT NOT NULL,
+      commandName TEXT NOT NULL,
+      createdAt   INTEGER NOT NULL DEFAULT (unixepoch()),
+      PRIMARY KEY (guildId, alias)
+    );
   `);
 
   prepareStatements(_db);
@@ -221,6 +229,9 @@ const GUILD_CONFIG_KEYS = new Set([
   'counterBoostsChannel',
   'counterBoostlevelChannel',
   'counterEmojisChannel',
+
+  'ghostPingEnabled',
+  'ghostPingChannels',
 ]);
 
 const CUSTOM_COMMAND_KEYS = new Set([
@@ -579,6 +590,8 @@ const MIGRATIONS = [
           clearLimit             INTEGER NOT NULL DEFAULT 100,
           publicEnabled          INTEGER NOT NULL DEFAULT 0,
           ancienDuration         INTEGER NOT NULL DEFAULT 604800,
+          ghostPingEnabled       INTEGER NOT NULL DEFAULT 0,
+          ghostPingChannels      TEXT,
           createdAt           INTEGER NOT NULL DEFAULT (unixepoch()),
           updatedAt           INTEGER NOT NULL DEFAULT (unixepoch())
         );
@@ -601,6 +614,15 @@ const MIGRATIONS = [
           perm        TEXT    NOT NULL DEFAULT 'owner',
           updatedAt   INTEGER NOT NULL DEFAULT (unixepoch()),
           PRIMARY KEY (guildId, commandName)
+        );
+
+        CREATE TABLE IF NOT EXISTS cmd_targets (
+          guildId     TEXT    NOT NULL,
+          commandName TEXT    NOT NULL,
+          targetId    TEXT    NOT NULL,
+          targetType  TEXT    NOT NULL CHECK(targetType IN ('role','user')),
+          addedAt     INTEGER NOT NULL DEFAULT (unixepoch()),
+          PRIMARY KEY (guildId, commandName, targetId)
         );
 
         CREATE TABLE IF NOT EXISTS public_channels (
@@ -1104,6 +1126,11 @@ const MIGRATIONS = [
 
       if (!hasColumn('guild_config', 'ancienDuration'))
         db.prepare(`ALTER TABLE guild_config ADD COLUMN ancienDuration INTEGER NOT NULL DEFAULT 604800`).run();
+
+      if (!hasColumn('guild_config', 'ghostPingEnabled'))
+        db.prepare(`ALTER TABLE guild_config ADD COLUMN ghostPingEnabled INTEGER NOT NULL DEFAULT 0`).run();
+      if (!hasColumn('guild_config', 'ghostPingChannels'))
+        db.prepare(`ALTER TABLE guild_config ADD COLUMN ghostPingChannels TEXT`).run();
 
       if (!hasColumn('guild_config', 'muteRoleId'))
         db.prepare(`ALTER TABLE guild_config ADD COLUMN muteRoleId TEXT`).run();
@@ -3376,6 +3403,33 @@ up(db) {
     },
   },
 
+  {
+    version: 102,
+    up(db) {
+      const cols = db.prepare(`PRAGMA table_info(guild_config)`).all().map(r => r.name);
+      if (!cols.includes('ghostPingEnabled'))
+        db.exec(`ALTER TABLE guild_config ADD COLUMN ghostPingEnabled INTEGER NOT NULL DEFAULT 0`);
+      if (!cols.includes('ghostPingChannels'))
+        db.exec(`ALTER TABLE guild_config ADD COLUMN ghostPingChannels TEXT`);
+    },
+  },
+
+  {
+    version: 103,
+    up(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS cmd_targets (
+          guildId     TEXT    NOT NULL,
+          commandName TEXT    NOT NULL,
+          targetId    TEXT    NOT NULL,
+          targetType  TEXT    NOT NULL CHECK(targetType IN ('role','user')),
+          addedAt     INTEGER NOT NULL DEFAULT (unixepoch()),
+          PRIMARY KEY (guildId, commandName, targetId)
+        );
+      `);
+    },
+  },
+
 ];
 
 
@@ -3681,6 +3735,12 @@ function prepareStatements(db) {
     getBotConfig           : db.prepare('SELECT value FROM bot_config WHERE key = ?'),
     setBotConfig           : db.prepare('INSERT INTO bot_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'),
     deleteBotConfig        : db.prepare('DELETE FROM bot_config WHERE key = ?'),
+
+    getCmdTargets      : db.prepare('SELECT * FROM cmd_targets WHERE guildId = ? AND commandName = ?'),
+    addCmdTarget       : db.prepare('INSERT OR REPLACE INTO cmd_targets (guildId, commandName, targetId, targetType) VALUES (?, ?, ?, ?)'),
+    removeCmdTarget    : db.prepare('DELETE FROM cmd_targets WHERE guildId = ? AND commandName = ? AND targetId = ?'),
+    clearCmdTargets    : db.prepare('DELETE FROM cmd_targets WHERE guildId = ? AND commandName = ?'),
+    getAllCmdTargets    : db.prepare('SELECT * FROM cmd_targets WHERE guildId = ?'),
 
     getPermLevels      : db.prepare('SELECT * FROM perm_levels WHERE guildId = ?'),
     getCmdPerm         : db.prepare('SELECT perm FROM cmd_perms WHERE guildId = ? AND commandName = ?'),
@@ -4354,6 +4414,31 @@ const db = {
   getBlacklistRanks(guildId) {
     getDb();
     return _stmts.getBlacklistRanks.all(guildId).map(r => r.roleId);
+  },
+
+  getCmdTargets(guildId, commandName) {
+    getDb();
+    return _stmts.getCmdTargets.all(guildId, commandName);
+  },
+
+  addCmdTarget(guildId, commandName, targetId, targetType) {
+    getDb();
+    _stmts.addCmdTarget.run(guildId, commandName, targetId, targetType);
+  },
+
+  removeCmdTarget(guildId, commandName, targetId) {
+    getDb();
+    _stmts.removeCmdTarget.run(guildId, commandName, targetId);
+  },
+
+  clearCmdTargets(guildId, commandName) {
+    getDb();
+    _stmts.clearCmdTargets.run(guildId, commandName);
+  },
+
+  getAllCmdTargets(guildId) {
+    getDb();
+    return _stmts.getAllCmdTargets.all(guildId);
   },
 
   getPermLevels(guildId) {
@@ -7203,6 +7288,43 @@ const db = {
     getDb().prepare(
       `DELETE FROM invite_rewards WHERE guildId = ? AND threshold = ?`
     ).run(guildId, threshold);
+  },
+
+  getCmdAliases(guildId) {
+    return getDb().prepare(
+      `SELECT alias, commandName FROM cmd_aliases WHERE guildId = ? ORDER BY commandName, alias`
+    ).all(guildId);
+  },
+
+  getCmdAliasesByCommand(guildId, commandName) {
+    return getDb().prepare(
+      `SELECT alias FROM cmd_aliases WHERE guildId = ? AND commandName = ? ORDER BY alias`
+    ).all(guildId, commandName).map(r => r.alias);
+  },
+
+  getCmdAlias(guildId, alias) {
+    return getDb().prepare(
+      `SELECT commandName FROM cmd_aliases WHERE guildId = ? AND alias = ?`
+    ).get(guildId, alias) ?? null;
+  },
+
+  addCmdAlias(guildId, alias, commandName) {
+    getDb().prepare(
+      `INSERT INTO cmd_aliases (guildId, alias, commandName) VALUES (?, ?, ?)
+       ON CONFLICT(guildId, alias) DO UPDATE SET commandName = excluded.commandName`
+    ).run(guildId, alias.toLowerCase().trim(), commandName.toLowerCase().trim());
+  },
+
+  removeCmdAlias(guildId, alias) {
+    getDb().prepare(
+      `DELETE FROM cmd_aliases WHERE guildId = ? AND alias = ?`
+    ).run(guildId, alias.toLowerCase().trim());
+  },
+
+  clearCmdAliases(guildId, commandName) {
+    getDb().prepare(
+      `DELETE FROM cmd_aliases WHERE guildId = ? AND commandName = ?`
+    ).run(guildId, commandName);
   },
 
 };

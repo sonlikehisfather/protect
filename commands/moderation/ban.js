@@ -1,12 +1,22 @@
 'use strict';
 
 
+const {
+  ContainerBuilder,
+  TextDisplayBuilder,
+  MessageFlags,
+} = require('discord.js');
+
 const db                = require('../../core/database');
 const embed             = require('../../utils/embed');
 const perms             = require('../../utils/permissions');
 const logger            = require('../../utils/logger');
 const modDm             = require('../../utils/modDm');
 const { resolveMember } = require('../../utils/memberResolver');
+
+const COMPONENTS_V2_FLAG = MessageFlags?.IsComponentsV2 ?? (1 << 15);
+const V2_AVAILABLE       = typeof ContainerBuilder === 'function' &&
+                           typeof TextDisplayBuilder === 'function';
 
 module.exports = {
   help: {
@@ -210,28 +220,41 @@ module.exports = {
       null
     );
 
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          `**${targetUser.tag}** a été banni.`,
-          {
-            fields: [
-              {
-                name  : 'Raison',
-                value : reason,
-                inline: false,
-              }
-            ],
-            timestamp: false,
-          }
-        )
-      ],
-      allowedMentions: { parse: [] },
-    }).catch(() => null);
+    let sentPayload;
+    if (V2_AVAILABLE) {
+      try {
+        const body =
+          `## Banni
 
-    if (sent && deleteReply)
-      embed.scheduleDelete(sent, deleteDelay);
+` +
+          `**Membre** › <@${targetId}> \`${targetId}\`
+` +
+          `**Raison** › ${reason}
+` +
+          `**Modérateur** › <@${message.author.id}>
+
+` +
+          `-# <t:${Math.floor(Date.now() / 1000)}:f>`;
+        const container = new ContainerBuilder().setAccentColor(0xED4245);
+        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(body));
+        sentPayload = { embeds: [], components: [container], flags: COMPONENTS_V2_FLAG, allowedMentions: { parse: [] } };
+      } catch {}
+    }
+    if (!sentPayload) {
+      sentPayload = {
+        embeds: [embed.build(guildId, null, {
+          authorName: targetUser.username,
+          color     : '#ED4245',
+          fields    : [{ name: 'Raison', value: reason, inline: false }],
+          footer    : { text: targetId },
+          timestamp : false,
+        })],
+        allowedMentions: { parse: [] },
+      };
+    }
+
+    const sent = await message.channel.send(sentPayload).catch(() => null);
+    if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
 
     const e = embed.sanction(guildId, {
       type        : 'ban',

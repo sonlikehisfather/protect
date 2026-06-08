@@ -15,21 +15,21 @@ const V2_AVAILABLE       = typeof ContainerBuilder    === 'function' &&
                            typeof SeparatorBuilder   === 'function';
 
 const RESPONSES = [
-  { text: 'C\'est certain.',           color: '#57F287', emoji: '✅' },
-  { text: 'Sans aucun doute.',         color: '#57F287', emoji: '✅' },
-  { text: 'Oui, absolument.',          color: '#57F287', emoji: '✅' },
-  { text: 'Probablement.',             color: '#57F287', emoji: '✅' },
-  { text: 'Oui.',                      color: '#57F287', emoji: '✅' },
-  { text: 'Les signes disent oui.',    color: '#57F287', emoji: '✅' },
+  { text: 'C\'est certain.',           color: '#57F287', emoji: '✔' },
+  { text: 'Sans aucun doute.',         color: '#57F287', emoji: '✔' },
+  { text: 'Oui, absolument.',          color: '#57F287', emoji: '✔' },
+  { text: 'Probablement.',             color: '#57F287', emoji: '✔' },
+  { text: 'Oui.',                      color: '#57F287', emoji: '✔' },
+  { text: 'Les signes disent oui.',    color: '#57F287', emoji: '✔' },
   { text: 'Redemande plus tard.',      color: '#F1C40F', emoji: '⏳' },
   { text: 'Mieux vaut ne pas te dire.',color: '#F1C40F', emoji: '🤐' },
   { text: 'Impossible à prédire.',     color: '#F1C40F', emoji: '❓' },
   { text: 'Concentre-toi et redemande.',color: '#F1C40F', emoji: '💭' },
-  { text: 'N\'y compte pas.',          color: '#ED4245', emoji: '❌' },
-  { text: 'Ma réponse est non.',       color: '#ED4245', emoji: '❌' },
-  { text: 'Mes sources disent non.',   color: '#ED4245', emoji: '❌' },
-  { text: 'Très douteux.',             color: '#ED4245', emoji: '❌' },
-  { text: 'Non.',                      color: '#ED4245', emoji: '❌' },
+  { text: 'N\'y compte pas.',          color: '#ED4245', emoji: '✖' },
+  { text: 'Ma réponse est non.',       color: '#ED4245', emoji: '✖' },
+  { text: 'Mes sources disent non.',   color: '#ED4245', emoji: '✖' },
+  { text: 'Très douteux.',             color: '#ED4245', emoji: '✖' },
+  { text: 'Non.',                      color: '#ED4245', emoji: '✖' },
 ];
 
 exports.help = {

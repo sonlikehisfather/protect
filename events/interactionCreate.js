@@ -214,6 +214,13 @@ async function _handleButton(client, interaction) {
     return;
   }
 
+  if (id.startsWith('sa:')) {
+    return;
+  }
+
+  if (id.startsWith('bp:')) {
+    return;
+  }
 
   if (id.startsWith('embed:')) {
     return embed.replyExpiredPanel(interaction);
@@ -521,6 +528,14 @@ async function _handleSelectMenu(client, interaction) {
 
 
   if (id.startsWith('rr:')) {
+    return;
+  }
+
+  if (id.startsWith('sa:')) {
+    return;
+  }
+
+  if (id.startsWith('bp:')) {
     return;
   }
 

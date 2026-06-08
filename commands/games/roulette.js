@@ -59,7 +59,7 @@ exports.run = async (client, message, args) => {
       ));
     } else {
       const { win, multiplier, xpGain, emoji, colorName, choiceMise, resultNum } = extra;
-      const verdict = win ? `✅ **TU AS GAGNÉ** × ${multiplier}` : '❌ **PERDU**';
+      const verdict = win ? `✔ **TU AS GAGNÉ** × ${multiplier}` : '✖ **PERDU**';
       container.addTextDisplayComponents(new TextDisplayBuilder().setContent([
         `## 🎰 ${resultNum === 0 ? '🟢 JACKPOT !' : `${emoji} ${resultNum}`}`,
         ``,
@@ -125,7 +125,7 @@ exports.run = async (client, message, args) => {
       await sent.edit({
         embeds: [embed.build(guildId, null, {
           title: resultNum === 0 ? '🟢 JACKPOT' : `${emoji} ${resultNum}`,
-          description: `${win ? '✅ GAGNÉ' : '❌ PERDU'}${win ? ` ×${multiplier}` : ''}\n✨ +${xpGain} XP`,
+          description: `${win ? '✔ GAGNÉ' : '✖ PERDU'}${win ? ` ×${multiplier}` : ''}\n✨ +${xpGain} XP`,
           fields: [
             { name: '🎲 Numéro', value: `${emoji} ${colorName}`,                                           inline: true },
             { name: '💰 Mise',   value: choiceText,                                                         inline: true },

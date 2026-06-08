@@ -1,1149 +1,950 @@
 'use strict';
 
-
-const fs = require('fs');
-const path = require('path');
+const fs    = require('fs');
+const path  = require('path');
 const https = require('https');
 const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  StringSelectMenuBuilder,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
   ChannelType,
   PermissionsBitField,
   OverwriteType,
+  ContainerBuilder,
+  TextDisplayBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  MessageFlags,
 } = require('discord.js');
 
-const db = require('../../core/database');
+const V2_FLAG = MessageFlags?.IsComponentsV2 ?? (1 << 15);
+const V2_OK   = typeof ContainerBuilder === 'function' &&
+                typeof TextDisplayBuilder === 'function';
+
+const db    = require('../../core/database');
 const embed = require('../../utils/embed');
 const perms = require('../../utils/permissions');
 
 const BACKUP_DIR = path.join(__dirname, '..', '..', 'data', 'backups');
-const CONFIRM_MS = 120_000;
+const IDLE_MS    = 120_000;
+const TOTAL_MS   = 300_000;
+const PAGE_SIZE  = 25;
 
 exports.help = {
   name        : 'backup',
-  description : 'Créer, gérer et restaurer une sauvegarde serveur.',
-  usage       : 'backup <create|list|info|delete|load> [id]',
+  description : 'Create, manage and restore a server backup.',
+  usage       : 'backup [create|list|info|delete|load] [id]',
   aliases     : ['backups', 'sauvegarde'],
-  subcommands : [
-    {
-      name        : 'backup create',
-      description : 'Créer une sauvegarde des rôles, salons et permissions.',
-      usage       : 'backup create [nom]',
-      category    : 'backups',
-    },
-    {
-      name        : 'backup list',
-      description : 'Lister les sauvegardes du serveur.',
-      usage       : 'backup list',
-      category    : 'backups',
-    },
-    {
-      name        : 'backup info',
-      description : 'Afficher les détails d’une sauvegarde.',
-      usage       : 'backup info <id>',
-      category    : 'backups',
-    },
-    {
-      name        : 'backup delete',
-      description : 'Supprimer une sauvegarde.',
-      usage       : 'backup delete <id>',
-      category    : 'backups',
-    },
-    {
-      name        : 'backup clear',
-      description : 'Supprimer toutes les sauvegardes.',
-      usage       : 'backup clear',
-      category    : 'backups',
-    },
-    {
-      name        : 'backup load',
-      description : 'Restaurer une sauvegarde sur le serveur.',
-      usage       : 'backup load <id>',
-      category    : 'backups',
-    },
-  ],
+  category    : 'owner',
 };
 
 exports.run = async (client, message, args) => {
   if (!perms.check(message, exports.help.name)) return;
 
-  const guild = message.guild;
+  const guild   = message.guild;
   const guildId = guild.id;
-  const config = db.getGuildConfig(guildId);
+  const config  = db.getGuildConfig(guildId);
 
-  const deleteCmd = Boolean(config?.autoDeleteModCmds);
-  const deleteReply = Boolean(config?.autoDeleteModReplies);
-  const deleteDelay = config?.autoDeleteDelay ?? 5;
-
-  if (deleteCmd) {
-    await message.delete().catch(() => {});
-  }
+  if (Boolean(config?.autoDeleteModCmds)) await message.delete().catch(() => {});
 
   const sub = args[0]?.toLowerCase();
 
-  if (!sub || ['help', 'aide'].includes(sub)) {
-    const sent = await _sendHelp(message).catch(() => null);
-    if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
-    return;
-  }
-
   if (sub === 'create' || sub === 'créer' || sub === 'creer') {
-    const sent = await _createBackup(message, args.slice(1)).catch(err => _handleError(message, err));
-    if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
-    return;
+    return _standalonCreate(message, args.slice(1));
   }
-
   if (sub === 'list' || sub === 'liste') {
-    const sent = await _listBackups(message).catch(err => _handleError(message, err));
-    if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
-    return;
+    return _openPanel(message, { view: 'list' });
   }
-
   if (sub === 'info' || sub === 'show') {
-    const sent = await _showInfo(message, args[1]).catch(err => _handleError(message, err));
-    if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
-    return;
+    const b = _getBackupOrNull(args[1]);
+    return _openPanel(message, { view: b ? 'detail' : 'home', selected: b });
   }
-
   if (sub === 'delete' || sub === 'del' || sub === 'remove' || sub === 'supprimer') {
-    const sent = await _deleteBackup(message, args[1]).catch(err => _handleError(message, err));
-    if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
-    return;
+    const b = _getBackupOrNull(args[1]);
+    return _openPanel(message, { view: b ? 'confirm_del' : 'home', selected: b });
   }
-
   if (sub === 'clear' || sub === 'clean' || sub === 'vider') {
-    return _confirmClearBackups(message, deleteReply, deleteDelay).catch(err => _handleError(message, err));
+    return _openPanel(message, { view: 'confirm_clear' });
   }
-
   if (sub === 'load' || sub === 'restore' || sub === 'restaurer') {
-    return _confirmRestore(message, args[1], deleteReply, deleteDelay).catch(err => _handleError(message, err));
+    const b = _getBackupOrNull(args[1]);
+    return _openPanel(message, { view: b ? 'confirm_load' : 'home', selected: b });
   }
 
-  const sent = await embed.replyError(
-    message,
-    'Sous-commande inconnue. Utilisez `backup create`, `backup list`, `backup info <id>`, `backup delete <id>`, `backup clear` ou `backup load <id>`.',
-    { timestamp: false }
-  ).catch(() => null);
-
-  if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
+  return _openPanel(message, { view: 'home' });
 };
 
-async function _sendHelp(message) {
-  return message.channel.send({
-    embeds: [
-      embed.build(message.guild.id, null, {
-        title: 'Système de backup serveur',
-        fields: [
-          {
-            name: 'Commandes',
-            value:
-              '`backup create [nom]` - créer une sauvegarde\n' +
-              '`backup list` - lister les sauvegardes\n' +
-              '`backup info <id>` - détails d’une sauvegarde\n' +
-              '`backup delete <id>` - supprimer une sauvegarde\n' +
-              '`backup clear` - supprimer toutes les sauvegardes\n' +
-              '`backup load <id>` - restaurer une sauvegarde',
-          },
-          {
-            name: 'Contenu sauvegardé',
-            value: 'Rôles, catégories, salons textes/vocaux/forums/annonces/stages et permissions. Une backup peut être restaurée sur n’importe quel serveur où le bot est présent.',
-          },
-        ],
-        timestamp: false,
-      }),
-    ],
-    allowedMentions: { repliedUser: false },
+// ─────────────────────────────────────────────────────────────────────────────
+// PANEL PRINCIPAL
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function _openPanel(message, initialState = {}) {
+  const guildId = message.guild.id;
+
+  const state = {
+    view     : initialState.view     ?? 'home',
+    selected : initialState.selected ?? null,
+    page     : 0,
+    status   : initialState.status   ?? null,
+  };
+
+  const build = (disabled = false) => _buildPanelPayload(guildId, state, disabled);
+
+  const panel = await message.channel.send(build()).catch(() => null);
+  if (!panel) return;
+
+  embed.registerPrivateInteraction(panel, message.author.id, TOTAL_MS);
+
+  const collector = panel.createMessageComponentCollector({
+    filter : i => i.user.id === message.author.id && i.message.id === panel.id,
+    idle   : IDLE_MS,
+    time   : TOTAL_MS,
+  });
+
+  const refresh = async (i) => {
+    const payload = build();
+    const { flags: _flags, ...editPayload } = payload;
+    await i.deferUpdate().catch(() => {});
+    await panel.edit(editPayload).catch(() => {});
+  };
+
+  collector.on('collect', async i => {
+    const id = i.customId;
+
+    // ── Close ──────────────────────────────────────────────────────────────
+    if (id === 'bp:close') {
+      collector.stop('closed');
+      embed.clearPrivateInteraction(panel);
+      await i.deferUpdate().catch(() => {});
+      await panel.delete().catch(() => {});
+      await message.delete().catch(() => {});
+      return;
+    }
+
+    // ── Back to home ───────────────────────────────────────────────────────
+    if (id === 'bp:home') {
+      state.view = 'home'; state.selected = null; state.status = null;
+      await refresh(i); return;
+    }
+
+    // ── Main action select ─────────────────────────────────────────────────
+    if (id === 'bp:action') {
+      const action = i.values[0];
+      if (action === 'create') {
+        state.view = 'creating'; state.status = null;
+        await refresh(i);
+        const backup = await _doCreate(message).catch(() => null);
+        if (backup) {
+          state.view = 'created'; state.selected = backup;
+        } else {
+          state.view = 'home'; state.status = '× Erreur lors de la création.';
+        }
+        await panel.edit(build()).catch(() => {});
+        return;
+      }
+      if (action === 'list')  { state.view = 'list';       state.page = 0; state.selected = null; state.status = null; await refresh(i); return; }
+      if (action === 'info')  { state.view = 'info_select'; state.selected = null; state.status = null; await refresh(i); return; }
+      if (action === 'clear') { state.view = 'confirm_clear'; state.status = null; await refresh(i); return; }
+      return;
+    }
+
+    // ── Info select: pick a backup ─────────────────────────────────────────
+    if (id === 'bp:info:select') {
+      const allBackups = _readAllBackups().sort((a, b) => b.createdAt - a.createdAt);
+      state.selected = allBackups.find(b => b.id === i.values[0]) ?? null;
+      state.view = state.selected ? 'detail' : 'info_select';
+      await refresh(i); return;
+    }
+
+    // ── List: select backup ────────────────────────────────────────────────
+    if (id === 'bp:list:select') {
+      const allBackups = _readAllBackups().sort((a, b) => b.createdAt - a.createdAt);
+      state.selected = allBackups.find(b => b.id === i.values[0]) ?? null;
+      await refresh(i); return;
+    }
+
+    // ── List: pagination ───────────────────────────────────────────────────
+    if (id === 'bp:list:prev') { state.page = Math.max(0, state.page - 1); state.selected = null; await refresh(i); return; }
+    if (id === 'bp:list:next') {
+      const total = Math.ceil(_readAllBackups().length / PAGE_SIZE);
+      state.page = Math.min(total - 1, state.page + 1); state.selected = null; await refresh(i); return;
+    }
+
+    // ── Detail / delete / load from list ──────────────────────────────────
+    if (id === 'bp:list')         { state.view = 'list';         state.status = null; state.page = 0; await refresh(i); return; }
+    if (id === 'bp:detail')       { state.view = state.selected ? 'detail' : 'list'; state.status = null; await refresh(i); return; }
+    if (id === 'bp:confirm_del')  { state.view = state.selected ? 'confirm_del'  : 'list'; state.status = null; await refresh(i); return; }
+    if (id === 'bp:confirm_load') { state.view = state.selected ? 'confirm_load' : 'list'; state.status = null; await refresh(i); return; }
+
+    // ── Rename: open modal ────────────────────────────────────────────────
+    if (id === 'bp:rename') {
+      if (!state.selected) return;
+      try {
+        const modal = new ModalBuilder()
+          .setCustomId(`bp:rename:submit:${state.selected.id}`)
+          .setTitle('Rename backup');
+        const input = new TextInputBuilder()
+          .setCustomId('bp:rename:name')
+          .setLabel('New name')
+          .setStyle(TextInputStyle.Short)
+          .setMaxLength(64)
+          .setRequired(true)
+          .setValue(state.selected.name || '');
+        modal.addComponents(new ActionRowBuilder().addComponents(input));
+        await i.showModal(modal);
+        const submitted = await i.awaitModalSubmit({
+          filter: m => m.customId === `bp:rename:submit:${state.selected?.id}` && m.user.id === i.user.id,
+          time: 120_000,
+        }).catch(() => null);
+        if (!submitted) return;
+        const newName = submitted.fields.getTextInputValue('bp:rename:name')?.trim();
+        if (newName && state.selected) {
+          const updated = _renameBackup(state.selected.id, newName);
+          if (updated) { state.selected = updated; state.status = null; }
+        }
+        const { flags: _mf, ...modalEdit } = build();
+        await submitted.reply({ content: '\u2714 Renomm\u00e9.', flags: MessageFlags.Ephemeral }).catch(() => {});
+        await panel.edit(modalEdit).catch(() => {});
+      } catch (err) {
+        console.error('[backup:rename] crash:', err);
+      }
+      return;
+    }
+
+    // ── Confirm delete ─────────────────────────────────────────────────────
+    if (id === 'bp:do_del') {
+      if (!state.selected) { state.view = 'home'; await refresh(i); return; }
+      const ok = _deleteBackupFile(state.selected.id);
+      state.status   = ok ? `✔ Backup \`${state.selected.id}\` supprimée.` : '× Impossible de supprimer.';
+      state.selected = null;
+      state.view     = 'list';
+      await refresh(i); return;
+    }
+
+    // ── Confirm clear ──────────────────────────────────────────────────────
+    if (id === 'bp:do_clear') {
+      const result   = _clearAllBackups();
+      state.view     = 'home';
+      state.status   = `✔ **${result.deleted}** sauvegarde(s) supprimée(s).${result.errors.length ? ` › ${result.errors.length} erreur(s).` : ''}`;
+      state.selected = null;
+      await refresh(i); return;
+    }
+
+    // ── Confirm load ───────────────────────────────────────────────────────
+    if (id === 'bp:do_load') {
+      if (!state.selected) { state.view = 'home'; await refresh(i); return; }
+      const me = message.guild.members.me;
+      if (!me.permissions.has(PermissionsBitField.Flags.ManageRoles) ||
+          !me.permissions.has(PermissionsBitField.Flags.ManageChannels) ||
+          !me.permissions.has(PermissionsBitField.Flags.ManageGuild)) {
+        state.status = '× Permissions insuffisantes (Gérer rôles, salons, serveur requis).';
+        state.view   = 'confirm_load';
+        await refresh(i); return;
+      }
+      const v = _validateBackup(state.selected);
+      if (!v.ok) { state.status = `× Backup invalide : ${v.reason}`; await refresh(i); return; }
+
+      state.view   = 'loading';
+      state.status = null;
+      const loadPayload = build(true);
+      const { flags: _lf, ...loadEdit } = loadPayload;
+      await i.deferUpdate().catch(() => {});
+      await panel.edit(loadEdit).catch(() => {});
+
+      const result = await _restoreBackup(message.guild, state.selected);
+      state.view     = 'loaded';
+      state.status   = `✔ Restauration terminée › ${result.rolesCreated} rôles, ${result.channelsCreated} salons${result.errors.length ? `, ${result.errors.length} erreur(s)` : ''}.`;
+      state.selected = null;
+      const { flags: _rf, ...restoredEdit } = build();
+      await panel.edit(restoredEdit).catch(() => {});
+      return;
+    }
+  });
+
+  collector.on('end', (_, reason) => {
+    embed.clearPrivateInteraction(panel);
+    if (['closed'].includes(reason)) return;
+    const { flags: _ef, ...expiredEdit } = build(true);
+    panel.edit(expiredEdit).catch(() => {});
   });
 }
 
-async function _createBackup(message, nameArgs) {
+// ─────────────────────────────────────────────────────────────────────────────
+// BUILD PAYLOAD
+// ─────────────────────────────────────────────────────────────────────────────
+
+function _buildPanelPayload(guildId, state, disabled = false) {
+  const { view, selected, page, status } = state;
+  const allBackups = _readAllBackups().sort((a, b) => b.createdAt - a.createdAt);
+  const totalPages = Math.max(1, Math.ceil(allBackups.length / PAGE_SIZE));
+  const slice      = allBackups.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+  const rows = [];
+  let bodyLines = [];
+  let accent = 0x5865F2;
+
+  // ── HOME ──────────────────────────────────────────────────────────────────
+  if (view === 'home' || view === 'created') {
+    accent = view === 'created' ? 0x57F287 : 0x5865F2;
+    bodyLines = [
+      '## »  Backup manager',
+      '',
+      `**Available backups** › ${allBackups.length}`,
+    ];
+    if (status) bodyLines.push('', status);
+    bodyLines.push('', '-# The system is limited to 25 backups max.');
+    if (view === 'created' && selected) {
+      bodyLines.push(
+        '',
+        '### Backup created',
+        `**ID** › \`${selected.id}\``,
+        `**Name** › ${_esc(selected.name || 'Unnamed')}`,
+        `**Roles** › ${selected.roles.length}  ·  **Channels** › ${selected.channels.length}  ·  **Emojis** › ${selected.emojis?.length ?? 0}`,
+        `-# ${_fmt(selected.createdAt)}`,
+      );
+    }
+    rows.push(new ActionRowBuilder().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId('bp:action')
+        .setPlaceholder('Choose an action…')
+        .setDisabled(disabled)
+        .addOptions([
+          { label: 'Create a backup',    value: 'create', description: 'Save roles, channels, emojis…' },
+          { label: 'List backups',       value: 'list',   description: 'View, load or delete' },
+          { label: 'Backup info',        value: 'info',   description: 'Details of a backup' },
+          { label: 'Delete all',         value: 'clear',  description: 'Remove all backups' },
+        ])
+    ));
+    rows.push(new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('bp:close').setLabel('×').setStyle(ButtonStyle.Secondary).setDisabled(disabled),
+    ));
+  }
+
+  // ── CREATING ──────────────────────────────────────────────────────────────
+  else if (view === 'creating') {
+    accent = 0xFEE75C;
+    bodyLines = ['## ◌  Creating backup…', '', '›  Saving roles, channels and assets…'];
+  }
+
+  // ── LIST ──────────────────────────────────────────────────────────────────
+  else if (view === 'list') {
+    accent = 0x5865F2;
+    bodyLines = [
+      `## ≡  Backups (${allBackups.length})`,
+    ];
+    if (totalPages > 1) bodyLines.push(`-# Page ${page + 1} / ${totalPages}`);
+    if (status) bodyLines.push('', status);
+
+    if (!allBackups.length) {
+      bodyLines.push('', 'No backups available.');
+    } else if (selected) {
+      bodyLines.push(
+        '',
+        `### ${_esc(selected.name || 'Unnamed')}`,
+        `**ID** › \`${selected.id}\``,
+        `**Server** › ${_esc(selected.guildName || 'Unknown')}`,
+        `**Roles** › ${selected.roles.length}  ·  **Channels** › ${selected.channels.length}  ·  **Emojis** › ${selected.emojis?.length ?? 0}`,
+        `-# Created ${_fmt(selected.createdAt)}`,
+      );
+    }
+
+    if (slice.length) {
+      rows.push(new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId('bp:list:select')
+          .setPlaceholder('Select a backup…')
+          .setDisabled(disabled)
+          .addOptions(slice.map(b => ({
+            label      : `${_esc(b.name || 'Unnamed')} · ${b.id}`.slice(0, 100),
+            description: `${_esc(b.guildName || '?')} · ${b.roles.length}R / ${b.channels.length}S`.slice(0, 100),
+            value      : b.id,
+            default    : selected?.id === b.id,
+          })))
+      ));
+    }
+
+    const actionBtns = [
+      new ButtonBuilder().setCustomId('bp:detail').setLabel('Info').setStyle(ButtonStyle.Primary).setDisabled(disabled || !selected),
+      new ButtonBuilder().setCustomId('bp:confirm_load').setLabel('Load').setStyle(ButtonStyle.Danger).setDisabled(disabled || !selected),
+      new ButtonBuilder().setCustomId('bp:confirm_del').setLabel('Delete').setStyle(ButtonStyle.Secondary).setDisabled(disabled || !selected),
+    ];
+    rows.push(new ActionRowBuilder().addComponents(...actionBtns));
+
+    const navRow = [
+      new ButtonBuilder().setCustomId('bp:list:prev').setLabel('‹').setStyle(ButtonStyle.Secondary).setDisabled(disabled || page === 0),
+      new ButtonBuilder().setCustomId('bp:list:next').setLabel('›').setStyle(ButtonStyle.Secondary).setDisabled(disabled || page >= totalPages - 1),
+      new ButtonBuilder().setCustomId('bp:home').setLabel('« Home').setStyle(ButtonStyle.Secondary).setDisabled(disabled),
+      new ButtonBuilder().setCustomId('bp:close').setLabel('×').setStyle(ButtonStyle.Secondary).setDisabled(disabled),
+    ];
+    rows.push(new ActionRowBuilder().addComponents(...navRow));
+  }
+
+  // ── DETAIL ────────────────────────────────────────────────────────────────
+  else if (view === 'detail' && selected) {
+    accent = 0x5865F2;
+    bodyLines = [
+      `## §  ${_esc(selected.name || 'Unnamed')}`,
+      '',
+      `**ID** › \`${selected.id}\``,
+      `**Source server** › ${_esc(selected.guildName || 'Unknown')} (\`${selected.guildId}\`)`,
+      `**Created by** › ${selected.createdBy ? `<@${selected.createdBy}>` : 'Unknown'}`,
+      '',
+      `**Roles** › ${selected.roles.length}  ·  **Channels** › ${selected.channels.length}`,
+      `**Emojis** › ${selected.emojis?.length ?? 0}  ·  **Stickers** › ${selected.stickers?.length ?? 0}`,
+      `**Icon** › ${selected.hasIcon ? 'Yes' : 'No'}  ·  **Banner** › ${selected.hasBanner ? 'Yes' : 'No'}`,
+      '',
+      `-# Created ${_fmt(selected.createdAt)}`,
+    ];
+    rows.push(new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('bp:confirm_load').setLabel('Load').setStyle(ButtonStyle.Danger).setDisabled(disabled),
+      new ButtonBuilder().setCustomId('bp:rename').setLabel('~ Rename').setStyle(ButtonStyle.Primary).setDisabled(disabled),
+      new ButtonBuilder().setCustomId('bp:confirm_del').setLabel('Delete').setStyle(ButtonStyle.Secondary).setDisabled(disabled),
+      new ButtonBuilder().setCustomId('bp:list').setLabel('« Back').setStyle(ButtonStyle.Secondary).setDisabled(disabled),
+      new ButtonBuilder().setCustomId('bp:close').setLabel('×').setStyle(ButtonStyle.Secondary).setDisabled(disabled),
+    ));
+  }
+
+  // ── CONFIRM DELETE ────────────────────────────────────────────────────────
+  else if (view === 'confirm_del' && selected) {
+    accent = 0xED4245;
+    bodyLines = [
+      '## ×  Delete this backup?',
+      '',
+      `**ID** › \`${selected.id}\``,
+      `**Name** › ${_esc(selected.name || 'Unnamed')}`,
+      `**Server** › ${_esc(selected.guildName || 'Unknown')}`,
+      '',
+      '> ‼ This action is **irreversible**.',
+    ];
+    rows.push(new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('bp:do_del').setLabel('Confirm').setStyle(ButtonStyle.Danger).setDisabled(disabled),
+      new ButtonBuilder().setCustomId('bp:detail').setLabel('Cancel').setStyle(ButtonStyle.Secondary).setDisabled(disabled),
+      new ButtonBuilder().setCustomId('bp:close').setLabel('×').setStyle(ButtonStyle.Secondary).setDisabled(disabled),
+    ));
+  }
+
+  // ── CONFIRM CLEAR ─────────────────────────────────────────────────────────
+  else if (view === 'confirm_clear') {
+    accent = 0xED4245;
+    bodyLines = [
+      '## ×  Delete all backups?',
+      '',
+      `**${allBackups.length}** backup(s) will be permanently deleted.`,
+      '',
+      '> ‼ This action is **irreversible**.',
+    ];
+    rows.push(new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('bp:do_clear').setLabel('Delete all').setStyle(ButtonStyle.Danger).setDisabled(disabled),
+      new ButtonBuilder().setCustomId('bp:home').setLabel('Cancel').setStyle(ButtonStyle.Secondary).setDisabled(disabled),
+      new ButtonBuilder().setCustomId('bp:close').setLabel('×').setStyle(ButtonStyle.Secondary).setDisabled(disabled),
+    ));
+  }
+
+  // ── CONFIRM LOAD ──────────────────────────────────────────────────────────
+  else if (view === 'confirm_load' && selected) {
+    accent = 0xED4245;
+    bodyLines = [
+      '## »  Restore this backup?',
+      '',
+      `**ID** › \`${selected.id}\`  ·  **${_esc(selected.name || 'Unnamed')}**`,
+      `**Source** › ${_esc(selected.guildName || 'Unknown')}`,
+      `**Roles** › ${selected.roles.length}  ·  **Channels** › ${selected.channels.length}`,
+      '',
+      '> ‼ Existing channels and roles will be **deleted** and recreated.',
+      '> This action is **irreversible**.',
+    ];
+    if (status) bodyLines.push('', status);
+    rows.push(new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('bp:do_load').setLabel('Confirm').setStyle(ButtonStyle.Danger).setDisabled(disabled),
+      new ButtonBuilder().setCustomId('bp:detail').setLabel('Cancel').setStyle(ButtonStyle.Secondary).setDisabled(disabled),
+      new ButtonBuilder().setCustomId('bp:close').setLabel('×').setStyle(ButtonStyle.Secondary).setDisabled(disabled),
+    ));
+  }
+
+  // ── INFO SELECT ──────────────────────────────────────────────────────────
+  else if (view === 'info_select') {
+    accent = 0x5865F2;
+    bodyLines = [
+      '## §  Backup info',
+      '',
+      allBackups.length ? 'Select a backup to view its details.' : 'No backups available.',
+    ];
+    if (allBackups.length) {
+      rows.push(new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId('bp:info:select')
+          .setPlaceholder('Choose a backup…')
+          .setDisabled(disabled)
+          .addOptions(allBackups.slice(0, 25).map(b => ({
+            label      : `${_esc(b.name || 'Unnamed')} · ${b.id}`.slice(0, 100),
+            description: `${_esc(b.guildName || '?')} · ${b.roles.length}R / ${b.channels.length}S`.slice(0, 100),
+            value      : b.id,
+          })))
+      ));
+    }
+    rows.push(new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('bp:home').setLabel('« Home').setStyle(ButtonStyle.Secondary).setDisabled(disabled),
+      new ButtonBuilder().setCustomId('bp:close').setLabel('×').setStyle(ButtonStyle.Secondary).setDisabled(disabled),
+    ));
+  }
+
+  // ── LOADING ───────────────────────────────────────────────────────────────
+  else if (view === 'loading') {
+    accent = 0xFEE75C;
+    bodyLines = ['## ◌  Restoring backup…', '', '›  Rebuilding roles and channels…'];
+  }
+
+  // ── LOADED ────────────────────────────────────────────────────────────────
+  else if (view === 'loaded') {
+    accent = 0x57F287;
+    bodyLines = ['## +  Restore complete'];
+    if (status) bodyLines.push('', status);
+    rows.push(new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('bp:home').setLabel('« Home').setStyle(ButtonStyle.Secondary).setDisabled(disabled),
+      new ButtonBuilder().setCustomId('bp:close').setLabel('×').setStyle(ButtonStyle.Secondary).setDisabled(disabled),
+    ));
+  }
+
+  // ── FALLBACK ──────────────────────────────────────────────────────────────
+  else {
+    bodyLines = ['## »  Backup manager'];
+    rows.push(new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('bp:home').setLabel('« Home').setStyle(ButtonStyle.Secondary).setDisabled(disabled),
+      new ButtonBuilder().setCustomId('bp:close').setLabel('×').setStyle(ButtonStyle.Secondary).setDisabled(disabled),
+    ));
+  }
+
+  // ── BUILD MESSAGE ─────────────────────────────────────────────────────────
+  if (V2_OK) {
+    const c = new ContainerBuilder().setAccentColor(accent);
+    c.addTextDisplayComponents(new TextDisplayBuilder().setContent(bodyLines.join('\n')));
+    if (rows.length) {
+      c.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
+      c.addActionRowComponents(...rows);
+    }
+    return { flags: V2_FLAG, components: [c], allowedMentions: { parse: [] } };
+  }
+
+  return {
+    embeds     : [embed.build(guildId, bodyLines.join('\n'), { title: 'Gestion des sauvegardes', timestamp: false })],
+    components : rows,
+    allowedMentions: { parse: [] },
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STANDALONE CREATE (invoked from list panel via collector)
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function _standalonCreate(message, nameArgs) {
   const guild = message.guild;
   await guild.roles.fetch().catch(() => null);
   await guild.channels.fetch().catch(() => null);
   await guild.emojis.fetch().catch(() => null);
   await guild.stickers.fetch().catch(() => null);
-
   const backup = await _serializeGuild(guild, message.author.id, nameArgs.join(' ').trim());
   await _writeBackupWithAssets(backup.id, backup, guild);
-
-  return message.channel.send({
-    embeds: [
-      embed.build(guild.id, `Sauvegarde créée avec l'id \`${backup.id}\`.`, {
-        title: 'Backup créé',
-        fields: [
-          { name: 'Nom', value: backup.name || 'Aucun', inline: true },
-          { name: 'Rôles', value: String(backup.roles.length), inline: true },
-          { name: 'Salons', value: String(backup.channels.length), inline: true },
-          { name: 'Emojis', value: String(backup.emojis?.length ?? 0), inline: true },
-          { name: 'Stickers', value: String(backup.stickers?.length ?? 0), inline: true },
-          { name: 'Icône/Bannière', value: `${backup.hasIcon ? 'Oui' : 'Non'} / ${backup.hasBanner ? 'Oui' : 'Non'}`, inline: true },
-        ],
-        timestamp: false,
-      }),
-    ],
-    allowedMentions: { repliedUser: false },
-  });
+  return _openPanel(message, { view: 'created', selected: backup });
 }
 
-async function _listBackups(message) {
-  const backups = _readAllBackups();
-
-  if (!backups.length) {
-    return embed.replyError(message, 'Aucune sauvegarde trouvée.', { timestamp: false });
-  }
-
-  const lines = backups
-    .sort((a, b) => b.createdAt - a.createdAt)
-    .slice(0, 15)
-    .map(b => `\`${b.id}\` - **${_escape(b.name || 'Sans nom')}** - ${_escape(b.guildName || 'Serveur inconnu')} - ${_formatDate(b.createdAt)} - ${b.roles.length} rôles / ${b.channels.length} salons`);
-
-  return message.channel.send({
-    embeds: [
-      embed.build(message.guild.id, lines.join('\n'), {
-        title: 'Backups disponibles',
-        footer: backups.length > 15 ? `${backups.length - 15} sauvegarde(s) non affichée(s)` : null,
-        timestamp: false,
-      }),
-    ],
-    allowedMentions: { repliedUser: false },
-  });
+async function _doCreate(message) {
+  const guild = message.guild;
+  await guild.roles.fetch().catch(() => null);
+  await guild.channels.fetch().catch(() => null);
+  await guild.emojis.fetch().catch(() => null);
+  await guild.stickers.fetch().catch(() => null);
+  const backup = await _serializeGuild(guild, message.author.id, '');
+  await _writeBackupWithAssets(backup.id, backup, guild);
+  return backup;
 }
 
-async function _showInfo(message, backupId) {
-  const backup = _getBackupOrNull(backupId);
-  if (!backup) {
-    return embed.replyError(message, 'Sauvegarde introuvable.', { timestamp: false });
-  }
+// ─────────────────────────────────────────────────────────────────────────────
+// RENAME
+// ─────────────────────────────────────────────────────────────────────────────
 
-  return message.channel.send({
-    embeds: [
-      embed.build(message.guild.id, null, {
-        title: `Backup ${backup.id}`,
-        fields: [
-          { name: 'Nom', value: backup.name || 'Aucun', inline: true },
-          { name: 'Créé le', value: _formatDate(backup.createdAt), inline: true },
-          { name: 'Créé par', value: backup.createdBy ? `<@${backup.createdBy}>` : 'Inconnu', inline: true },
-          { name: 'Serveur source', value: `${backup.guildName} (${backup.guildId})`, inline: false },
-          { name: 'Contenu', value: `${backup.roles.length} rôle(s)\n${backup.channels.length} salon(s)`, inline: true },
-        ],
-        timestamp: false,
-      }),
-    ],
-    allowedMentions: { repliedUser: false },
-  });
+function _renameBackup(id, newName) {
+  const safeId = _safeId(id);
+  if (!safeId) return false;
+  const filePath = fs.existsSync(path.join(BACKUP_DIR, safeId, 'backup.json'))
+    ? path.join(BACKUP_DIR, safeId, 'backup.json')
+    : fs.existsSync(path.join(BACKUP_DIR, `${safeId}.json`))
+      ? path.join(BACKUP_DIR, `${safeId}.json`)
+      : null;
+  if (!filePath) return false;
+  try {
+    const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    data.name  = newName.slice(0, 64).trim();
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+    return data;
+  } catch { return false; }
 }
 
-async function _deleteBackup(message, backupId) {
-  const backup = _getBackupOrNull(backupId);
-  if (!backup) {
-    return embed.replyError(message, 'Sauvegarde introuvable.', { timestamp: false });
-  }
 
-  const deleted = _deleteBackupFile(backup.id);
-  if (!deleted) {
-    return embed.replyError(message, 'Impossible de supprimer le fichier de sauvegarde.', { timestamp: false });
-  }
-
-  return embed.reply(message, `Sauvegarde \`${backup.id}\` supprimée.`, { timestamp: false });
-}
-
-async function _confirmClearBackups(message, deleteReply, deleteDelay) {
-  const backups = _readAllBackups();
-
-  if (!backups.length) {
-    const sent = await embed.replyError(message, 'Aucune sauvegarde à supprimer.', { timestamp: false }).catch(() => null);
-    if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
-    return;
-  }
-
-  const confirmMessage = await message.channel.send({
-    embeds: [
-      embed.build(message.guild.id, null, {
-        title: 'Confirmer la suppression des backups',
-        fields: [
-          { name: 'Backups détectées', value: String(backups.length), inline: true },
-          { name: 'Action', value: 'Toutes les sauvegardes globales et anciennes sauvegardes par serveur seront supprimées.', inline: false },
-          { name: 'Attention', value: 'Cette action est irréversible.', inline: false },
-        ],
-        timestamp: false,
-      }),
-    ],
-    components: [_clearRow(false)],
-    allowedMentions: { repliedUser: false },
-  }).catch(() => null);
-
-  if (!confirmMessage) return;
-
-  embed.registerPrivateInteraction(confirmMessage, message.author.id, CONFIRM_MS);
-
-  const collector = confirmMessage.createMessageComponentCollector({
-    filter: interaction => interaction.user.id === message.author.id && interaction.message.id === confirmMessage.id,
-    idle: 60_000,
-    time: CONFIRM_MS,
-  });
-
-  collector.on('collect', async interaction => {
-    if (interaction.customId === 'local:backup:clear:cancel') {
-      collector.stop('cancelled');
-      await interaction.update({
-        embeds: [embed.build(message.guild.id, 'Suppression annulée.', { timestamp: false })],
-        components: [_clearRow(true)],
-      }).catch(() => {});
-      return;
-    }
-
-    if (interaction.customId !== 'local:backup:clear:confirm') {
-      return interaction.deferUpdate().catch(() => {});
-    }
-
-    collector.stop('confirmed');
-    const result = _clearAllBackups();
-
-    await interaction.update({
-      embeds: [
-        embed.build(message.guild.id, null, {
-          title: 'Backups supprimées',
-          fields: [
-            { name: 'Fichiers supprimés', value: String(result.deleted), inline: true },
-            { name: 'Erreurs', value: String(result.errors.length), inline: true },
-            { name: 'Détails', value: result.errors.length ? result.errors.slice(0, 8).join('\n').slice(0, 1024) : 'Aucune erreur détectée.', inline: false },
-          ],
-          timestamp: false,
-        }),
-      ],
-      components: [_clearRow(true)],
-    }).catch(() => {});
-
-    if (deleteReply) embed.scheduleDelete(confirmMessage, deleteDelay);
-  });
-
-  collector.on('end', (_, reason) => {
-    embed.clearPrivateInteraction(confirmMessage);
-    if (reason === 'confirmed' || reason === 'cancelled') return;
-    confirmMessage.edit({ components: [_clearRow(true)] }).catch(() => {});
-  });
-}
-
-async function _confirmRestore(message, backupId, deleteReply, deleteDelay) {
-  const backup = _getBackupOrNull(backupId);
-  if (!backup) {
-    const sent = await embed.replyError(message, 'Sauvegarde introuvable.', { timestamp: false }).catch(() => null);
-    if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
-    return;
-  }
-
-  const me = message.guild.members.me;
-  if (
-    !me.permissions.has(PermissionsBitField.Flags.ManageRoles) ||
-    !me.permissions.has(PermissionsBitField.Flags.ManageChannels) ||
-    !me.permissions.has(PermissionsBitField.Flags.ManageGuild)
-  ) {
-    const sent = await embed.replyError(
-      message,
-      'Il me faut les permissions **Gérer les rôles**, **Gérer les salons** et **Gérer le serveur** pour restaurer une sauvegarde complète.',
-      { timestamp: false }
-    ).catch(() => null);
-    if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
-    return;
-  }
-
-  const validation = _validateBackup(backup);
-  if (!validation.ok) {
-    const sent = await embed.replyError(
-      message,
-      `Backup invalide : ${validation.reason}`,
-      { timestamp: false }
-    ).catch(() => null);
-    if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
-    return;
-  }
-
-  const row = _confirmRow(false);
-  const confirmMessage = await message.channel.send({
-    embeds: [
-      embed.build(
-        message.guild.id,
-        `Cette action va **supprimer les salons et rôles supprimables** de **${_escape(message.guild.name)}**, renommer le serveur, puis restaurer le backup \`${backup.id}\`.\nSource : **${_escape(backup.guildName || 'Serveur inconnu')}**.\nCette action est destructive et irréversible.`,
-        {
-          title: 'Confirmer la restauration du backup',
-          fields: [
-            { name: 'Backup', value: backup.name || backup.id, inline: true },
-            { name: 'Serveur source', value: backup.guildName || backup.guildId || 'Inconnu', inline: true },
-            { name: 'Rôles', value: String(backup.roles.length), inline: true },
-            { name: 'Salons', value: String(backup.channels.length), inline: true },
-            { name: 'Emojis', value: String(backup.emojis?.length ?? 0), inline: true },
-            { name: 'Stickers', value: String(backup.stickers?.length ?? 0), inline: true },
-            { name: 'Icône/Bannière', value: `${backup.hasIcon ? 'Oui' : 'Non'} / ${backup.hasBanner ? 'Oui' : 'Non'}`, inline: true },
-            { name: 'Attention', value: 'Le bot va d’abord tenter de nettoyer le serveur cible avant de recréer la structure.', inline: false },
-          ],
-          timestamp: false,
-        }
-      ),
-    ],
-    components: [row],
-    allowedMentions: { repliedUser: false },
-  }).catch(() => null);
-
-  if (!confirmMessage) return;
-
-  embed.registerPrivateInteraction(confirmMessage, message.author.id, CONFIRM_MS);
-
-  const collector = confirmMessage.createMessageComponentCollector({
-    filter: interaction => interaction.user.id === message.author.id && interaction.message.id === confirmMessage.id,
-    idle: 60_000,
-    time: CONFIRM_MS,
-  });
-
-  collector.on('collect', async interaction => {
-    if (interaction.customId === 'local:backup:cancel') {
-      collector.stop('cancelled');
-      await interaction.update({
-        embeds: [embed.build(message.guild.id, 'Restauration annulée.', { timestamp: false })],
-        components: [_confirmRow(true)],
-      }).catch(() => {});
-      return;
-    }
-
-    if (interaction.customId !== 'local:backup:confirm') {
-      return interaction.deferUpdate().catch(() => {});
-    }
-
-    collector.stop('confirmed');
-    await interaction.update({
-      embeds: [embed.build(message.guild.id, 'Restauration en cours...', { timestamp: false })],
-      components: [_confirmRow(true)],
-    }).catch(() => {});
-
-    const result = await _restoreBackup(message.guild, backup);
-
-    await confirmMessage.edit({
-      embeds: [
-        embed.build(message.guild.id, null, {
-          title: 'Restauration terminée',
-          fields: [
-            { name: 'Serveur renommé', value: result.guildRenamed ? 'Oui' : 'Non', inline: true },
-            { name: 'Icône/Bannière', value: `${result.iconRestored ? 'Oui' : 'Non'} / ${result.bannerRestored ? 'Oui' : 'Non'}`, inline: true },
-            { name: 'Salons supprimés', value: String(result.channelsDeleted), inline: true },
-            { name: 'Rôles supprimés', value: String(result.rolesDeleted), inline: true },
-            { name: 'Rôles créés', value: String(result.rolesCreated), inline: true },
-            { name: 'Salons créés', value: String(result.channelsCreated), inline: true },
-            { name: 'Emojis créés', value: String(result.emojisCreated), inline: true },
-            { name: 'Stickers créés', value: String(result.stickersCreated), inline: true },
-            { name: 'Erreurs', value: String(result.errors.length), inline: true },
-            { name: 'Détails', value: result.errors.length ? result.errors.slice(0, 8).join('\n').slice(0, 1024) : 'Aucune erreur détectée.' },
-          ],
-          timestamp: false,
-        }),
-      ],
-      components: [_confirmRow(true)],
-    }).catch(() => {});
-
-    if (deleteReply) embed.scheduleDelete(confirmMessage, deleteDelay);
-  });
-
-  collector.on('end', (_, reason) => {
-    embed.clearPrivateInteraction(confirmMessage);
-    if (reason === 'confirmed' || reason === 'cancelled') return;
-    confirmMessage.edit({ components: [_confirmRow(true)] }).catch(() => {});
-  });
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// SERIALIZE / RESTORE
+// ─────────────────────────────────────────────────────────────────────────────
 
 async function _serializeGuild(guild, createdBy, name) {
   const roles = guild.roles.cache
     .filter(role => role.id !== guild.id && !role.managed)
     .sort((a, b) => a.position - b.position)
     .map(role => ({
-      oldId: role.id,
-      name: role.name,
-      color: role.color,
-      hoist: role.hoist,
-      mentionable: role.mentionable,
-      permissions: role.permissions.bitfield.toString(),
-      position: role.position,
-      rawPosition: role.rawPosition ?? role.position,
+      oldId       : role.id,
+      name        : role.name,
+      color       : role.color,
+      hoist       : role.hoist,
+      mentionable : role.mentionable,
+      permissions : role.permissions.bitfield.toString(),
+      position    : role.position,
+      rawPosition : role.rawPosition ?? role.position,
     }));
 
   const channels = guild.channels.cache
-    .filter(channel => channel.type !== ChannelType.DM && channel.type !== ChannelType.GroupDM)
+    .filter(ch => ch.type !== ChannelType.DM && ch.type !== ChannelType.GroupDM)
     .sort((a, b) => a.rawPosition - b.rawPosition)
-    .map(channel => ({
-      oldId: channel.id,
-      parentId: channel.parentId,
-      type: channel.type,
-      name: channel.name,
-      topic: channel.topic ?? null,
-      nsfw: Boolean(channel.nsfw),
-      bitrate: channel.bitrate ?? null,
-      userLimit: channel.userLimit ?? null,
-      rateLimitPerUser: channel.rateLimitPerUser ?? null,
-      position: channel.rawPosition,
-      defaultAutoArchiveDuration: channel.defaultAutoArchiveDuration ?? null,
-      defaultReactionEmoji: channel.defaultReactionEmoji ?? null,
-      defaultThreadRateLimitPerUser: channel.defaultThreadRateLimitPerUser ?? null,
-      defaultSortOrder: channel.defaultSortOrder ?? null,
-      defaultForumLayout: channel.defaultForumLayout ?? null,
-      availableTags: Array.isArray(channel.availableTags) ? channel.availableTags.map(tag => ({
-        name: tag.name,
-        moderated: Boolean(tag.moderated),
-        emojiId: tag.emoji?.id ?? null,
-        emojiName: tag.emoji?.name ?? null,
-      })) : [],
-      permissionOverwrites: channel.permissionOverwrites.cache.map(overwrite => ({
-        id: overwrite.id,
-        type: overwrite.type,
-        allow: overwrite.allow.bitfield.toString(),
-        deny: overwrite.deny.bitfield.toString(),
+    .map(ch => ({
+      oldId                         : ch.id,
+      parentId                      : ch.parentId,
+      type                          : ch.type,
+      name                          : ch.name,
+      topic                         : ch.topic ?? null,
+      nsfw                          : Boolean(ch.nsfw),
+      bitrate                       : ch.bitrate ?? null,
+      userLimit                     : ch.userLimit ?? null,
+      rateLimitPerUser              : ch.rateLimitPerUser ?? null,
+      position                      : ch.rawPosition,
+      defaultAutoArchiveDuration    : ch.defaultAutoArchiveDuration ?? null,
+      defaultReactionEmoji          : ch.defaultReactionEmoji ?? null,
+      defaultThreadRateLimitPerUser : ch.defaultThreadRateLimitPerUser ?? null,
+      defaultSortOrder              : ch.defaultSortOrder ?? null,
+      defaultForumLayout            : ch.defaultForumLayout ?? null,
+      availableTags                 : Array.isArray(ch.availableTags)
+        ? ch.availableTags.map(t => ({ name: t.name, moderated: Boolean(t.moderated), emojiId: t.emoji?.id ?? null, emojiName: t.emoji?.name ?? null }))
+        : [],
+      permissionOverwrites: ch.permissionOverwrites.cache.map(o => ({
+        id   : o.id,
+        type : o.type,
+        allow: o.allow.bitfield.toString(),
+        deny : o.deny.bitfield.toString(),
       })),
     }));
 
-  const emojis = guild.emojis.cache.map(emoji => ({
-    id: emoji.id,
-    name: emoji.name,
-    animated: emoji.animated,
-    url: emoji.imageURL({ extension: emoji.animated ? 'gif' : 'png', size: 128 }),
+  const emojis = guild.emojis.cache.map(e => ({
+    id      : e.id,
+    name    : e.name,
+    animated: e.animated,
+    url     : e.imageURL({ extension: e.animated ? 'gif' : 'png', size: 128 }),
   }));
 
-  const stickers = guild.stickers.cache.map(sticker => ({
-    id: sticker.id,
-    name: sticker.name,
-    description: sticker.description ?? null,
-    tags: sticker.tags ?? [],
-    format: sticker.format,
-    url: sticker.url,
+  const stickers = guild.stickers.cache.map(s => ({
+    id         : s.id,
+    name       : s.name,
+    description: s.description ?? null,
+    tags       : s.tags ?? [],
+    format     : s.format,
+    url        : s.url,
   }));
-
-  const iconUrl = guild.iconURL({ extension: 'png', size: 4096 }) ?? null;
-  const bannerUrl = guild.bannerURL({ extension: 'png', size: 4096 }) ?? null;
 
   return {
-    version: 2,
-    id: _makeBackupId(),
-    name: name || null,
-    guildId: guild.id,
-    guildName: guild.name,
-    createdAt: Math.floor(Date.now() / 1000),
+    version   : 2,
+    id        : _makeId(),
+    name      : name || null,
+    guildId   : guild.id,
+    guildName : guild.name,
+    createdAt : Math.floor(Date.now() / 1000),
     createdBy,
     roles,
     channels,
     emojis,
     stickers,
-    hasIcon: !!iconUrl,
-    hasBanner: !!bannerUrl,
+    hasIcon  : !!guild.iconURL(),
+    hasBanner: !!guild.bannerURL(),
   };
 }
 
 async function _restoreBackup(guild, backup) {
   const result = {
-    guildRenamed: false,
-    iconRestored: false,
-    bannerRestored: false,
-    rolesDeleted: 0,
-    channelsDeleted: 0,
-    rolesCreated: 0,
-    channelsCreated: 0,
-    emojisCreated: 0,
-    stickersCreated: 0,
-    errors: [],
+    guildRenamed   : false, iconRestored : false, bannerRestored: false,
+    rolesDeleted   : 0,     channelsDeleted: 0,
+    rolesCreated   : 0,     channelsCreated: 0,
+    emojisCreated  : 0,     stickersCreated: 0,
+    errors         : [],
   };
-  const roleMap = new Map([[backup.guildId, guild.id], [guild.id, guild.id]]);
-  const userMap = new Map();
+
+  const roleMap    = new Map([[backup.guildId, guild.id], [guild.id, guild.id]]);
+  const userMap    = new Map();
   const channelMap = new Map();
-  const me = guild.members.me;
+  const me         = guild.members.me;
 
   await guild.roles.fetch().catch(() => null);
   await guild.channels.fetch().catch(() => null);
 
-  if (backup.guildName && guild.name !== backup.guildName) {
-    await guild.setName(backup.guildName, `Restauration backup ${backup.id}`)
+  if (backup.guildName && guild.name !== backup.guildName)
+    await guild.setName(backup.guildName, `Restauration ${backup.id}`)
       .then(() => { result.guildRenamed = true; })
-      .catch(err => result.errors.push(`Nom serveur: ${err.message}`));
-  }
+      .catch(err => result.errors.push(`Nom: ${err.message}`));
 
   await _clearGuild(guild, result);
   await guild.roles.fetch().catch(() => null);
   await guild.channels.fetch().catch(() => null);
 
-  const rolesToCreate = [...backup.roles].sort((a, b) => _rolePosition(b) - _rolePosition(a));
-
-  for (const role of rolesToCreate) {
+  for (const role of [...backup.roles].sort((a, b) => _rolePos(b) - _rolePos(a))) {
     try {
-      if (BigInt(role.permissions) & PermissionsBitField.Flags.Administrator) {
-        result.errors.push(`Rôle ${role.name}: permission Administrateur ignorée.`);
-      }
-
       const safePerms = BigInt(role.permissions) & ~PermissionsBitField.Flags.Administrator;
-      const created = await guild.roles.create({
-        name: role.name,
-        colors: { primaryColor: role.color || 0 },
-        hoist: role.hoist,
-        mentionable: role.mentionable,
-        permissions: safePerms,
-        reason: `Restauration backup ${backup.id}`,
+      const created   = await guild.roles.create({
+        name: role.name, hoist: role.hoist, mentionable: role.mentionable,
+        permissions: safePerms, reason: `Restauration ${backup.id}`,
       });
-
       roleMap.set(role.oldId, created.id);
       result.rolesCreated++;
-    } catch (err) {
-      result.errors.push(`Rôle ${role.name}: ${err.message}`);
-    }
+    } catch (err) { result.errors.push(`Rôle ${role.name}: ${err.message}`); }
   }
 
-  const categories = backup.channels.filter(c => c.type === ChannelType.GuildCategory);
+  const cats   = backup.channels.filter(c => c.type === ChannelType.GuildCategory);
   const others = backup.channels.filter(c => c.type !== ChannelType.GuildCategory);
 
-  for (const channel of [...categories, ...others]) {
+  for (const ch of [...cats, ...others]) {
     try {
-      const options = {
-        name: channel.name,
-        type: channel.type,
-        reason: `Restauration backup ${backup.id}`,
-        permissionOverwrites: _mapOverwrites(channel.permissionOverwrites, roleMap, userMap, guild),
+      const opts = {
+        name: ch.name, type: ch.type, reason: `Restauration ${backup.id}`,
+        permissionOverwrites: _mapOverwrites(ch.permissionOverwrites, roleMap, userMap, guild),
       };
+      if (ch.parentId && channelMap.has(ch.parentId)) opts.parent = channelMap.get(ch.parentId);
+      if (ch.topic)                    opts.topic                         = ch.topic;
+      if (ch.nsfw != null)             opts.nsfw                          = ch.nsfw;
+      if (ch.bitrate)                  opts.bitrate                       = ch.bitrate;
+      if (ch.userLimit != null)        opts.userLimit                     = ch.userLimit;
+      if (ch.rateLimitPerUser != null) opts.rateLimitPerUser              = ch.rateLimitPerUser;
+      if (ch.defaultAutoArchiveDuration != null) opts.defaultAutoArchiveDuration = ch.defaultAutoArchiveDuration;
+      if (ch.defaultReactionEmoji != null)       opts.defaultReactionEmoji       = ch.defaultReactionEmoji;
+      if (ch.defaultThreadRateLimitPerUser != null) opts.defaultThreadRateLimitPerUser = ch.defaultThreadRateLimitPerUser;
+      if (ch.defaultSortOrder != null) opts.defaultSortOrder = ch.defaultSortOrder;
+      if (ch.defaultForumLayout != null) opts.defaultForumLayout = ch.defaultForumLayout;
+      if (Array.isArray(ch.availableTags) && ch.availableTags.length) opts.availableTags = ch.availableTags;
 
-      if (channel.parentId && channelMap.has(channel.parentId)) {
-        options.parent = channelMap.get(channel.parentId);
-      }
-
-      if (channel.topic) options.topic = channel.topic;
-      if (channel.nsfw != null) options.nsfw = channel.nsfw;
-      if (channel.bitrate) options.bitrate = channel.bitrate;
-      if (channel.userLimit != null) options.userLimit = channel.userLimit;
-      if (channel.rateLimitPerUser != null) options.rateLimitPerUser = channel.rateLimitPerUser;
-      if (channel.defaultAutoArchiveDuration != null) options.defaultAutoArchiveDuration = channel.defaultAutoArchiveDuration;
-      if (channel.defaultReactionEmoji != null) options.defaultReactionEmoji = channel.defaultReactionEmoji;
-      if (channel.defaultThreadRateLimitPerUser != null) options.defaultThreadRateLimitPerUser = channel.defaultThreadRateLimitPerUser;
-      if (channel.defaultSortOrder != null) options.defaultSortOrder = channel.defaultSortOrder;
-      if (channel.defaultForumLayout != null) options.defaultForumLayout = channel.defaultForumLayout;
-      if (Array.isArray(channel.availableTags) && channel.availableTags.length) options.availableTags = channel.availableTags;
-
-      const created = await guild.channels.create(options);
-      channelMap.set(channel.oldId, created.id);
+      const created = await guild.channels.create(opts);
+      channelMap.set(ch.oldId, created.id);
       result.channelsCreated++;
-    } catch (err) {
-      result.errors.push(`Salon ${channel.name}: ${err.message}`);
-    }
+    } catch (err) { result.errors.push(`Salon ${ch.name}: ${err.message}`); }
   }
 
   await _applyPositions(guild, backup, roleMap, channelMap, result, me);
-
   await _restoreAssets(guild, backup, result);
-
   return result;
 }
 
 async function _clearGuild(guild, result) {
-  const channels = [...guild.channels.cache.values()]
-    .filter(channel => channel.deletable)
-    .sort((a, b) => b.rawPosition - a.rawPosition);
-
-  for (const channel of channels) {
-    await channel.delete('Nettoyage avant restauration backup')
-      .then(() => { result.channelsDeleted++; })
-      .catch(err => result.errors.push(`Suppression salon ${channel.name}: ${err.message}`));
-  }
+  for (const ch of [...guild.channels.cache.values()].filter(c => c.deletable).sort((a, b) => b.rawPosition - a.rawPosition))
+    await ch.delete('Nettoyage backup').then(() => result.channelsDeleted++).catch(err => result.errors.push(`Del salon ${ch.name}: ${err.message}`));
 
   await guild.channels.fetch().catch(() => null);
 
-  const roles = [...guild.roles.cache.values()]
-    .filter(role => role.id !== guild.id && !role.managed && role.editable)
-    .sort((a, b) => b.position - a.position);
-
-  for (const role of roles) {
-    await role.delete('Nettoyage avant restauration backup')
-      .then(() => { result.rolesDeleted++; })
-      .catch(err => result.errors.push(`Suppression rôle ${role.name}: ${err.message}`));
-  }
+  for (const r of [...guild.roles.cache.values()].filter(r => r.id !== guild.id && !r.managed && r.editable).sort((a, b) => b.position - a.position))
+    await r.delete('Nettoyage backup').then(() => result.rolesDeleted++).catch(err => result.errors.push(`Del rôle ${r.name}: ${err.message}`));
 }
 
 async function _applyPositions(guild, backup, roleMap, channelMap, result, me) {
   await guild.roles.fetch().catch(() => null);
   await guild.channels.fetch().catch(() => null);
 
-  const maxRolePosition = Math.max(me.roles.highest.position - 1, 1);
-  const rolePositions = backup.roles
-    .filter(role => roleMap.has(role.oldId))
-    .sort((a, b) => _rolePosition(b) - _rolePosition(a))
-    .map(role => ({
-      role: roleMap.get(role.oldId),
-      position: Math.min(Math.max(_rolePosition(role), 1), maxRolePosition),
-    }));
-
-  if (rolePositions.length) {
-    await guild.roles.setPositions(rolePositions).catch(err => result.errors.push(`Positions rôles: ${err.message}`));
-  }
+  const maxPos = Math.max(me.roles.highest.position - 1, 1);
+  const rPos   = backup.roles
+    .filter(r => roleMap.has(r.oldId))
+    .sort((a, b) => _rolePos(b) - _rolePos(a))
+    .map(r => ({ role: roleMap.get(r.oldId), position: Math.min(Math.max(_rolePos(r), 1), maxPos) }));
+  if (rPos.length) await guild.roles.setPositions(rPos).catch(err => result.errors.push(`Pos rôles: ${err.message}`));
 
   await guild.channels.fetch().catch(() => null);
 
-  const categories = backup.channels
-    .filter(channel => channel.type === ChannelType.GuildCategory)
-    .filter(channel => channelMap.has(channel.oldId))
-    .sort((a, b) => a.position - b.position);
-
-  for (const [index, channel] of categories.entries()) {
-    const id = channelMap.get(channel.oldId);
-    const created = guild.channels.cache.get(id);
-    if (!created) continue;
-    await created.setPosition(index).catch(err => result.errors.push(`Position catégorie ${channel.name}: ${err.message}`));
+  for (const [i, ch] of backup.channels.filter(c => c.type === ChannelType.GuildCategory && channelMap.has(c.oldId)).sort((a, b) => a.position - b.position).entries()) {
+    const c = guild.channels.cache.get(channelMap.get(ch.oldId));
+    if (c) await c.setPosition(i).catch(() => {});
   }
 
   await guild.channels.fetch().catch(() => null);
 
   const groups = new Map();
-  for (const channel of backup.channels) {
-    if (channel.type === ChannelType.GuildCategory || !channelMap.has(channel.oldId)) continue;
-    const parentKey = channel.parentId && channelMap.has(channel.parentId)
-      ? channel.parentId
-      : 'root';
-    if (!groups.has(parentKey)) groups.set(parentKey, []);
-    groups.get(parentKey).push(channel);
+  for (const ch of backup.channels) {
+    if (ch.type === ChannelType.GuildCategory || !channelMap.has(ch.oldId)) continue;
+    const key = ch.parentId && channelMap.has(ch.parentId) ? ch.parentId : 'root';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(ch);
   }
-
-  for (const channels of groups.values()) {
-    channels.sort((a, b) => a.position - b.position);
-
-    for (const [index, channel] of channels.entries()) {
-      const id = channelMap.get(channel.oldId);
-      const created = guild.channels.cache.get(id);
-      if (!created) continue;
-      await created.setPosition(index).catch(err => result.errors.push(`Position ${channel.name}: ${err.message}`));
+  for (const chs of groups.values()) {
+    chs.sort((a, b) => a.position - b.position);
+    for (const [i, ch] of chs.entries()) {
+      const c = guild.channels.cache.get(channelMap.get(ch.oldId));
+      if (c) await c.setPosition(i).catch(() => {});
     }
   }
 }
 
 async function _restoreAssets(guild, backup, result) {
-  const backupDir = path.join(BACKUP_DIR, backup.id);
+  const dir = path.join(BACKUP_DIR, backup.id);
 
-  const iconPath = path.join(backupDir, 'icon.png');
-  if (backup.hasIcon && fs.existsSync(iconPath)) {
-    try {
-      await guild.setIcon(iconPath, `Restauration backup ${backup.id}`);
-      result.iconRestored = true;
-    } catch (err) {
-      result.errors.push(`Icône serveur: ${err.message}`);
-    }
-  }
+  const iconPath = path.join(dir, 'icon.png');
+  if (backup.hasIcon && fs.existsSync(iconPath))
+    await guild.setIcon(iconPath).then(() => result.iconRestored = true).catch(err => result.errors.push(`Icône: ${err.message}`));
 
-  const bannerPath = path.join(backupDir, 'banner.png');
-  if (backup.hasBanner && fs.existsSync(bannerPath)) {
-    try {
-      await guild.setBanner(bannerPath, `Restauration backup ${backup.id}`);
-      result.bannerRestored = true;
-    } catch (err) {
-      result.errors.push(`Bannière serveur: ${err.message}`);
-    }
-  }
+  const bannerPath = path.join(dir, 'banner.png');
+  if (backup.hasBanner && fs.existsSync(bannerPath))
+    await guild.setBanner(bannerPath).then(() => result.bannerRestored = true).catch(err => result.errors.push(`Bannière: ${err.message}`));
 
   if (backup.emojis?.length) {
-    const emojiDir = path.join(backupDir, 'emojis');
-    for (const emoji of backup.emojis) {
-      const ext = emoji.animated ? 'gif' : 'png';
-      const emojiPath = path.join(emojiDir, `${emoji.id}.${ext}`);
-      if (!fs.existsSync(emojiPath)) continue;
-
-      try {
-        await guild.emojis.create({
-          attachment: emojiPath,
-          name: emoji.name,
-          reason: `Restauration backup ${backup.id}`,
-        });
-        result.emojisCreated++;
-      } catch (err) {
-        if (err.code === 30008) {
-          result.errors.push(`Emoji ${emoji.name}: limite d'emojis atteinte`);
-          break;
-        }
-        result.errors.push(`Emoji ${emoji.name}: ${err.message}`);
-      }
+    const emojiDir = path.join(dir, 'emojis');
+    for (const e of backup.emojis) {
+      const p = path.join(emojiDir, `${e.id}.${e.animated ? 'gif' : 'png'}`);
+      if (!fs.existsSync(p)) continue;
+      try { await guild.emojis.create({ attachment: p, name: e.name }); result.emojisCreated++; }
+      catch (err) { if (err.code === 30008) break; result.errors.push(`Emoji ${e.name}: ${err.message}`); }
     }
   }
 
   if (backup.stickers?.length) {
-    const stickerDir = path.join(backupDir, 'stickers');
-    for (const sticker of backup.stickers) {
-      const stickerPath = path.join(stickerDir, `${sticker.id}.png`);
-      if (!fs.existsSync(stickerPath)) continue;
-
-      try {
-        await guild.stickers.create({
-          file: stickerPath,
-          name: sticker.name,
-          description: sticker.description || sticker.name,
-          tags: sticker.tags?.[0] || sticker.name,
-          reason: `Restauration backup ${backup.id}`,
-        });
-        result.stickersCreated++;
-      } catch (err) {
-        if (err.code === 30039) {
-          result.errors.push(`Sticker ${sticker.name}: limite de stickers atteinte`);
-          break;
-        }
-        result.errors.push(`Sticker ${sticker.name}: ${err.message}`);
-      }
+    const stickerDir = path.join(dir, 'stickers');
+    for (const s of backup.stickers) {
+      const p = path.join(stickerDir, `${s.id}.png`);
+      if (!fs.existsSync(p)) continue;
+      try { await guild.stickers.create({ file: p, name: s.name, description: s.description || s.name, tags: s.tags?.[0] || s.name }); result.stickersCreated++; }
+      catch (err) { if (err.code === 30039) break; result.errors.push(`Sticker ${s.name}: ${err.message}`); }
     }
   }
 }
 
 function _mapOverwrites(overwrites, roleMap, userMap, guild) {
   const mapped = [];
-
-  for (const overwrite of overwrites || []) {
-    let id = overwrite.id;
-    if (overwrite.id === guild.id) {
-      id = guild.id;
-    } else if (overwrite.type === OverwriteType.Role || overwrite.type === 0) {
-      if (!roleMap.has(overwrite.id)) continue;
-      id = roleMap.get(overwrite.id);
-    } else if (overwrite.type === OverwriteType.Member || overwrite.type === 1) {
-      if (!guild.members.cache.has(overwrite.id) && !userMap.has(overwrite.id)) continue;
-      userMap.set(overwrite.id, overwrite.id);
-      id = overwrite.id;
-    } else {
-      continue;
-    }
-
-    mapped.push({
-      id,
-      type: overwrite.type,
-      allow: BigInt(overwrite.allow),
-      deny: BigInt(overwrite.deny),
-    });
+  for (const o of overwrites || []) {
+    let id = o.id;
+    if (o.id === guild.id) { id = guild.id; }
+    else if (o.type === OverwriteType.Role || o.type === 0) {
+      if (!roleMap.has(o.id)) continue;
+      id = roleMap.get(o.id);
+    } else if (o.type === OverwriteType.Member || o.type === 1) {
+      if (!guild.members.cache.has(o.id) && !userMap.has(o.id)) continue;
+      userMap.set(o.id, o.id); id = o.id;
+    } else continue;
+    mapped.push({ id, type: o.type, allow: BigInt(o.allow), deny: BigInt(o.deny) });
   }
-
   return mapped;
 }
 
-function _rolePosition(role) {
-  const position = Number(role?.rawPosition ?? role?.position ?? 1);
-  return Number.isFinite(position) ? position : 1;
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// FILE HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
 
-function _confirmRow(disabled) {
-  return new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('local:backup:confirm')
-      .setLabel('Confirmer')
-      .setStyle(ButtonStyle.Danger)
-      .setDisabled(disabled),
-    new ButtonBuilder()
-      .setCustomId('local:backup:cancel')
-      .setLabel('Annuler')
-      .setStyle(ButtonStyle.Secondary)
-      .setDisabled(disabled)
-  );
-}
+function _ensureDir() { fs.mkdirSync(BACKUP_DIR, { recursive: true }); }
 
-function _clearRow(disabled) {
-  return new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('local:backup:clear:confirm')
-      .setLabel('Tout supprimer')
-      .setStyle(ButtonStyle.Danger)
-      .setDisabled(disabled),
-    new ButtonBuilder()
-      .setCustomId('local:backup:clear:cancel')
-      .setLabel('Annuler')
-      .setStyle(ButtonStyle.Secondary)
-      .setDisabled(disabled)
-  );
-}
+async function _writeBackupWithAssets(id, payload, guild) {
+  _ensureDir();
+  const dir = path.join(BACKUP_DIR, id);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'backup.json'), JSON.stringify(payload, null, 2), 'utf8');
 
-function _ensureBackupDir() {
-  fs.mkdirSync(BACKUP_DIR, { recursive: true });
-}
-
-function _backupPath(backupId) {
-  return path.join(BACKUP_DIR, `${backupId}.json`);
-}
-
-function _writeBackup(backupId, payload) {
-  _ensureBackupDir();
-  fs.writeFileSync(_backupPath(backupId), JSON.stringify(payload, null, 2), 'utf8');
-}
-
-async function _writeBackupWithAssets(backupId, payload, guild) {
-  _ensureBackupDir();
-
-  const backupDir = path.join(BACKUP_DIR, backupId);
-  fs.mkdirSync(backupDir, { recursive: true });
-
-  fs.writeFileSync(path.join(backupDir, 'backup.json'), JSON.stringify(payload, null, 2), 'utf8');
-
-  const downloads = [];
-
+  const dl = [];
   if (payload.hasIcon) {
-    const iconUrl = guild.iconURL({ extension: 'png', size: 4096 });
-    if (iconUrl) {
-      downloads.push(_downloadFile(iconUrl, path.join(backupDir, 'icon.png')));
-    }
+    const u = guild.iconURL({ extension: 'png', size: 4096 });
+    if (u) dl.push(_download(u, path.join(dir, 'icon.png')));
   }
-
   if (payload.hasBanner) {
-    const bannerUrl = guild.bannerURL({ extension: 'png', size: 4096 });
-    if (bannerUrl) {
-      downloads.push(_downloadFile(bannerUrl, path.join(backupDir, 'banner.png')));
-    }
+    const u = guild.bannerURL({ extension: 'png', size: 4096 });
+    if (u) dl.push(_download(u, path.join(dir, 'banner.png')));
   }
-
   if (payload.emojis?.length) {
-    const emojiDir = path.join(backupDir, 'emojis');
-    fs.mkdirSync(emojiDir, { recursive: true });
-    for (const emoji of payload.emojis) {
-      if (emoji.url) {
-        const ext = emoji.animated ? 'gif' : 'png';
-        downloads.push(_downloadFile(emoji.url, path.join(emojiDir, `${emoji.id}.${ext}`)));
-      }
-    }
+    const ed = path.join(dir, 'emojis');
+    fs.mkdirSync(ed, { recursive: true });
+    for (const e of payload.emojis)
+      if (e.url) dl.push(_download(e.url, path.join(ed, `${e.id}.${e.animated ? 'gif' : 'png'}`)));
   }
-
   if (payload.stickers?.length) {
-    const stickerDir = path.join(backupDir, 'stickers');
-    fs.mkdirSync(stickerDir, { recursive: true });
-    for (const sticker of payload.stickers) {
-      if (sticker.url) {
-        downloads.push(_downloadFile(sticker.url, path.join(stickerDir, `${sticker.id}.png`)));
-      }
-    }
+    const sd = path.join(dir, 'stickers');
+    fs.mkdirSync(sd, { recursive: true });
+    for (const s of payload.stickers)
+      if (s.url) dl.push(_download(s.url, path.join(sd, `${s.id}.png`)));
   }
-
-  await Promise.allSettled(downloads);
+  await Promise.allSettled(dl);
 }
 
-function _downloadFile(url, dest) {
+function _download(url, dest) {
   return new Promise((resolve, reject) => {
     const file = fs.createWriteStream(dest);
-    https.get(url, { timeout: 30000 }, response => {
-      if (response.statusCode !== 200) {
-        file.close();
-        fs.unlinkSync(dest);
-        reject(new Error(`Status ${response.statusCode}`));
-        return;
-      }
-      response.pipe(file);
-      file.on('finish', () => {
-        file.close();
-        resolve();
-      });
-    }).on('error', err => {
-      file.close();
-      fs.unlinkSync(dest).catch(() => {});
-      reject(err);
-    });
+    https.get(url, { timeout: 30000 }, res => {
+      if (res.statusCode !== 200) { file.close(); try { fs.unlinkSync(dest); } catch {} reject(new Error(`${res.statusCode}`)); return; }
+      res.pipe(file);
+      file.on('finish', () => { file.close(); resolve(); });
+    }).on('error', err => { file.close(); try { fs.unlinkSync(dest); } catch {} reject(err); });
   });
 }
 
 function _readAllBackups() {
   if (!fs.existsSync(BACKUP_DIR)) return [];
-
   const backups = [];
-
-  for (const file of fs.readdirSync(BACKUP_DIR)) {
-    const fullPath = path.join(BACKUP_DIR, file);
-    const stat = fs.statSync(fullPath);
-
-    if (stat.isFile() && file.endsWith('.json')) {
-      const parsed = _readBackupFile(fullPath);
-      if (parsed) backups.push(parsed);
-      continue;
-    }
-
+  for (const entry of fs.readdirSync(BACKUP_DIR)) {
+    const full = path.join(BACKUP_DIR, entry);
+    const stat = fs.statSync(full);
+    if (stat.isFile() && entry.endsWith('.json')) { const p = _readFile(full); if (p) backups.push(p); continue; }
     if (stat.isDirectory()) {
-      for (const legacyFile of fs.readdirSync(fullPath)) {
-        if (!legacyFile.endsWith('.json')) continue;
-        const parsed = _readBackupFile(path.join(fullPath, legacyFile));
-        if (parsed) backups.push(parsed);
-      }
+      for (const f of fs.readdirSync(full))
+        if (f.endsWith('.json')) { const p = _readFile(path.join(full, f)); if (p) backups.push(p); }
     }
   }
-
   const unique = new Map();
-  for (const backup of backups) {
-    if (backup?.id && !unique.has(backup.id)) {
-      unique.set(backup.id, backup);
-    }
-  }
-
+  for (const b of backups) if (b?.id && !unique.has(b.id)) unique.set(b.id, b);
   return [...unique.values()];
 }
 
-function _getBackupOrNull(backupId) {
-  const id = _safeId(backupId);
-  if (!id) return null;
-
-  const backupDir = path.join(BACKUP_DIR, id);
-  const dirFile = path.join(backupDir, 'backup.json');
-  if (fs.existsSync(dirFile)) {
-    return _readBackupFile(dirFile);
-  }
-
-  const file = _backupPath(id);
-  if (fs.existsSync(file)) {
-    return _readBackupFile(file);
-  }
-
-  if (!fs.existsSync(BACKUP_DIR)) return null;
-
-  for (const entry of fs.readdirSync(BACKUP_DIR)) {
-    const legacyPath = path.join(BACKUP_DIR, entry, `${id}.json`);
-    if (!fs.existsSync(legacyPath)) continue;
-    const stat = fs.statSync(legacyPath);
-    if (!stat.isFile()) continue;
-    return _readBackupFile(legacyPath);
-  }
-
+function _getBackupOrNull(id) {
+  const safeId = _safeId(id);
+  if (!safeId) return null;
+  const dirFile = path.join(BACKUP_DIR, safeId, 'backup.json');
+  if (fs.existsSync(dirFile)) return _readFile(dirFile);
+  const flat = path.join(BACKUP_DIR, `${safeId}.json`);
+  if (fs.existsSync(flat)) return _readFile(flat);
   return null;
 }
 
-function _deleteBackupFile(backupId) {
-  const id = _safeId(backupId);
-  if (!id) return false;
-
-  const backupDir = path.join(BACKUP_DIR, id);
-  if (fs.existsSync(backupDir) && fs.statSync(backupDir).isDirectory()) {
-    fs.rmSync(backupDir, { recursive: true, force: true });
-    return true;
-  }
-
-  const file = _backupPath(id);
-  if (fs.existsSync(file)) {
-    fs.unlinkSync(file);
-    return true;
-  }
-
-  if (!fs.existsSync(BACKUP_DIR)) return false;
-
-  for (const entry of fs.readdirSync(BACKUP_DIR)) {
-    const legacyPath = path.join(BACKUP_DIR, entry, `${id}.json`);
-    if (!fs.existsSync(legacyPath)) continue;
-    const stat = fs.statSync(legacyPath);
-    if (!stat.isFile()) continue;
-    fs.unlinkSync(legacyPath);
-    return true;
-  }
-
+function _deleteBackupFile(id) {
+  const safeId = _safeId(id);
+  if (!safeId) return false;
+  const dir = path.join(BACKUP_DIR, safeId);
+  if (fs.existsSync(dir) && fs.statSync(dir).isDirectory()) { fs.rmSync(dir, { recursive: true, force: true }); return true; }
+  const flat = path.join(BACKUP_DIR, `${safeId}.json`);
+  if (fs.existsSync(flat)) { fs.unlinkSync(flat); return true; }
   return false;
 }
 
 function _clearAllBackups() {
   const result = { deleted: 0, errors: [] };
   if (!fs.existsSync(BACKUP_DIR)) return result;
-
   for (const entry of fs.readdirSync(BACKUP_DIR)) {
-    const fullPath = path.join(BACKUP_DIR, entry);
-
+    const full = path.join(BACKUP_DIR, entry);
     try {
-      const stat = fs.statSync(fullPath);
-
-      if (stat.isFile() && entry.endsWith('.json')) {
-        fs.unlinkSync(fullPath);
-        result.deleted++;
-        continue;
-      }
-
-      if (stat.isDirectory()) {
-        result.deleted += _clearBackupDirectory(fullPath, result.errors);
-        fs.rmSync(fullPath, { recursive: true, force: true });
-      }
-    } catch (err) {
-      result.errors.push(`${entry}: ${err.message}`);
-    }
+      const stat = fs.statSync(full);
+      if (stat.isFile() && entry.endsWith('.json')) { fs.unlinkSync(full); result.deleted++; }
+      else if (stat.isDirectory()) { fs.rmSync(full, { recursive: true, force: true }); result.deleted++; }
+    } catch (err) { result.errors.push(`${entry}: ${err.message}`); }
   }
-
   return result;
 }
 
-function _clearBackupDirectory(directory, errors) {
-  let deleted = 0;
+function _readFile(p) { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return null; } }
 
-  for (const entry of fs.readdirSync(directory)) {
-    const fullPath = path.join(directory, entry);
-
-    try {
-      const stat = fs.statSync(fullPath);
-      if (stat.isDirectory()) {
-        deleted += _clearBackupDirectory(fullPath, errors);
-        continue;
-      }
-
-      if (stat.isFile() && entry.endsWith('.json')) {
-        fs.unlinkSync(fullPath);
-        deleted++;
-      }
-    } catch (err) {
-      errors.push(`${entry}: ${err.message}`);
-    }
-  }
-
-  return deleted;
-}
-
-function _readBackupFile(filePath) {
-  try {
-    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
-  } catch {
-    return null;
-  }
-}
-
-function _validateBackup(backup) {
-  if (!backup || typeof backup !== 'object') {
-    return { ok: false, reason: 'format invalide' };
-  }
-
-  if (backup.version !== 1 && backup.version !== 2) {
-    return { ok: false, reason: 'version non supportée' };
-  }
-
-  if (!backup.id || !_safeId(backup.id)) {
-    return { ok: false, reason: 'identifiant invalide' };
-  }
-
-  if (!Array.isArray(backup.roles)) {
-    return { ok: false, reason: 'liste des rôles invalide' };
-  }
-
-  if (!Array.isArray(backup.channels)) {
-    return { ok: false, reason: 'liste des salons invalide' };
-  }
-
-  if (backup.roles.length > 250) {
-    return { ok: false, reason: 'trop de rôles dans la sauvegarde' };
-  }
-
-  if (backup.channels.length > 500) {
-    return { ok: false, reason: 'trop de salons dans la sauvegarde' };
-  }
-
+function _validateBackup(b) {
+  if (!b || typeof b !== 'object')            return { ok: false, reason: 'format invalide' };
+  if (b.version !== 1 && b.version !== 2)     return { ok: false, reason: 'version non supportée' };
+  if (!b.id || !_safeId(b.id))               return { ok: false, reason: 'identifiant invalide' };
+  if (!Array.isArray(b.roles))               return { ok: false, reason: 'liste des rôles invalide' };
+  if (!Array.isArray(b.channels))            return { ok: false, reason: 'liste des salons invalide' };
+  if (b.roles.length > 250)                  return { ok: false, reason: 'trop de rôles' };
+  if (b.channels.length > 500)              return { ok: false, reason: 'trop de salons' };
   return { ok: true };
 }
 
-function _safeId(value) {
-  const id = String(value || '').trim().toLowerCase();
-  if (!/^[a-z0-9_-]{6,32}$/.test(id)) return null;
-  return id;
-}
-
-function _makeBackupId() {
-  const now = Date.now().toString(36);
-  const random = Math.random().toString(36).slice(2, 8);
-  return `${now}-${random}`;
-}
-
-function _formatDate(ts) {
-  const date = new Date(Number(ts) * 1000);
-  if (Number.isNaN(date.getTime())) return 'Date inconnue';
-  return `<t:${Math.floor(date.getTime() / 1000)}:f>`;
-}
-
-function _escape(value) {
-  return String(value).replace(/[*_`~|]/g, '\\$&').slice(0, 80);
-}
-
-async function _handleError(message, err) {
-  console.error('[backup] error:', err);
-  return embed.replyError(
-    message,
-    'Une erreur est survenue pendant le traitement du backup.',
-    { timestamp: false }
-  ).catch(() => null);
-}
+function _safeId(v)     { const id = String(v || '').trim().toLowerCase(); return /^[a-z0-9_-]{6,32}$/.test(id) ? id : null; }
+function _makeId()      { return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`; }
+function _rolePos(r)    { const p = Number(r?.rawPosition ?? r?.position ?? 1); return Number.isFinite(p) ? p : 1; }
+function _fmt(ts)       { return `<t:${Math.floor(Number(ts))}:f>`; }
+function _esc(v)        { return String(v).replace(/[*_`~|]/g, '\\$&').slice(0, 80); }

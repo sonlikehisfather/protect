@@ -50,7 +50,7 @@ exports.run = async (client, message, args) => {
     } else {
       const { choice, result, win, xpGain } = extra;
       const emoji   = result === 'pile' ? '👤' : '⚡';
-      const verdict = win ? `✅ Gagné ! (+${xpGain} XP)` : `❌ Perdu... (+${xpGain} XP)`;
+      const verdict = win ? `✔ Gagné ! (+${xpGain} XP)` : `× Perdu... (+${xpGain} XP)`;
       container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
         `## 🪙 Pile ou Face\n\n**Ton choix** : ${choice.toUpperCase()}\n**Résultat** : ${emoji} ${result.toUpperCase()}\n\n${verdict}`,
       ));
@@ -90,7 +90,7 @@ exports.run = async (client, message, args) => {
       await sent.edit(_buildV2('result', { choice, result, win, xpGain })).catch(() => {});
     } else {
       const emoji    = result === 'pile' ? '👤' : '⚡';
-      const winEmoji = win ? '✅' : '❌';
+      const winEmoji = win ? '✔' : '×';
       await sent.edit({
         embeds: [embed.build(guildId, null, {
           title: '🪙 Pile ou Face',

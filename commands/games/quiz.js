@@ -277,8 +277,8 @@ exports.run = async (client, message, args) => {
   let score   = 0;
 
   const _btnRow = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('quiz:true').setLabel('✅ VRAI').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId('quiz:false').setLabel('❌ FAUX').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId('quiz:true').setLabel('✔ VRAI').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('quiz:false').setLabel('✖ FAUX').setStyle(ButtonStyle.Danger),
   );
 
   const _buildV2Question = () => {
@@ -334,8 +334,8 @@ exports.run = async (client, message, args) => {
 
     if (V2_AVAILABLE) {
       const feedbackBody = isCorrect
-        ? `✅ **Bonne réponse !**\n> **${q.q}** est bien **${answer}** !`
-        : `❌ **Mauvaise réponse !**\n> La réponse était **${answer}**.`;
+        ? `✔ **Bonne réponse !**\n> **${q.q}** est bien **${answer}** !`
+        : `✖ **Mauvaise réponse !**\n> La réponse était **${answer}**.`;
       const feedbackContainer = new ContainerBuilder()
         .addTextDisplayComponents(new TextDisplayBuilder().setContent(feedbackBody));
       await sent.edit({ components: [feedbackContainer], flags: COMPONENTS_V2_FLAG }).catch(() => {});

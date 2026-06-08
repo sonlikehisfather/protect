@@ -1,8 +1,17 @@
 'use strict';
 
+const {
+  ContainerBuilder,
+  TextDisplayBuilder,
+  MessageFlags,
+} = require('discord.js');
 
 const db    = require('../../core/database');
 const embed = require('../../utils/embed');
+
+const COMPONENTS_V2_FLAG = MessageFlags?.IsComponentsV2 ?? (1 << 15);
+const V2_AVAILABLE       = typeof ContainerBuilder === 'function' &&
+                           typeof TextDisplayBuilder === 'function';
 
 module.exports = {
   help: {
@@ -79,47 +88,66 @@ module.exports = {
       }
     }
 
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(guildId, null, {
-          title  : 'Informations du bannissement',
-          fields : [
-            {
-              name  : 'Utilisateur',
-              value : `<@${ban.user.id}> (${ban.user.tag}) \`${ban.user.id}\``,
-              inline: false,
-            },
-            {
-              name  : 'Profil',
-              value : `https://discord.com/users/${ban.user.id}`,
-              inline: false,
-            },
-            {
-              name  : 'Statut',
-              value : statusText,
-              inline: false,
-            },
-            {
-              name  : 'Fin du bannissement',
-              value : endText,
-              inline: false,
-            },
-            {
-              name  : 'Modérateur',
-              value : modText,
-              inline: false,
-            },
-            {
-              name  : 'Raison',
-              value : _truncate(reasonText),
-              inline: false,
-            },
-          ],
-          timestamp: false,
-        })
-      ],
-      allowedMentions: { repliedUser: false },
-    }).catch(() => null);
+    const isTmp  = statusText === 'Banni temporairement';
+    const banDateText = activeBan?.createdAt
+      ? `<t:${activeBan.createdAt}:f>`
+      : 'Inconnue';
+
+    const lines  = [
+      `## <@${ban.user.id}> \`${ban.user.id}\``,
+      '',
+      `**Statut** › ${statusText}`,
+      `**Banni le** › ${banDateText}`,
+      `**Modérateur** › ${modText}`,
+    ];
+
+    if (isTmp) {
+      lines.push(`**Expiration** › ${endText}`);
+    }
+
+    const tsFooter = activeBan?.createdAt ? `-# <t:${activeBan.createdAt}:f>` : null;
+    lines.push('', `> ${_truncate(reasonText)}`);
+    if (tsFooter) lines.push('', tsFooter);
+
+    const body = lines.join('\n');
+
+    let payload;
+
+    if (V2_AVAILABLE) {
+      try {
+        const container = new ContainerBuilder().setAccentColor(0xED4245);
+        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(body));
+        payload = {
+          embeds          : [],
+          components      : [container],
+          flags           : COMPONENTS_V2_FLAG,
+          allowedMentions : { parse: [] },
+        };
+      } catch { V2_AVAILABLE && (payload = null); }
+    }
+
+    if (!payload) {
+      const fields = [
+        { name: 'Statut',      value: statusText,            inline: true },
+        { name: 'Modérateur',  value: modText,               inline: true },
+      ];
+      if (isTmp) fields.push({ name: 'Expiration', value: endText, inline: true });
+      fields.push({ name: 'Raison', value: _truncate(reasonText), inline: false });
+
+      payload = {
+        embeds: [embed.build(guildId, null, {
+          authorName : `${ban.user.username}`,
+          authorIcon : ban.user.displayAvatarURL({ size: 64, extension: 'png' }),
+          color      : '#ED4245',
+          fields,
+          footer     : { text: ban.user.id },
+          timestamp  : false,
+        })],
+        allowedMentions: { repliedUser: false },
+      };
+    }
+
+    const sent = await message.channel.send(payload).catch(() => null);
 
     if (sent && deleteReply) {
       embed.scheduleDelete(sent, deleteDelay);

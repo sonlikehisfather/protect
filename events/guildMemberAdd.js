@@ -172,6 +172,22 @@ module.exports = {
 
       await _applyAutoroles(guild, member);
 
+      if (!member.user.bot && Number(config?.ghostPingEnabled) === 1 && config?.ghostPingChannels) {
+        try {
+          const channelIds = JSON.parse(config.ghostPingChannels);
+          for (const channelId of channelIds) {
+            const ch = guild.channels.cache.get(channelId)
+              ?? await client.channels.fetch(channelId).catch(() => null);
+            if (!ch?.isTextBased()) continue;
+            const sent = await ch.send({
+              content        : `<@${member.id}>`,
+              allowedMentions: { users: [member.id] },
+            }).catch(() => null);
+            if (sent) sent.delete().catch(() => {});
+          }
+        } catch {}
+      }
+
       try {
         const verifyEnabled  = Number(config?.verifyEnabled) === 1;
         const verifyDuration = Math.floor(Number(config?.verifyDuration) || 0);
