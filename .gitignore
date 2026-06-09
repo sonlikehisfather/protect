@@ -1,47 +1,38 @@
+# Environnement
 .env
 .env.*
 !.env.example
+
+# Dépendances
 node_modules/
+
+# Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-database.sqlite
-database.sqlite3
+
+# Base de données
 *.db
 *.sqlite
 *.sqlite3
-*.backup*
-*.bak
-*.dump
-*.sql
+*.sqlite-shm
+*.sqlite-wal
+
+# Backups
+data/
+dumps/
 backups/
 !commands/backups/
 !commands/backups/*.js
-data/backups/
-dumps/
+
+# Éditeurs
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
-.git/
-pass*.js
-*_report.js
-*_check.js
-*_cleaner.js
-*_clean.js
-*_final*.js
-_append*.js
-_update*.js
-_comment*.js
-_append_final_report.js
-_final_check.js
-_update_clean_report.js
-_comment_cleaner.js
-.cache/
-dist/
-build/
-coverage/
+
+# Secrets / Certificats
 *.pem
 *.key
 *.crt
@@ -49,3 +40,9 @@ coverage/
 *.pfx
 secrets.json
 config.secret.json
+
+# Build
+.cache/
+dist/
+build/
+coverage/
