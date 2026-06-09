@@ -78,10 +78,6 @@ exports.run = async (client, message, args) => {
   return _openPanel(message, { view: 'home' });
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PANEL PRINCIPAL
-// ─────────────────────────────────────────────────────────────────────────────
-
 async function _openPanel(message, initialState = {}) {
   const guildId = message.guild.id;
 
@@ -115,7 +111,6 @@ async function _openPanel(message, initialState = {}) {
   collector.on('collect', async i => {
     const id = i.customId;
 
-    // ── Close ──────────────────────────────────────────────────────────────
     if (id === 'bp:close') {
       collector.stop('closed');
       embed.clearPrivateInteraction(panel);
@@ -125,13 +120,11 @@ async function _openPanel(message, initialState = {}) {
       return;
     }
 
-    // ── Back to home ───────────────────────────────────────────────────────
     if (id === 'bp:home') {
       state.view = 'home'; state.selected = null; state.status = null;
       await refresh(i); return;
     }
 
-    // ── Main action select ─────────────────────────────────────────────────
     if (id === 'bp:action') {
       const action = i.values[0];
       if (action === 'create') {
@@ -152,7 +145,6 @@ async function _openPanel(message, initialState = {}) {
       return;
     }
 
-    // ── Info select: pick a backup ─────────────────────────────────────────
     if (id === 'bp:info:select') {
       const allBackups = _readAllBackups().sort((a, b) => b.createdAt - a.createdAt);
       state.selected = allBackups.find(b => b.id === i.values[0]) ?? null;
@@ -160,27 +152,23 @@ async function _openPanel(message, initialState = {}) {
       await refresh(i); return;
     }
 
-    // ── List: select backup ────────────────────────────────────────────────
     if (id === 'bp:list:select') {
       const allBackups = _readAllBackups().sort((a, b) => b.createdAt - a.createdAt);
       state.selected = allBackups.find(b => b.id === i.values[0]) ?? null;
       await refresh(i); return;
     }
 
-    // ── List: pagination ───────────────────────────────────────────────────
     if (id === 'bp:list:prev') { state.page = Math.max(0, state.page - 1); state.selected = null; await refresh(i); return; }
     if (id === 'bp:list:next') {
       const total = Math.ceil(_readAllBackups().length / PAGE_SIZE);
       state.page = Math.min(total - 1, state.page + 1); state.selected = null; await refresh(i); return;
     }
 
-    // ── Detail / delete / load from list ──────────────────────────────────
     if (id === 'bp:list')         { state.view = 'list';         state.status = null; state.page = 0; await refresh(i); return; }
     if (id === 'bp:detail')       { state.view = state.selected ? 'detail' : 'list'; state.status = null; await refresh(i); return; }
     if (id === 'bp:confirm_del')  { state.view = state.selected ? 'confirm_del'  : 'list'; state.status = null; await refresh(i); return; }
     if (id === 'bp:confirm_load') { state.view = state.selected ? 'confirm_load' : 'list'; state.status = null; await refresh(i); return; }
 
-    // ── Rename: open modal ────────────────────────────────────────────────
     if (id === 'bp:rename') {
       if (!state.selected) return;
       try {
@@ -215,7 +203,6 @@ async function _openPanel(message, initialState = {}) {
       return;
     }
 
-    // ── Confirm delete ─────────────────────────────────────────────────────
     if (id === 'bp:do_del') {
       if (!state.selected) { state.view = 'home'; await refresh(i); return; }
       const ok = _deleteBackupFile(state.selected.id);
@@ -225,7 +212,6 @@ async function _openPanel(message, initialState = {}) {
       await refresh(i); return;
     }
 
-    // ── Confirm clear ──────────────────────────────────────────────────────
     if (id === 'bp:do_clear') {
       const result   = _clearAllBackups();
       state.view     = 'home';
@@ -234,7 +220,6 @@ async function _openPanel(message, initialState = {}) {
       await refresh(i); return;
     }
 
-    // ── Confirm load ───────────────────────────────────────────────────────
     if (id === 'bp:do_load') {
       if (!state.selected) { state.view = 'home'; await refresh(i); return; }
       const me = message.guild.members.me;
@@ -273,10 +258,6 @@ async function _openPanel(message, initialState = {}) {
   });
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// BUILD PAYLOAD
-// ─────────────────────────────────────────────────────────────────────────────
-
 function _buildPanelPayload(guildId, state, disabled = false) {
   const { view, selected, page, status } = state;
   const allBackups = _readAllBackups().sort((a, b) => b.createdAt - a.createdAt);
@@ -287,7 +268,6 @@ function _buildPanelPayload(guildId, state, disabled = false) {
   let bodyLines = [];
   let accent = 0x5865F2;
 
-  // ── HOME ──────────────────────────────────────────────────────────────────
   if (view === 'home' || view === 'created') {
     accent = view === 'created' ? 0x57F287 : 0x5865F2;
     bodyLines = [
@@ -324,13 +304,11 @@ function _buildPanelPayload(guildId, state, disabled = false) {
     ));
   }
 
-  // ── CREATING ──────────────────────────────────────────────────────────────
   else if (view === 'creating') {
     accent = 0xFEE75C;
     bodyLines = ['## ◌  Creating backup…', '', '›  Saving roles, channels and assets…'];
   }
 
-  // ── LIST ──────────────────────────────────────────────────────────────────
   else if (view === 'list') {
     accent = 0x5865F2;
     bodyLines = [
@@ -383,7 +361,6 @@ function _buildPanelPayload(guildId, state, disabled = false) {
     rows.push(new ActionRowBuilder().addComponents(...navRow));
   }
 
-  // ── DETAIL ────────────────────────────────────────────────────────────────
   else if (view === 'detail' && selected) {
     accent = 0x5865F2;
     bodyLines = [
@@ -408,7 +385,6 @@ function _buildPanelPayload(guildId, state, disabled = false) {
     ));
   }
 
-  // ── CONFIRM DELETE ────────────────────────────────────────────────────────
   else if (view === 'confirm_del' && selected) {
     accent = 0xED4245;
     bodyLines = [
@@ -427,7 +403,6 @@ function _buildPanelPayload(guildId, state, disabled = false) {
     ));
   }
 
-  // ── CONFIRM CLEAR ─────────────────────────────────────────────────────────
   else if (view === 'confirm_clear') {
     accent = 0xED4245;
     bodyLines = [
@@ -444,7 +419,6 @@ function _buildPanelPayload(guildId, state, disabled = false) {
     ));
   }
 
-  // ── CONFIRM LOAD ──────────────────────────────────────────────────────────
   else if (view === 'confirm_load' && selected) {
     accent = 0xED4245;
     bodyLines = [
@@ -465,7 +439,6 @@ function _buildPanelPayload(guildId, state, disabled = false) {
     ));
   }
 
-  // ── INFO SELECT ──────────────────────────────────────────────────────────
   else if (view === 'info_select') {
     accent = 0x5865F2;
     bodyLines = [
@@ -492,13 +465,11 @@ function _buildPanelPayload(guildId, state, disabled = false) {
     ));
   }
 
-  // ── LOADING ───────────────────────────────────────────────────────────────
   else if (view === 'loading') {
     accent = 0xFEE75C;
     bodyLines = ['## ◌  Restoring backup…', '', '›  Rebuilding roles and channels…'];
   }
 
-  // ── LOADED ────────────────────────────────────────────────────────────────
   else if (view === 'loaded') {
     accent = 0x57F287;
     bodyLines = ['## +  Restore complete'];
@@ -509,7 +480,6 @@ function _buildPanelPayload(guildId, state, disabled = false) {
     ));
   }
 
-  // ── FALLBACK ──────────────────────────────────────────────────────────────
   else {
     bodyLines = ['## »  Backup manager'];
     rows.push(new ActionRowBuilder().addComponents(
@@ -518,7 +488,6 @@ function _buildPanelPayload(guildId, state, disabled = false) {
     ));
   }
 
-  // ── BUILD MESSAGE ─────────────────────────────────────────────────────────
   if (V2_OK) {
     const c = new ContainerBuilder().setAccentColor(accent);
     c.addTextDisplayComponents(new TextDisplayBuilder().setContent(bodyLines.join('\n')));
@@ -535,10 +504,6 @@ function _buildPanelPayload(guildId, state, disabled = false) {
     allowedMentions: { parse: [] },
   };
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// STANDALONE CREATE (invoked from list panel via collector)
-// ─────────────────────────────────────────────────────────────────────────────
 
 async function _standalonCreate(message, nameArgs) {
   const guild = message.guild;
@@ -562,10 +527,6 @@ async function _doCreate(message) {
   return backup;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// RENAME
-// ─────────────────────────────────────────────────────────────────────────────
-
 function _renameBackup(id, newName) {
   const safeId = _safeId(id);
   if (!safeId) return false;
@@ -583,10 +544,6 @@ function _renameBackup(id, newName) {
   } catch { return false; }
 }
 
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SERIALIZE / RESTORE
-// ─────────────────────────────────────────────────────────────────────────────
 
 async function _serializeGuild(guild, createdBy, name) {
   const roles = guild.roles.cache
@@ -831,10 +788,6 @@ function _mapOverwrites(overwrites, roleMap, userMap, guild) {
   }
   return mapped;
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// FILE HELPERS
-// ─────────────────────────────────────────────────────────────────────────────
 
 function _ensureDir() { fs.mkdirSync(BACKUP_DIR, { recursive: true }); }
 

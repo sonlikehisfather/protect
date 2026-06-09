@@ -3448,7 +3448,7 @@ function runMigrations(db) {
   db.transaction(() => {
     for (const migration of pending) {
       migration.up(db);
-      db.prepare('INSERT INTO schema_version (version) VALUES (?)').run(migration.version);
+      db.prepare('INSERT OR IGNORE INTO schema_version (version) VALUES (?)').run(migration.version);
     }
   })();
 
@@ -7164,7 +7164,7 @@ const db = {
     const existing = _stmts.getRainbowRole.get(guildId, roleId);
     const mode = options.mode || 'rainbow';
     const paletteSize = Number(options.paletteSize) || 7;
-    const active = options.active === false ? 0 : 1;
+    const active = (options.active === false || options.active === 0) ? 0 : 1;
     const interval = Number(options.interval) || 60;
     const nextRun = options.nextRun || new Date(Date.now() + interval * 1000).toISOString();
     const color = options.color !== undefined ? options.color : existing?.color ?? null;

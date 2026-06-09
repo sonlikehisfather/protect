@@ -132,7 +132,7 @@ async function _applyImmediateRainbowRole(guild, row) {
 
   if (!role.editable) {
     db.updateRainbowRole(guild.id, row.roleId, { active: 0 });
-    return;
+    return { error: 'not_editable' };
   }
 
   const previousColor = row.color || (role.color ? `#${role.color.toString(16).padStart(6, '0')}` : null);
@@ -155,8 +155,10 @@ async function _applyImmediateRainbowRole(guild, row) {
   } catch (err) {
     if (err?.code === 50013) {
       db.updateRainbowRole(guild.id, row.roleId, { active: 0 });
+      return { error: 'missing_permissions' };
     }
     console.error('[rainbowrole] immediate update failed:', err?.message || err);
+    return { error: 'unknown' };
   }
 }
 
@@ -216,7 +218,7 @@ module.exports = {
 
     const buildPayload = (disabled = false) => {
       const entries = db.getRainbowRoles(guildId);
-      const selectedRoleExists = state.selectedRoleId && guild.roles.cache.has(state.selectedRoleId);
+      const selectedRoleExists = state.selectedRoleId && entries.some(e => e.roleId === state.selectedRoleId);
       if (!selectedRoleExists && entries.length) {
         state.selectedRoleId = entries[0].roleId;
       }
@@ -621,7 +623,7 @@ module.exports = {
             const selectedRoleId = state.selectedRoleId;
             if (selectedRoleId) {
               const current = db.getRainbowRole(guildId, selectedRoleId);
-              const active = !(current?.active ?? true);
+              const active = current ? !Boolean(current.active) : true;
               const row = db.setRainbowRole(guildId, selectedRoleId, {
                 active,
                 interval: current?.interval ?? 60,
@@ -630,7 +632,13 @@ module.exports = {
                 nextRun: new Date(Date.now() + (current?.interval ?? 60) * 1000).toISOString(),
               });
               if (row && row.active) {
-                await _applyImmediateRainbowRole(guild, row);
+                const applyResult = await _applyImmediateRainbowRole(guild, row);
+                if (applyResult?.error) {
+                  const errMsg = applyResult.error === 'missing_permissions' || applyResult.error === 'not_editable'
+                    ? '‼ Permissions insuffisantes — le bot ne peut pas modifier ce rôle (hiérarchie ou permissions manquantes).'
+                    : '‼ Erreur lors de l\'application de la couleur.';
+                  await interaction.followUp({ content: errMsg, flags: 64 }).catch(() => {});
+                }
               }
             }
             try {
