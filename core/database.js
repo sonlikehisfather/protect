@@ -3430,6 +3430,18 @@ up(db) {
     },
   },
 
+  {
+    version: 104,
+    up(db) {
+      const hasColumn = (table, col) =>
+        !!db.prepare(`SELECT 1 FROM pragma_table_info('${table}') WHERE name = ?`).get(col);
+
+      if (!hasColumn('ticket_options', 'buttonStyle')) {
+        db.exec('ALTER TABLE ticket_options ADD COLUMN buttonStyle TEXT');
+      }
+    },
+  },
+
 ];
 
 
@@ -3935,8 +3947,8 @@ function prepareStatements(db) {
       INSERT INTO ticket_options (
         panelId, label, emoji, description, categoryId,
         mentionRoles, staffRoles, logChannelId,
-        openMessage, openEmbedJson, nameTemplate
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        openMessage, openEmbedJson, nameTemplate, buttonStyle
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `),
 
     getTicketOptionsByPanel : db.prepare(`
@@ -3960,7 +3972,8 @@ function prepareStatements(db) {
         logChannelId  = COALESCE(?, logChannelId),
         openMessage   = COALESCE(?, openMessage),
         openEmbedJson = COALESCE(?, openEmbedJson),
-        nameTemplate  = COALESCE(?, nameTemplate)
+        nameTemplate  = COALESCE(?, nameTemplate),
+        buttonStyle   = COALESCE(?, buttonStyle)
       WHERE id = ?
     `),
 
@@ -5006,6 +5019,7 @@ const db = {
       data.openMessage ?? null,
       data.openEmbedJson ?? null,
       data.nameTemplate ?? null,
+      data.buttonStyle ?? null,
     ).lastInsertRowid;
   },
 
@@ -5028,7 +5042,7 @@ const db = {
     const db = getDb();
     const ALLOWED = new Set([
       'label','emoji','description','categoryId','mentionRoles',
-      'staffRoles','logChannelId','openMessage','openEmbedJson','nameTemplate',
+      'staffRoles','logChannelId','openMessage','openEmbedJson','nameTemplate','buttonStyle',
     ]);
     const entries = Object.entries(data).filter(([k, v]) => ALLOWED.has(k) && v !== undefined);
     if (!entries.length) return;

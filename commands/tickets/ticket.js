@@ -299,10 +299,9 @@ async function _renderTicketSettingsSelector(client, message, panels, existingSe
     .setCustomId('tp_settings_select')
     .setPlaceholder('Choisir un panel')
     .addOptions(visible.map((p, idx) => ({
-      label       : `Panel ${idx + 1}`.slice(0, 100),
+      label       : `⌘ Panel ${idx + 1}`.slice(0, 100),
       value       : String(p.id),
       description : `${p.panelType === 'select' ? 'Sélecteur' : 'Boutons'} · ${p.messageId ? 'Envoyé' : 'Non envoyé'}`.slice(0, 100),
-      emoji       : '🎫',
     })));
 
   const closeRow = new ActionRowBuilder().addComponents(
@@ -484,64 +483,43 @@ async function _openPanelConfig(client, message, panelId, existingSent = null) {
 
   const runSetEmbedModal = async interaction => {
     const parsed = _safeJsonParse(panel.embedJson) || {};
-    const modal = _modal(`tp_modal_embed_${panel.id}`, 'Personnaliser l\'embed', [
-      _input('title',       'Titre',                 TextInputStyle.Short,     { value: parsed.title || '',       maxLength: 256,  required: false }),
-      _input('description', 'Description',           TextInputStyle.Paragraph, { value: parsed.description || '', maxLength: 4000, required: false, placeholder: 'Texte de l\'embed du panel (vide = aucune)' }),
-      _input('color',       'Couleur hex (#5865F2)', TextInputStyle.Short,     { value: parsed.color || '',       maxLength: 7,    required: false, placeholder: '#2B2D31' }),
-      _input('footer',      'Footer',                TextInputStyle.Short,     { value: parsed.footer || '',      maxLength: 256,  required: false }),
-      _input('image',       'URL image',             TextInputStyle.Short,     { value: parsed.image || '',       maxLength: 512,  required: false, placeholder: 'https://...' }),
-    ]);
+    const initialState = {
+      title: parsed.title || null,
+      description: parsed.description || null,
+      color: parsed.color || null,
+      footer: parsed.footer || null,
+      footerIcon: parsed.footerIcon || null,
+      image: parsed.image || null,
+      thumbnail: parsed.thumbnail || null,
+      author: parsed.author || null,
+      authorIcon: parsed.authorIcon || null,
+      authorUrl: parsed.authorUrl || null,
+      url: parsed.url || null,
+      timestamp: parsed.timestamp || false,
+      fields: parsed.fields || [],
+    };
 
-    busy = true;
-    const _shown = await interaction.showModal(modal).then(() => true).catch(() => false);
-    busy = false;
-    if (!_shown) return;
+    await interaction.deferUpdate().catch(() => {});
 
-    const modalSubmit = await _awaitOwnModal(interaction, `tp_modal_embed_${panel.id}`);
-    if (!modalSubmit) {
+    const embedCmd = require('../server/embed.js');
+    await embedCmd.openForTicket(client, message, initialState, async (saveData) => {
+      db.updateTicketPanelEmbed(panel.id, JSON.stringify({
+        title: saveData.title,
+        description: saveData.description,
+        color: saveData.color,
+        footer: saveData.footer,
+        footerIcon: saveData.footerIcon,
+        image: saveData.image,
+        thumbnail: saveData.thumbnail,
+        author: saveData.author,
+        authorIcon: saveData.authorIcon,
+        authorUrl: saveData.authorUrl,
+        url: saveData.url,
+        timestamp: saveData.timestamp,
+        fields: saveData.fields || [],
+      }));
       await refreshMessage();
-      return;
-    }
-
-    busy = true;
-    try {
-
-    const title       = modalSubmit.fields.getTextInputValue('title').trim();
-    const description = modalSubmit.fields.getTextInputValue('description').trim();
-    const colorRaw    = modalSubmit.fields.getTextInputValue('color').trim();
-    const footer      = modalSubmit.fields.getTextInputValue('footer').trim();
-    const image       = modalSubmit.fields.getTextInputValue('image').trim();
-
-    const color = colorRaw ? _normalizeHexColor(colorRaw) : null;
-    if (colorRaw && !color) {
-      return modalSubmit.reply({
-        embeds: [embed.build(guildId, 'Couleur invalide. Exemple : `#5865F2`', { color: '#ED4245' })],
-        flags : MessageFlags.Ephemeral,
-      }).catch(() => {});
-    }
-
-    const imageUrl = image ? _validateHttpUrl(image) : null;
-    if (image && !imageUrl) {
-      return modalSubmit.reply({
-        embeds: [embed.build(guildId, 'URL d\'image invalide.', { color: '#ED4245' })],
-        flags : MessageFlags.Ephemeral,
-      }).catch(() => {});
-    }
-
-    db.updateTicketPanelEmbed(panel.id, JSON.stringify({
-      title       : title || null,
-      description : description || null,
-      color       : color || null,
-      footer      : footer || null,
-      image       : imageUrl || null,
-      thumbnail   : null,
-    }));
-
-    await modalSubmit.deferUpdate().catch(() => {});
-    await refreshMessage();
-    } finally {
-      busy = false;
-    }
+    });
   };
 
 
@@ -1186,7 +1164,8 @@ async function _openPanelConfig(client, message, panelId, existingSent = null) {
     if (id === 'tp_validate') {
       collector.stop('validated');
       await interaction.deferUpdate().catch(() => {});
-      return sent.edit(buildClosedPayload('Configuration du panel enregistrée.')).catch(() => {});
+      await sent.edit(buildClosedPayload('Configuration du panel enregistrée.')).catch(() => {});
+      return;
     }
 
     if (id === 'tp_add_panel') {
@@ -1443,13 +1422,12 @@ function _buildPanelConfigRows(panel, options, viewState = 'main', guild = null,
 
 
   const optionSelections = [
-    { label: 'Ajouter une option', value: 'add_option', description: 'Créer une nouvelle option', emoji: '➕' },
+    { label: '[+] Ajouter', value: 'add_option', description: 'Créer une nouvelle option' },
     ...(options.length
       ? options.slice(0, 24).map((o, idx) => ({
-          label       : String(o.label || `Option ${idx + 1}`).slice(0, 100),
+          label       : `[✎] ${String(o.label || `Option ${idx + 1}`)}`.slice(0, 100),
           value       : `edit_option_${o.id}`,
           description : `Modifier l'option ${idx + 1}`.slice(0, 100),
-          emoji       : '✏️',
         }))
       : [{ label: 'Aucune option configurée', value: 'no_option', description: 'Aucune action disponible' }]),
   ].slice(0, 25);
@@ -1463,8 +1441,8 @@ function _buildPanelConfigRows(panel, options, viewState = 'main', guild = null,
   const footerButtons = [
     new ButtonBuilder().setCustomId('tp_validate').setLabel('Valider').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('tp_add_panel').setLabel('Ajouter un panel').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('tp_advanced').setEmoji('🔧').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('tp_delete').setEmoji('🗑️').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId('tp_advanced').setLabel('Outils').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('tp_delete').setLabel('Suppr').setStyle(ButtonStyle.Danger),
   ];
   if (hasMultiplePanels) {
     footerButtons.push(new ButtonBuilder().setCustomId('tp_back').setLabel('Retour').setStyle(ButtonStyle.Secondary));
@@ -1482,21 +1460,22 @@ function _buildPanelConfigRows(panel, options, viewState = 'main', guild = null,
 
 
 function _buildPanelConfigAdvancedRows(panel) {
+  const fmtDelay = s => (s ? _secondsToHuman(s) || `${s}s` : 'Désactivée');
   const configSelections = [
-    { label: 'Choisir le message du panel',     value: 'set_embed',          description: 'Personnaliser titre, description et visuel', emoji: '✏️' },
-    { label: 'Envoyer un message automatique',  value: 'send_auto',          description: 'Publier le panel dans son salon',            emoji: '📤' },
-    { label: 'Nombre max de tickets',           value: 'set_max',            description: 'Limiter les tickets par membre',             emoji: '🔢' },
-    { label: 'Suppression automatique',         value: 'set_autodelete',     description: 'Définir un délai avant suppression',         emoji: '🧹' },
-    { label: 'Fermeture inactive',              value: 'set_inactiveclose',  description: 'Fermer si aucun message pendant X temps',    emoji: '⏳' },
-    { label: 'Salon de logs',                   value: 'set_logchannel',     description: 'Définir où envoyer les logs',                emoji: '📡' },
-    { label: `Transcript MP : ${panel.transcriptDm ? 'Activé' : 'Désactivé'}`,                 value: 'toggle_transcriptdm', description: 'Activer ou désactiver l\'envoi en MP',       emoji: '📩' },
-    { label: `Bouton claim : ${Number(panel.showClaimButton ?? 1) ? 'Activé' : 'Désactivé'}`,  value: 'toggle_claim_btn',    description: 'Afficher ou masquer le bouton claim',       emoji: '📌' },
-    { label: `Bouton close : ${Number(panel.showCloseButton ?? 1) ? 'Activé' : 'Désactivé'}`,  value: 'toggle_close_btn',    description: 'Afficher ou masquer le bouton close',       emoji: '🔒' },
-    { label: `Close on leave : ${Number(panel.closeOnLeave) ? 'Activé' : 'Désactivé'}`,        value: 'toggle_closeonleave', description: 'Fermer le ticket si le membre quitte',      emoji: '🚪' },
-    { label: `Autoclaim : ${panel.claimMode === 'autoclaim' ? 'Activé' : 'Désactivé'}`,        value: 'toggle_autoclaim',    description: 'Activer ou désactiver l\'autoclaim',         emoji: '⚡' },
-    { label: 'Rôles bypass (max tickets)',      value: 'set_bypass_roles',   description: 'Rôles qui ignorent la limite',              emoji: '🛡️' },
+    { label: '[1] Choisir le message',          value: 'set_embed',          description: 'Personnaliser titre, description et visuel' },
+    { label: '[2] Envoyer le panel',            value: 'send_auto',          description: 'Publier le panel dans son salon' },
+    { label: '[3] Nombre max de tickets',       value: 'set_max',            description: 'Limiter les tickets par membre' },
+    { label: `[4] Suppression auto : ${fmtDelay(panel.autoDeleteSeconds) || 'Désactivée'}`, value: 'set_autodelete', description: 'Délai avant suppression du ticket fermé' },
+    { label: '[5] Fermeture inactive',          value: 'set_inactiveclose',  description: 'Fermer si aucun message pendant X temps' },
+    { label: '[6] Salon de logs',               value: 'set_logchannel',     description: 'Définir où envoyer les logs' },
+    { label: `Transcript MP : ${panel.transcriptDm ? 'Activé' : 'Désactivé'}`,                 value: 'toggle_transcriptdm', description: 'Activer ou désactiver l\'envoi en MP' },
+    { label: `Bouton claim : ${Number(panel.showClaimButton ?? 1) ? 'Activé' : 'Désactivé'}`,  value: 'toggle_claim_btn',    description: 'Afficher ou masquer le bouton claim' },
+    { label: `Bouton close : ${Number(panel.showCloseButton ?? 1) ? 'Activé' : 'Désactivé'}`,  value: 'toggle_close_btn',    description: 'Afficher ou masquer le bouton close' },
+    { label: `Close on leave : ${Number(panel.closeOnLeave) ? 'Activé' : 'Désactivé'}`,        value: 'toggle_closeonleave', description: 'Fermer le ticket si le membre quitte' },
+    { label: `Autoclaim : ${panel.claimMode === 'autoclaim' ? 'Activé' : 'Désactivé'}`,        value: 'toggle_autoclaim',    description: 'Activer ou désactiver l\'autoclaim' },
+    { label: '[7] Rôles bypass',              value: 'set_bypass_roles',   description: 'Rôles qui ignorent la limite' },
     ...(panel.panelType === 'select'
-      ? [{ label: 'Texte du menu', value: 'set_placeholder', description: 'Modifier le placeholder du menu déroulant', emoji: '💬' }]
+      ? [{ label: '[8] Texte du menu', value: 'set_placeholder', description: 'Modifier le placeholder du menu' }]
       : []),
   ].slice(0, 25);
 
@@ -1524,34 +1503,34 @@ function _hexToInt(hex) {
 
 function _buildOptionMenuChoices(options) {
   return [
-    { label: 'Ajouter une option', value: 'add_option', description: 'Créer une nouvelle option', emoji: '➕' },
+    { label: '[+] Ajouter', value: 'add_option', description: 'Créer une nouvelle option' },
     ...(options.length
       ? options.slice(0, 24).map((o, idx) => ({
-          label       : String(o.label || `Option ${idx + 1}`).slice(0, 100),
+          label       : `[✎] ${String(o.label || `Option ${idx + 1}`)}`.slice(0, 100),
           value       : `edit_option_${o.id}`,
           description : `Modifier l'option ${idx + 1}`.slice(0, 100),
-          emoji       : '✏️',
         }))
       : [{ label: 'Aucune option configurée', value: 'no_option', description: 'Aucune action disponible' }]),
   ].slice(0, 25);
 }
 
 function _buildAdvancedSelectOptions(panel) {
+  const fmtDelay = s => (s ? _secondsToHuman(s) || `${s}s` : 'Désactivée');
   return [
-    { label: 'Modifier le message du panel',    value: 'set_embed',          emoji: '✏️',  description: 'Personnaliser titre, description et visuel' },
-    { label: 'Envoyer le panel',                value: 'send_auto',          emoji: '📤',  description: 'Publier le panel dans son salon' },
-    { label: 'Nombre max de tickets',           value: 'set_max',            emoji: '🔢',  description: 'Limiter les tickets par membre' },
-    { label: 'Suppression automatique',         value: 'set_autodelete',     emoji: '🧹',  description: 'Définir un délai avant suppression' },
-    { label: 'Fermeture inactive',              value: 'set_inactiveclose',  emoji: '⏳',  description: 'Fermer si aucun message pendant X temps' },
-    { label: 'Salon de logs',                   value: 'set_logchannel',     emoji: '📡',  description: 'Définir où envoyer les logs' },
-    { label: `Transcript MP : ${panel.transcriptDm ? 'Activé' : 'Désactivé'}`,                 value: 'toggle_transcriptdm', emoji: '📩',  description: 'Activer ou désactiver l\'envoi en MP' },
-    { label: `Bouton claim : ${Number(panel.showClaimButton ?? 1) ? 'Activé' : 'Désactivé'}`,  value: 'toggle_claim_btn',    emoji: '📌',  description: 'Afficher ou masquer le bouton claim' },
-    { label: `Bouton close : ${Number(panel.showCloseButton ?? 1) ? 'Activé' : 'Désactivé'}`,  value: 'toggle_close_btn',    emoji: '🔒',  description: 'Afficher ou masquer le bouton close' },
-    { label: `Close on leave : ${Number(panel.closeOnLeave) ? 'Activé' : 'Désactivé'}`,        value: 'toggle_closeonleave', emoji: '🚪',  description: 'Fermer le ticket si le membre quitte' },
-    { label: `Autoclaim : ${panel.claimMode === 'autoclaim' ? 'Activé' : 'Désactivé'}`,        value: 'toggle_autoclaim',    emoji: '⚡',  description: 'Activer ou désactiver l\'autoclaim' },
-    { label: 'Rôles bypass (max tickets)',      value: 'set_bypass_roles',   emoji: '🛡️', description: 'Rôles qui ignorent la limite' },
+    { label: 'Modifier le message du panel',    value: 'set_embed',          description: 'Personnaliser titre, description et visuel' },
+    { label: 'Envoyer le panel',                value: 'send_auto',          description: 'Publier le panel dans son salon' },
+    { label: 'Nombre max de tickets',           value: 'set_max',            description: 'Limiter les tickets par membre' },
+    { label: `Suppression auto : ${fmtDelay(panel.autoDeleteSeconds) || 'Désactivée'}`, value: 'set_autodelete', description: 'Délai avant suppression du ticket fermé' },
+    { label: 'Fermeture inactive',              value: 'set_inactiveclose',  description: 'Fermer si aucun message pendant X temps' },
+    { label: 'Salon de logs',                   value: 'set_logchannel',     description: 'Définir où envoyer les logs' },
+    { label: `Transcript MP : ${panel.transcriptDm ? 'Activé' : 'Désactivé'}`,                 value: 'toggle_transcriptdm', description: 'Activer ou désactiver l\'envoi en MP' },
+    { label: `Bouton claim : ${Number(panel.showClaimButton ?? 1) ? 'Activé' : 'Désactivé'}`,  value: 'toggle_claim_btn',    description: 'Afficher ou masquer le bouton claim' },
+    { label: `Bouton close : ${Number(panel.showCloseButton ?? 1) ? 'Activé' : 'Désactivé'}`,  value: 'toggle_close_btn',    description: 'Afficher ou masquer le bouton close' },
+    { label: `Close on leave : ${Number(panel.closeOnLeave) ? 'Activé' : 'Désactivé'}`,        value: 'toggle_closeonleave', description: 'Fermer le ticket si le membre quitte' },
+    { label: `Autoclaim : ${panel.claimMode === 'autoclaim' ? 'Activé' : 'Désactivé'}`,        value: 'toggle_autoclaim',    description: 'Activer ou désactiver l\'autoclaim' },
+    { label: 'Rôles bypass (max tickets)',      value: 'set_bypass_roles',   description: 'Rôles qui ignorent la limite' },
     ...(panel.panelType === 'select'
-      ? [{ label: 'Texte du menu', value: 'set_placeholder', emoji: '💬', description: 'Modifier le placeholder du menu déroulant' }]
+      ? [{ label: 'Texte du menu', value: 'set_placeholder', description: 'Modifier le placeholder du menu déroulant' }]
       : []),
   ].slice(0, 25);
 }
@@ -1584,21 +1563,21 @@ function _appendMainV2(container, panel, options, guild) {
 
 
   const channelPart = panel.channelId ? `<#${panel.channelId}>` : '';
-  const statePart   = panel.messageId ? '💬' : 'Message non configuré';
+  const statePart   = panel.messageId ? '' : 'Message non configuré';
   const messageLine = channelPart ? `${channelPart} › ${statePart}` : statePart;
 
 
-  container.addSectionComponents(
-    new SectionBuilder()
-      .addTextDisplayComponents(
-        new TextDisplayBuilder().setContent('## Paramètres des tickets'),
-      )
-      .setButtonAccessory(
-        new ButtonBuilder()
-          .setCustomId('tp_advanced')
-          .setEmoji('🔧')
-          .setStyle(ButtonStyle.Secondary),
-      ),
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent('## Paramètres des tickets'),
+  );
+  container.addActionRowComponents(
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('tp_advanced')
+        .setEmoji('🔧')
+        .setLabel('Outils avancés')
+        .setStyle(ButtonStyle.Secondary),
+    ),
   );
 
   container.addTextDisplayComponents(
@@ -1671,10 +1650,10 @@ function _appendMainV2(container, panel, options, guild) {
 
   container.addActionRowComponents(
     new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('tp_validate').setLabel('Valider').setEmoji('').setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId('tp_add_panel').setLabel('Ajouter un panel').setEmoji('➕').setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId('tp_delete').setEmoji('🗑️').setStyle(ButtonStyle.Danger),
-      new ButtonBuilder().setCustomId('tp_back').setEmoji('↩️').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId('tp_validate').setLabel('Valider').setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId('tp_add_panel').setLabel('+ Panel').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId('tp_delete').setLabel('Suppr').setStyle(ButtonStyle.Danger),
+      new ButtonBuilder().setCustomId('tp_back').setLabel('←').setStyle(ButtonStyle.Secondary),
     ),
   );
 }
@@ -1711,14 +1690,16 @@ function _appendAdvancedV2(container, panel) {
   const parsed   = _safeJsonParse(panel.embedJson) || {};
   const embTitle = String(parsed.title       || 'Tickets').slice(0, 80);
   const embDesc  = String(parsed.description || 'Utilisez ce menu pour créer un ticket et contacter le staff').slice(0, 120);
+  const fieldsCount = Array.isArray(parsed.fields) ? parsed.fields.length : 0;
+  const fieldsInfo = fieldsCount > 0 ? `\n(${fieldsCount} field${fieldsCount > 1 ? 's' : ''})` : '';
 
   container.addSectionComponents(
     new SectionBuilder()
       .addTextDisplayComponents(
-        new TextDisplayBuilder().setContent(`**Message du panel**\n${embTitle}\n${embDesc}`),
+        new TextDisplayBuilder().setContent(`**Message du panel**\n${embTitle}\n${embDesc}${fieldsInfo}`),
       )
       .setButtonAccessory(
-        new ButtonBuilder().setCustomId('tp_msg_pick').setEmoji('✏️').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId('tp_msg_pick').setLabel('Éditer').setStyle(ButtonStyle.Secondary),
       ),
   );
 
@@ -1820,7 +1801,7 @@ function _appendAdvancedV2(container, panel) {
         new TextDisplayBuilder().setContent('**Quitter**\nRevenir au dashboard du panel.'),
       )
       .setButtonAccessory(
-        new ButtonBuilder().setCustomId('tp_advanced_back').setLabel('Retour').setEmoji('↩️').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId('tp_advanced_back').setLabel('← Retour').setStyle(ButtonStyle.Secondary),
       ),
   );
 }
@@ -1861,10 +1842,18 @@ async function _openOptionConfig(client, message, optionId, forcePanelId = null,
   }
 
   const accentColor = _hexToInt(embed.getGuildColor(guildId));
+  const usingV2     = V2_AVAILABLE;
 
   const buildState = () => {
     option = db.getTicketOption(option.id);
     if (!option) return null;
+
+    if (usingV2) {
+      const v2 = _buildOptionV2Payload(option, panel, message.guild, accentColor);
+      if (v2) {
+        return { payload: v2, isV2: true };
+      }
+    }
 
     return {
       payload: {
@@ -1928,6 +1917,7 @@ async function _openOptionConfig(client, message, optionId, forcePanelId = null,
       to_edit_description   : 'to_set_label',
       to_edit_name_template : 'to_set_nametemplate',
       to_edit_open_message  : 'to_set_openmessage',
+      to_edit_button_style  : 'to_set_buttonstyle',
   };
 
   collector.on('collect', async interaction => {
@@ -2198,7 +2188,82 @@ async function _openOptionConfig(client, message, optionId, forcePanelId = null,
     }
 
     if (action === 'to_set_openmessage') {
-      const modal = _modal(`to_modal_openmessage_${option.id}`, 'Message d’ouverture', [
+      busy = true;
+      await interaction.deferUpdate().catch(() => {});
+
+      const embedCmd = require('../server/embed.js');
+      const initialEmbed = _safeJsonParse(option.openEmbedJson);
+      const initialState = {
+        title: initialEmbed?.title || '',
+        description: initialEmbed?.description || option.openMessage || '',
+        color: initialEmbed?.color || embed.getGuildColor(guildId),
+        footer: initialEmbed?.footer?.text || '',
+        footerIcon: initialEmbed?.footer?.iconURL || '',
+        author: initialEmbed?.author?.name || '',
+        authorIcon: initialEmbed?.author?.iconURL || '',
+        thumbnail: initialEmbed?.thumbnail?.url || '',
+        image: initialEmbed?.image?.url || '',
+        timestamp: initialEmbed?.timestamp || false,
+        fields: initialEmbed?.fields || [],
+      };
+
+      await embedCmd.openForTicket(client, message, initialState, async (saveData) => {
+        db.updateTicketOption(option.id, {
+          openEmbedJson: JSON.stringify({
+            title: saveData.title,
+            description: saveData.description,
+            color: saveData.color,
+            footer: saveData.footer ? { text: saveData.footer, iconURL: saveData.footerIcon } : undefined,
+            author: saveData.author ? { name: saveData.author, iconURL: saveData.authorIcon } : undefined,
+            thumbnail: saveData.thumbnail ? { url: saveData.thumbnail } : undefined,
+            image: saveData.image ? { url: saveData.image } : undefined,
+            timestamp: saveData.timestamp,
+            fields: saveData.fields || [],
+          }),
+          openMessage: null,
+        });
+        await refreshMessage();
+      });
+
+      busy = false;
+      return;
+    }
+
+    if (action === 'to_set_nametemplate') {
+      const modal = _modal(`to_modal_nametemplate_${option.id}`, 'Nom du salon ticket', [
+        _input('template', 'Template ({username}, {number}, {option})', TextInputStyle.Short, {
+          value       : option.nameTemplate || '',
+          maxLength   : 90,
+          required    : false,
+          placeholder : 'ticket-{number}',
+        }),
+      ]);
+
+      busy = true;
+      const _shown = await interaction.showModal(modal).then(() => true).catch(() => false);
+      busy = false;
+      if (!_shown) return;
+
+      const modalSubmit = await _awaitOwnModal(interaction, `to_modal_nametemplate_${option.id}`);
+      if (!modalSubmit) { await refreshMessage(); return; }
+
+      busy = true;
+      try {
+
+      const raw  = modalSubmit.fields.getTextInputValue('template').trim();
+      const safe = raw.toLowerCase().replace(/[^a-z0-9-_{} ]/g, '').trim().slice(0, 90);
+      db.updateTicketOption(option.id, { nameTemplate: safe || null });
+
+      await modalSubmit.deferUpdate().catch(() => {});
+      await refreshMessage();
+      return;
+      } finally {
+        busy = false;
+      }
+    }
+
+    if (action === 'to_set_nametemplate') {
+      const modal = _modal(`to_modal_nametemplate_${option.id}`, 'Message d’ouverture', [
         _input('message', 'Message affiché à l’ouverture', TextInputStyle.Paragraph, {
           value       : option.openMessage || '',
           maxLength   : 2000,
@@ -2227,6 +2292,48 @@ async function _openOptionConfig(client, message, optionId, forcePanelId = null,
       } finally {
         busy = false;
       }
+    }
+
+    if (action === 'to_set_buttonstyle') {
+      const styleSelect = new StringSelectMenuBuilder()
+        .setCustomId('to_select_button_style')
+        .setPlaceholder('Choisir la couleur du bouton')
+        .addOptions(
+          { label: '[1] Bleu (Primary)', value: 'primary', default: (option.buttonStyle || 'primary') === 'primary' },
+          { label: '[2] Gris (Secondary)', value: 'secondary', default: (option.buttonStyle || 'primary') === 'secondary' },
+          { label: '[3] Vert (Success)', value: 'success', default: (option.buttonStyle || 'primary') === 'success' },
+          { label: '[4] Rouge (Danger)', value: 'danger', default: (option.buttonStyle || 'primary') === 'danger' },
+        );
+
+      const styleRow = new ActionRowBuilder().addComponents(styleSelect);
+
+      try {
+        await interaction.reply({
+          embeds     : [embed.build(guildId, 'Choisissez la couleur du bouton pour cette option.', { timestamp: false })],
+          components : [styleRow],
+          flags      : MessageFlags.Ephemeral,
+        });
+      } catch { return; }
+
+      let selected;
+      try {
+        selected = await interaction.channel.awaitMessageComponent({
+          componentType : ComponentType.StringSelect,
+          filter        : i => i.user.id === message.author.id && i.customId === 'to_select_button_style',
+          time          : TIMEOUTS.CONFIRM_TIME_MS,
+        });
+      } catch {
+        await interaction.editReply({ components: [] }).catch(() => {});
+        return;
+      }
+
+      const style = selected.values[0];
+      db.updateTicketOption(option.id, { buttonStyle: style });
+
+      await selected.deferUpdate().catch(() => {});
+      await selected.deleteReply().catch(() => {});
+      await refreshMessage();
+      return;
     }
 
     if (action === 'to_set_nametemplate') {
@@ -2360,7 +2467,7 @@ function _buildOptionConfigEmbed(guildId, option, panel) {
       { name: 'Logs',         value: option.logChannelId ? `<#${option.logChannelId}>`                                : 'Aucun',            inline: true },
       { name: 'Staff',        value: staffRoles.length   ? staffRoles.map(id => `<@&${id}>`).join(', ').slice(0, 200)  : 'Aucun',           inline: true },
       { name: 'Mentions',     value: mentionRoles.length ? mentionRoles.map(id => `<@&${id}>`).join(', ').slice(0, 200) : 'Aucune',         inline: true },
-      { name: 'Ouverture',    value: option.openMessage  ? 'Défini'                                                    : 'Non défini',      inline: true },
+      { name: 'Ouverture',    value: option.openEmbedJson ? '✔ Embed' : (option.openMessage ? 'Défini' : 'Non défini'),      inline: true },
       { name: 'Nom du salon', value: option.nameTemplate ? `\`${option.nameTemplate}\``                               : '`ticket-{number}`', inline: true },
     ],
     timestamp: false,
@@ -2373,20 +2480,20 @@ function _buildOptionConfigRows() {
     .setCustomId('to_config_menu')
     .setPlaceholder('Configurer l\'option...')
     .addOptions([
-      { label: 'Texte, emoji et description', value: 'edit_identity',      description: 'Modifier le nom, l\'emoji et la description', emoji: '✏️' },
-      { label: 'Catégorie de création',       value: 'edit_category',      description: 'Définir la catégorie Discord',                emoji: '📁' },
-      { label: 'Salon de logs',               value: 'edit_logs',          description: 'Définir le salon de logs de l\'option',       emoji: '📋' },
-      { label: 'Rôles staff',                 value: 'edit_staff_roles',   description: 'Définir les rôles staff pour cette option',  emoji: '🛡️' },
-      { label: 'Rôles à mentionner',          value: 'edit_mention_roles', description: 'Définir les rôles à mentionner à l\'ouverture', emoji: '🔔' },
-      { label: 'Message d\'ouverture',        value: 'edit_open_message',  description: 'Définir le message affiché à l\'ouverture',      emoji: '💬' },
-      { label: 'Nom du salon',                value: 'edit_name_template', description: 'Définir le template du nom du salon ticket', emoji: '🏷️' },
+      { label: '[1] Texte, emoji, description', value: 'edit_identity',      description: 'Modifier le nom, l\'emoji et la description' },
+      { label: '[2] Catégorie',               value: 'edit_category',      description: 'Définir la catégorie Discord' },
+      { label: '[3] Salon de logs',           value: 'edit_logs',          description: 'Définir le salon de logs de l\'option' },
+      { label: '[4] Rôles staff',             value: 'edit_staff_roles',   description: 'Définir les rôles staff pour cette option' },
+      { label: '[5] Rôles à mentionner',      value: 'edit_mention_roles', description: 'Définir les rôles à mentionner à l\'ouverture' },
+      { label: '[6] Message d\'ouverture',      value: 'edit_open_message',  description: 'Définir le message affiché à l\'ouverture' },
+      { label: '[7] Nom du salon',            value: 'edit_name_template', description: 'Définir le template du nom du salon ticket' },
     ]);
 
   return [
     new ActionRowBuilder().addComponents(configMenu),
     new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('to_back').setLabel('Retour au panel').setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId('to_delete').setEmoji('🗑️').setStyle(ButtonStyle.Danger),
+      new ButtonBuilder().setCustomId('to_delete').setLabel('Suppr').setStyle(ButtonStyle.Danger),
     ),
   ];
 }
@@ -2436,7 +2543,7 @@ function _appendOptionV2(container, option, panel, guild) {
     new SectionBuilder()
       .addTextDisplayComponents(new TextDisplayBuilder().setContent(`**Emoji**\n${emojiVal}`))
       .setButtonAccessory(
-        new ButtonBuilder().setCustomId('to_edit_emoji').setEmoji('✏️').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId('to_edit_emoji').setLabel('Éditer').setStyle(ButtonStyle.Secondary),
       ),
   );
 
@@ -2445,7 +2552,7 @@ function _appendOptionV2(container, option, panel, guild) {
     new SectionBuilder()
       .addTextDisplayComponents(new TextDisplayBuilder().setContent(`**Texte**\n${labelVal}`))
       .setButtonAccessory(
-        new ButtonBuilder().setCustomId('to_edit_label').setEmoji('✏️').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId('to_edit_label').setLabel('Éditer').setStyle(ButtonStyle.Secondary),
       ),
   );
 
@@ -2454,7 +2561,7 @@ function _appendOptionV2(container, option, panel, guild) {
     new SectionBuilder()
       .addTextDisplayComponents(new TextDisplayBuilder().setContent(`**Description (Sélecteur seulement)**\n${descVal}`))
       .setButtonAccessory(
-        new ButtonBuilder().setCustomId('to_edit_description').setEmoji('✏️').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId('to_edit_description').setLabel('Éditer').setStyle(ButtonStyle.Secondary),
       ),
   );
 
@@ -2500,16 +2607,17 @@ function _appendOptionV2(container, option, panel, guild) {
     new SectionBuilder()
       .addTextDisplayComponents(new TextDisplayBuilder().setContent(`**Nom du salon**\n${nameVal}`))
       .setButtonAccessory(
-        new ButtonBuilder().setCustomId('to_edit_name_template').setEmoji('✏️').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId('to_edit_name_template').setLabel('Éditer').setStyle(ButtonStyle.Secondary),
       ),
   );
 
-  const openVal = option.openMessage ? String(option.openMessage).slice(0, 300) : 'Non défini';
+  const hasEmbed = option.openEmbedJson && JSON.parse(option.openEmbedJson).description;
+  const openVal = hasEmbed ? '✔ Embed configuré' : (option.openMessage ? String(option.openMessage).slice(0, 300) : 'Non défini');
   container.addSectionComponents(
     new SectionBuilder()
       .addTextDisplayComponents(new TextDisplayBuilder().setContent(`**Message d'ouverture de ticket**\n${openVal}`))
       .setButtonAccessory(
-        new ButtonBuilder().setCustomId('to_edit_open_message').setEmoji('✏️').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId('to_edit_open_message').setLabel('Éditer').setStyle(ButtonStyle.Secondary),
       ),
   );
 
@@ -2531,10 +2639,27 @@ function _appendOptionV2(container, option, panel, guild) {
 
   container.addActionRowComponents(new ActionRowBuilder().addComponents(staffSelect));
 
+  const styleColors = {
+    'primary': 'Bleu',
+    'secondary': 'Gris',
+    'success': 'Vert',
+    'danger': 'Rouge',
+  };
+  const currentStyle = option.buttonStyle || 'primary';
+  const styleLabel = styleColors[currentStyle] || styleColors['primary'];
+
+  container.addSectionComponents(
+    new SectionBuilder()
+      .addTextDisplayComponents(new TextDisplayBuilder().setContent(`**Couleur du bouton**\n${styleLabel}`))
+      .setButtonAccessory(
+        new ButtonBuilder().setCustomId('to_edit_button_style').setLabel('Couleur').setStyle(ButtonStyle.Secondary),
+      ),
+  );
+
   container.addActionRowComponents(
     new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('to_back').setLabel('Retour').setEmoji('↩️').setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId('to_delete').setLabel('Supprimer l\'option').setEmoji('').setStyle(ButtonStyle.Danger),
+      new ButtonBuilder().setCustomId('to_back').setLabel('←').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId('to_delete').setLabel('Suppr').setStyle(ButtonStyle.Danger),
     ),
   );
 }
@@ -2795,10 +2920,11 @@ function _buildPanelPayload(guildId, panel, options) {
   } else {
     for (let i = 0; i < Math.min(options.length, 25); i += 5) {
       const btns = options.slice(i, i + 5).map((opt, idx) => {
+        const btnStyle = _parseButtonStyle(opt.buttonStyle) ?? _buttonStyleFromIndex(idx);
         const btn = new ButtonBuilder()
           .setCustomId(`ticket_open_${panel.id}_${opt.id}`)
           .setLabel(String(opt.label || 'Open').slice(0, 80))
-          .setStyle(_buttonStyleFromIndex(idx));
+          .setStyle(btnStyle);
 
         if (opt.emoji) {
           try { btn.setEmoji(opt.emoji); } catch {}
@@ -2838,6 +2964,15 @@ function _buildPanelEmbed(guildId, panel) {
   if (parsed.footer)    e.setFooter({ text: String(parsed.footer).slice(0, 2048) });
   if (parsed.image)     e.setImage(String(parsed.image));
   if (parsed.thumbnail) e.setThumbnail(String(parsed.thumbnail));
+
+  if (Array.isArray(parsed.fields) && parsed.fields.length > 0) {
+    const fields = parsed.fields.slice(0, 25).map(f => ({
+      name: String(f.name || '').slice(0, 256),
+      value: String(f.value || '').slice(0, 1024),
+      inline: Boolean(f.inline),
+    }));
+    e.addFields(fields);
+  }
 
   return e;
 }
@@ -2995,6 +3130,23 @@ function _buttonStyleFromIndex(index) {
   ][index] ?? ButtonStyle.Secondary;
 }
 
+function _parseButtonStyle(style) {
+  if (!style) return null;
+  const map = {
+    'primary': ButtonStyle.Primary,
+    'blue': ButtonStyle.Primary,
+    'blurple': ButtonStyle.Primary,
+    'secondary': ButtonStyle.Secondary,
+    'gray': ButtonStyle.Secondary,
+    'grey': ButtonStyle.Secondary,
+    'success': ButtonStyle.Success,
+    'green': ButtonStyle.Success,
+    'danger': ButtonStyle.Danger,
+    'red': ButtonStyle.Danger,
+  };
+  return map[String(style).toLowerCase()] ?? null;
+}
+
 function _sendHelp(message) {
   return embed.reply(message, null, {
     title  : 'Gestion des tickets',
@@ -3020,4 +3172,5 @@ function _sendHelp(message) {
     timestamp: false,
   });
 }
+
 

@@ -37,7 +37,7 @@ const LANGUAGES = [
   { label: 'Danois',       value: 'da', emoji: '\ud83c\udde9\ud83c\uddf0' },
   { label: 'Finnois',      value: 'fi', emoji: '🇫🇮' },
   { label: 'Grec',         value: 'el', emoji: '🇬🇷' },
-  { label: 'Hébreu',       value: 'he', emoji: '🇮🇱' },
+  { label: 'Juif',       value: 'he', emoji: '🇮🇱' },
   { label: 'Hindi',        value: 'hi', emoji: '🇮🇳' },
   { label: 'Indonésien',   value: 'id', emoji: '🇮🇩' },
   { label: 'Roumain',      value: 'ro', emoji: '🇷🇴' },

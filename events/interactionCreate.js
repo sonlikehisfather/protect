@@ -289,7 +289,7 @@ async function _handleButton(client, interaction) {
   }
 
 
-  if (id.startsWith('tp_') || id.startsWith('to_') || id.startsWith('mybot:') ||
+  if (id.startsWith('tp_') || id.startsWith('to_') || id.startsWith('tpe:') || id.startsWith('mybot:') ||
       id.startsWith('coinflip:') || id.startsWith('guess:') || id.startsWith('quiz:') ||
       id.startsWith('roulette:') || id.startsWith('bj:')) {
     return;
@@ -576,7 +576,7 @@ async function _handleSelectMenu(client, interaction) {
   }
 
 
-  if (id.startsWith('tp_') || id === 'to_config_menu' || id.startsWith('to_select_') || id.startsWith('ticket_rating:')) {
+  if (id.startsWith('tp_') || id.startsWith('tpe:') || id === 'to_config_menu' || id.startsWith('to_select_') || id.startsWith('ticket_rating:')) {
     return;
   }
 

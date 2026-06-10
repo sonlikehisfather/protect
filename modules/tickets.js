@@ -9,6 +9,7 @@ const {
   StringSelectMenuBuilder,
   ChannelType,
   AttachmentBuilder,
+  EmbedBuilder,
 } = require('discord.js');
 
 const db           = require('../core/database');
@@ -295,9 +296,31 @@ async function _openFromPanelOption(client, interaction, panel, option) {
     ? [new ActionRowBuilder().addComponents(helperButtons)]
     : [];
 
-  const openMessage =
-    option.openMessage ||
-    `Bienvenue <@${user.id}>.\nExpliquez votre demande ci-dessous et un membre du staff vous répondra dès que possible.`;
+  let welcomeEmbed;
+  if (option.openEmbedJson) {
+    try {
+      const parsed = JSON.parse(option.openEmbedJson);
+      // Convert hex color to int if needed
+      if (parsed.color && typeof parsed.color === 'string') {
+        parsed.color = parseInt(parsed.color.replace('#', ''), 16);
+      }
+      welcomeEmbed = new EmbedBuilder(parsed);
+    } catch {
+      welcomeEmbed = null;
+    }
+  }
+
+  if (!welcomeEmbed) {
+    const openMessage =
+      option.openMessage ||
+      `Bienvenue <@${user.id}>.\nExpliquez votre demande ci-dessous et un membre du staff vous répondra dès que possible.`;
+    welcomeEmbed = embed.build(guildId, openMessage, {
+      title     : option.label || 'Ticket',
+      footer    : `Créé par ${user.tag}`,
+      timestamp : new Date(),
+    });
+  }
+
 
   const welcome = await channel.send({
     content: [
@@ -306,13 +329,7 @@ async function _openFromPanelOption(client, interaction, panel, option) {
         .filter(roleId => guild.roles.cache.has(roleId))
         .map(roleId => `<@&${roleId}>`),
     ].join(' ').trim(),
-    embeds: [
-      embed.build(guildId, openMessage, {
-        title     : option.label || `Ticket ${String(ticketNumber).padStart(4, '0')}`,
-        footer    : `Créé par ${user.tag}`,
-        timestamp : new Date(),
-      }),
-    ],
+    embeds: [welcomeEmbed],
     components,
     allowedMentions: {
       users : [user.id],
@@ -1205,8 +1222,6 @@ async function restorePendingDeletes(client) {
     const delay = (ticket.deleteAt - now) * 1000;
     _schedulePendingDelete(client, ticket, delay);
   }
-
-  console.log(`[Tickets] ${tickets.length} suppression(s) programmée(s) restaurée(s).`);
 }
 
 function cancelPendingDelete(channelId) {

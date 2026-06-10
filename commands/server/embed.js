@@ -1247,6 +1247,501 @@
         await panel.edit(_buildClosedPayload(state, 'Session expirée, relance la commande pour reprendre.')).catch(() => {});
       });
     },
+
+    async openForTicket(client, message, initialState, onSave) {
+      const guild = message.guild;
+      const guildId = guild.id;
+      const defaultColor = _safeColor(db.getGuildConfig(guildId)?.color);
+
+      const state = initialState || {
+        title: null, description: null, author: null, authorIcon: null, authorUrl: null,
+        footer: null, footerIcon: null, thumbnail: null, image: null, url: null,
+        color: defaultColor, timestamp: false, fields: [], view: 'main',
+      };
+
+      const panel = await message.channel.send(_buildPanelPayload(state, 'ticket')).catch(() => null);
+      if (!panel) return null;
+
+      embed.registerPrivateInteraction(panel, message.author.id, TIMEOUTS.LONG_TIME_MS);
+
+      let busy = false;
+      const collector = panel.createMessageComponentCollector({
+        filter: i => i.user.id === message.author.id && i.message.id === panel.id,
+        idle: TIMEOUTS.LONG_TIME_MS,
+        time: TIMEOUTS.LONG_TIME_MS,
+      });
+
+      collector.on('collect', async interaction => {
+        const id = interaction.customId;
+
+        if (busy) {
+          await _ephemeral(interaction, guildId, 'Une modification est déjà en cours.');
+          return;
+        }
+
+        if (id === 'embed:close') {
+          collector.stop('closed');
+          await interaction.deferUpdate().catch(() => {});
+          await panel.delete().catch(() => {});
+          return;
+        }
+
+        if (id.startsWith('embed:nav:')) {
+          const target = id.slice('embed:nav:'.length);
+          if (['main', 'content', 'images', 'fields', 'tools'].includes(target)) {
+            state.view = target;
+            await interaction.deferUpdate().catch(() => {});
+            await _refresh(panel, state, 'ticket');
+          } else {
+            await interaction.deferUpdate().catch(() => {});
+          }
+          return;
+        }
+
+        if (id === 'embed:apercu') {
+          if (!_hasEmbedContent(state)) {
+            await _ephemeral(interaction, guildId, 'Aucun contenu à prévisualiser.');
+            return;
+          }
+          await interaction.reply({ embeds: [_buildPreview(state, false, { guild, client })], flags: 64 }).catch(() => {});
+          return;
+        }
+
+        if (id === 'embed:send') {
+          collector.stop('saved');
+          await interaction.deferUpdate().catch(() => {});
+          await panel.delete().catch(() => {});
+          if (onSave) await onSave(_stateToSaveData(state));
+          return;
+        }
+
+        if (id === 'embed:reset:request') {
+          state.view = 'tools_reset';
+          await interaction.deferUpdate().catch(() => {});
+          await _refresh(panel, state, 'ticket');
+          return;
+        }
+
+        if (id === 'embed:reset:cancel') {
+          state.view = 'tools';
+          await interaction.deferUpdate().catch(() => {});
+          await _refresh(panel, state, 'ticket');
+          return;
+        }
+
+        if (id === 'embed:reset:confirm') {
+          state.title = state.description = state.author = state.authorIcon = state.authorUrl = null;
+          state.footer = state.footerIcon = state.thumbnail = state.image = state.url = null;
+          state.color = defaultColor; state.timestamp = false; state.fields = []; state.view = 'tools';
+          await interaction.deferUpdate().catch(() => {});
+          await _refresh(panel, state, 'ticket');
+          return;
+        }
+
+        if (id === 'embed:load') {
+          const templates = db.listEmbeds(guildId);
+          if (!templates.length) {
+            await _ephemeral(interaction, guildId, 'Aucun template sauvegardé. Utilise `+embed capture` pour en créer.');
+            return;
+          }
+
+          const PAGE_SIZE = 5;
+          const pages = Math.ceil(templates.length / PAGE_SIZE);
+          let page = 0;
+
+          const _buildLoadPanel = (pg) => {
+            const slice = templates.slice(pg * PAGE_SIZE, pg * PAGE_SIZE + PAGE_SIZE);
+            const lines = slice.map((t, i) => `**${pg * PAGE_SIZE + i + 1}.** \`${t.name}\``);
+            const text = `## Templates sauvegardés\n\n${lines.join('\n')}`;
+
+            const container = new ContainerBuilder()
+              .addTextDisplayComponents(new TextDisplayBuilder().setContent(text))
+              .addSeparatorComponents(new SeparatorBuilder().setSpacing(1));
+
+            const numRow = new ActionRowBuilder();
+            slice.forEach((t, i) => {
+              numRow.addComponents(
+                new ButtonBuilder()
+                  .setCustomId(`eload:pick:${pg * PAGE_SIZE + i}`)
+                  .setLabel(String(pg * PAGE_SIZE + i + 1))
+                  .setStyle(ButtonStyle.Primary),
+              );
+            });
+            container.addActionRowComponents(numRow);
+
+            if (pages > 1) {
+              container.addActionRowComponents(
+                new ActionRowBuilder().addComponents(
+                  new ButtonBuilder().setCustomId('eload:prev').setLabel('◀').setStyle(ButtonStyle.Secondary).setDisabled(pg === 0),
+                  new ButtonBuilder().setCustomId('eload:next').setLabel('▶').setStyle(ButtonStyle.Secondary).setDisabled(pg >= pages - 1),
+                  new ButtonBuilder().setCustomId('eload:close').setLabel('✖').setStyle(ButtonStyle.Danger),
+                )
+              );
+            } else {
+              container.addActionRowComponents(
+                new ActionRowBuilder().addComponents(
+                  new ButtonBuilder().setCustomId('eload:close').setLabel('✖').setStyle(ButtonStyle.Danger),
+                )
+              );
+            }
+
+            return {
+              components: [container],
+              flags: COMPONENTS_V2_FLAG | 64,
+              allowedMentions: { parse: [] },
+            };
+          };
+
+          await interaction.reply(_buildLoadPanel(0)).catch(() => {});
+
+          const loadMsg = await interaction.fetchReply().catch(() => null);
+          if (!loadMsg) return;
+
+          const loadCollector = loadMsg.createMessageComponentCollector({
+            filter: x => x.user.id === interaction.user.id,
+            time: 60_000,
+          });
+
+          loadCollector.on('collect', async (x) => {
+            if (x.customId === 'eload:close') {
+              loadCollector.stop('closed');
+              await x.deferUpdate().catch(() => {});
+              interaction.deleteReply().catch(() => {});
+              return;
+            }
+            if (x.customId === 'eload:prev') {
+              page = Math.max(0, page - 1);
+              await x.deferUpdate().catch(() => {});
+              await interaction.editReply(_buildLoadPanel(page)).catch(() => {});
+              return;
+            }
+            if (x.customId === 'eload:next') {
+              page = Math.min(pages - 1, page + 1);
+              await x.deferUpdate().catch(() => {});
+              await interaction.editReply(_buildLoadPanel(page)).catch(() => {});
+              return;
+            }
+            if (x.customId.startsWith('eload:pick:')) {
+              const idx = parseInt(x.customId.slice('eload:pick:'.length), 10);
+              const picked = templates[idx];
+              if (!picked) { await x.deferUpdate().catch(() => {}); return; }
+
+              loadCollector.stop('picked');
+              await x.deferUpdate().catch(() => {});
+              interaction.deleteReply().catch(() => {});
+
+              const saved = db.getEmbed(guildId, picked.name);
+              if (!saved) return;
+
+              busy = true;
+              _loadTemplateIntoState(state, saved.data, defaultColor);
+              state.view = 'main';
+              await x.followUp({
+                content: `Template \`${picked.name}\` chargé.`,
+                flags: 64,
+                allowedMentions: { parse: [] },
+              }).catch(() => {});
+              busy = false;
+              await _refresh(panel, state, 'ticket');
+            }
+          });
+
+          loadCollector.on('end', (_, reason) => {
+            if (reason === 'closed' || reason === 'picked') return;
+            interaction.deleteReply().catch(() => {});
+          });
+
+          return;
+        }
+
+        if (id === 'embed:fields') {
+          const selected = interaction.values?.[0];
+          if (!selected) { await interaction.deferUpdate().catch(() => {}); return; }
+
+          if (selected === 'add_field') {
+            if (state.fields.length >= 25) {
+              await _ephemeral(interaction, guildId, 'Un embed ne peut pas contenir plus de 25 fields.');
+              return;
+            }
+            busy = true;
+            const modalId = `embed:addfield:${panel.id}:${interaction.id}`;
+            const shown = await interaction.showModal(_buildModal(modalId, 'Ajouter un field', [
+              _input('name', 'Nom du field', TextInputStyle.Short, { maxLength: 256, required: true }),
+              _input('value', 'Contenu du field', TextInputStyle.Paragraph, { maxLength: 1024, required: true }),
+            ])).then(() => true).catch(() => false);
+            busy = false;
+            if (!shown) return;
+            const submit = await _awaitOwnModal(interaction, modalId);
+            if (!submit) { await _refresh(panel, state, 'ticket'); return; }
+            busy = true;
+            const name = submit.fields.getTextInputValue('name').trim();
+            const value = submit.fields.getTextInputValue('value').trim();
+            if (name && value) state.fields.push({ name, value, inline: false });
+            await submit.deferUpdate().catch(() => {});
+            busy = false;
+            await _refresh(panel, state, 'ticket');
+            return;
+          }
+
+          if (selected === 'del_field') {
+            if (!state.fields.length) { await _ephemeral(interaction, guildId, 'Aucun field à supprimer.'); return; }
+            busy = true;
+            const modalId = `embed:delfield:${panel.id}:${interaction.id}`;
+            const shown = await interaction.showModal(_buildModal(modalId, 'Supprimer un field', [
+              _input('index', 'Numéro du field', TextInputStyle.Short, { maxLength: 2, required: true, placeholder: '1' }),
+            ])).then(() => true).catch(() => false);
+            busy = false;
+            if (!shown) return;
+            const submit = await _awaitOwnModal(interaction, modalId);
+            if (!submit) { await _refresh(panel, state, 'ticket'); return; }
+            busy = true;
+            const idx = Number(submit.fields.getTextInputValue('index').trim()) - 1;
+            if (Number.isInteger(idx) && state.fields[idx]) state.fields.splice(idx, 1);
+            await submit.deferUpdate().catch(() => {});
+            busy = false;
+            await _refresh(panel, state, 'ticket');
+            return;
+          }
+          await interaction.deferUpdate().catch(() => {});
+          return;
+        }
+
+        if (id === 'embed:edit' || (interaction.isStringSelectMenu() && id === 'embed:edit')) {
+          const selected = interaction.values?.[0];
+          if (!selected) { await interaction.deferUpdate().catch(() => {}); return; }
+
+          if (selected === 'timestamp') {
+            state.timestamp = !state.timestamp;
+            await interaction.deferUpdate().catch(() => {});
+            await _refresh(panel, state, 'ticket');
+            return;
+          }
+
+          const modalConfig = _modalConfig(selected, state);
+          if (!modalConfig) { await interaction.deferUpdate().catch(() => {}); return; }
+
+          busy = true;
+          const modalId = `embed:${selected}:${panel.id}:${interaction.id}`;
+          const shown = await interaction.showModal(_buildModal(modalId, modalConfig.title, modalConfig.inputs)).then(() => true).catch(() => false);
+          busy = false;
+          if (!shown) return;
+          const submit = await _awaitOwnModal(interaction, modalId);
+          if (!submit) { await _refresh(panel, state, 'ticket'); return; }
+
+          busy = true;
+          const value = submit.fields.getTextInputValue('value').trim();
+          state._lastSuccess = null;
+          const error = await _applyModalValue(selected, value, state, message, client);
+          if (error) {
+            await _modalError(submit, guildId, error);
+            busy = false;
+            await _refresh(panel, state, 'ticket');
+            return;
+          }
+          await submit.deferUpdate().catch(() => {});
+          busy = false;
+          await _refresh(panel, state, 'ticket');
+          return;
+        }
+
+        if (id === 'embed:save') {
+          if (!_hasEmbedContent(state)) {
+            await _ephemeral(interaction, guildId, 'Aucun contenu à sauvegarder.');
+            return;
+          }
+
+          busy = true;
+          const modalId = `embed:save:modal:${panel.id}:${interaction.id}`;
+          const shown = await interaction.showModal(
+            _buildModal(modalId, 'Sauvegarder l\'embed', [
+              _input('name', 'Nom du template', TextInputStyle.Short, {
+                maxLength: 32, required: true, placeholder: 'notifications',
+              }),
+            ])
+          ).then(() => true).catch(() => false);
+
+          busy = false;
+          if (!shown) return;
+
+          const submit = await _awaitOwnModal(interaction, modalId);
+          if (!submit) { await _refresh(panel, state, 'ticket'); return; }
+
+          busy = true;
+          const rawName = _normalizeTemplateName(submit.fields.getTextInputValue('name'));
+
+          if (!_isTemplateNameValid(rawName)) {
+            await _modalError(submit, guildId, 'Nom invalide. 1-32 caractères : a-z, 0-9, tiret, underscore. Noms réservés interdits.');
+            busy = false;
+            await _refresh(panel, state, 'ticket');
+            return;
+          }
+
+          const data = _stateToSaveData(state);
+          const existingTpl = db.getEmbed(guildId, rawName);
+
+          if (existingTpl) {
+            state._pendingSave = { name: rawName, data };
+            state.view = 'tools_save_confirm';
+            await submit.deferUpdate().catch(() => {});
+            busy = false;
+            await _refresh(panel, state, 'ticket');
+            return;
+          }
+
+          const tplCount = db.listEmbeds(guildId).length;
+          if (tplCount >= 25) {
+            await _modalError(submit, guildId, 'Limite atteinte : 25 templates maximum par serveur.');
+            busy = false;
+            await _refresh(panel, state, 'ticket');
+            return;
+          }
+
+          db.saveEmbed(guildId, rawName, data, message.author.id);
+          await submit.deferUpdate().catch(() => {});
+          await submit.followUp({
+            content: `Template sauvegardé : \`${rawName}\`.`,
+            flags: 64,
+            allowedMentions: { parse: [] },
+          }).catch(() => {});
+          busy = false;
+          state.view = 'tools';
+          await _refresh(panel, state, 'ticket');
+          return;
+        }
+
+        if (id === 'embed:save:confirm') {
+          if (!state._pendingSave) {
+            state.view = 'tools';
+            await interaction.deferUpdate().catch(() => {});
+            await _refresh(panel, state, 'ticket');
+            return;
+          }
+          const { name: saveName, data: saveData } = state._pendingSave;
+          db.saveEmbed(guildId, saveName, saveData, message.author.id);
+          state._pendingSave = null;
+          state.view = 'tools';
+          await interaction.deferUpdate().catch(() => {});
+          await interaction.followUp({
+            content: `Template remplacé : \`${saveName}\`.`,
+            flags: 64,
+            allowedMentions: { parse: [] },
+          }).catch(() => {});
+          await _refresh(panel, state, 'ticket');
+          return;
+        }
+
+        if (id === 'embed:save:cancel') {
+          state._pendingSave = null;
+          state.view = 'tools';
+          await interaction.deferUpdate().catch(() => {});
+          await _refresh(panel, state, 'ticket');
+          return;
+        }
+
+        if (id === 'embed:variables') {
+          await interaction.reply({
+            content: [
+              '**Serveur**',
+              '`{server}` → Nom du serveur',
+              '`{membercount}` → Nombre de membres',
+              '`{ServerIcon}` → Icône du serveur',
+              '`{ServerBoostsCount}` → Nombre de boosts',
+              '`{ServerLevel}` → Niveau boost',
+              '',
+              '**Bot**',
+              '`{BotPic}` → Avatar du bot',
+              '`{prefix}` → Préfixe',
+              '`{BotCommandsCount}` → Nombre total de commandes du bot',
+              '',
+              '**Date/Heure**',
+              '`{date}` → Date du jour',
+              '`{time}` → Heure actuelle',
+            ].join('\n'),
+            flags: 64,
+            allowedMentions: { parse: [] },
+          }).catch(() => {});
+          return;
+        }
+
+        if (id === 'embed:copy') {
+          busy = true;
+          const modalId = `embed:copy:modal:${panel.id}:${interaction.id}`;
+          const shown = await interaction.showModal(
+            _buildModal(modalId, 'Copier un embed existant', [
+              _input('channel', 'Salon source', TextInputStyle.Short, {
+                maxLength: 100, required: true, placeholder: '#salon, ID ou nom',
+              }),
+              _input('message', 'ID du message', TextInputStyle.Short, {
+                maxLength: 20, required: true, placeholder: '123456789012345678',
+              }),
+            ])
+          ).then(() => true).catch(() => false);
+
+          busy = false;
+          if (!shown) return;
+
+          const submit = await _awaitOwnModal(interaction, modalId);
+          if (!submit) { await _refresh(panel, state, 'ticket'); return; }
+
+          busy = true;
+          const channelQuery = submit.fields.getTextInputValue('channel').trim();
+          const messageId = submit.fields.getTextInputValue('message').trim();
+          const sourceChannel = await _resolveTextChannel(guild, channelQuery);
+
+          if (!sourceChannel) {
+            await _modalError(submit, guildId, 'Salon introuvable ou invalide.');
+            busy = false;
+            await _refresh(panel, state, 'ticket');
+            return;
+          }
+
+          if (!/^[0-9]{17,20}$/.test(messageId)) {
+            await _modalError(submit, guildId, 'ID de message invalide.');
+            busy = false;
+            await _refresh(panel, state, 'ticket');
+            return;
+          }
+
+          const targetMsg = await sourceChannel.messages.fetch(messageId).catch(() => null);
+          if (!targetMsg) {
+            await _modalError(submit, guildId, 'Message introuvable.');
+            busy = false;
+            await _refresh(panel, state, 'ticket');
+            return;
+          }
+
+          if (!targetMsg.embeds?.length) {
+            await _modalError(submit, guildId, 'Ce message ne contient aucun embed.');
+            busy = false;
+            await _refresh(panel, state, 'ticket');
+            return;
+          }
+
+          const copied = _stateFromEmbed(targetMsg.embeds[0], defaultColor);
+          Object.assign(state, copied);
+          state.view = 'main';
+          await submit.deferUpdate().catch(() => {});
+          await submit.followUp({
+            content: 'Embed chargé avec succès.',
+            flags: 64,
+            allowedMentions: { parse: [] },
+          }).catch(() => {});
+          busy = false;
+          await _refresh(panel, state, 'ticket');
+          return;
+        }
+
+        await interaction.deferUpdate().catch(() => {});
+      });
+
+      collector.on('end', (_, reason) => {
+        embed.clearPrivateInteraction(panel);
+        if (reason === 'closed' || reason === 'saved') return;
+        panel.edit(_buildClosedPayload(state, 'Session expirée.')).catch(() => {});
+      });
+
+      return panel;
+    },
   };
 
   function _buildRows(mode) {
@@ -2183,23 +2678,56 @@
   }
 
   function _stateFromEmbed(embedData, defaultColor) {
-    const raw = embedData?.data || embedData?.toJSON?.() || embedData || {};
+    if (!embedData) return { fields: [], view: 'main', color: defaultColor };
+
+    const toJSON = typeof embedData.toJSON === 'function' ? embedData.toJSON() : null;
+    const raw = embedData.data || toJSON || embedData || {};
+
+    const extractFields = () => {
+      if (Array.isArray(embedData.fields) && embedData.fields.length > 0) {
+        return embedData.fields.map(f => ({
+          name: f.name,
+          value: f.value,
+          inline: f.inline ?? false
+        }));
+      }
+      if (Array.isArray(raw.fields) && raw.fields.length > 0) {
+        return raw.fields.map(f => ({
+          name: f.name,
+          value: f.value,
+          inline: f.inline ?? false
+        }));
+      }
+      if (Array.isArray(toJSON?.fields) && toJSON.fields.length > 0) {
+        return toJSON.fields.map(f => ({
+          name: f.name,
+          value: f.value,
+          inline: f.inline ?? false
+        }));
+      }
+      return [];
+    };
+
+    const getColor = () => {
+      const c = embedData.color ?? raw.color ?? toJSON?.color;
+      if (c != null) return `#${Number(c).toString(16).padStart(6, '0')}`;
+      return defaultColor;
+    };
+
     return {
-      title       : raw.title || null,
-      description : raw.description || null,
-      author      : raw.author?.name || null,
-      authorIcon  : raw.author?.icon_url || raw.author?.iconURL || null,
-      authorUrl   : raw.author?.url || null,
-      footer      : raw.footer?.text || null,
-      footerIcon  : raw.footer?.icon_url || raw.footer?.iconURL || null,
-      thumbnail   : raw.thumbnail?.url || null,
-      image       : raw.image?.url || null,
-      url         : raw.url || null,
-      color       : raw.color != null ? `#${raw.color.toString(16).padStart(6, '0')}` : defaultColor,
-      timestamp   : Boolean(raw.timestamp),
-      fields      : Array.isArray(raw.fields)
-        ? raw.fields.map(f => ({ name: f.name, value: f.value, inline: f.inline ?? false }))
-        : [],
+      title       : embedData.title ?? raw.title ?? toJSON?.title ?? null,
+      description : embedData.description ?? raw.description ?? toJSON?.description ?? null,
+      author      : embedData.author?.name ?? raw.author?.name ?? toJSON?.author?.name ?? null,
+      authorIcon  : embedData.author?.iconURL ?? raw.author?.icon_url ?? raw.author?.iconURL ?? toJSON?.author?.icon_url ?? null,
+      authorUrl   : embedData.author?.url ?? raw.author?.url ?? toJSON?.author?.url ?? null,
+      footer      : embedData.footer?.text ?? raw.footer?.text ?? toJSON?.footer?.text ?? null,
+      footerIcon  : embedData.footer?.iconURL ?? raw.footer?.icon_url ?? raw.footer?.iconURL ?? toJSON?.footer?.icon_url ?? null,
+      thumbnail   : embedData.thumbnail?.url ?? raw.thumbnail?.url ?? toJSON?.thumbnail?.url ?? null,
+      image       : embedData.image?.url ?? raw.image?.url ?? toJSON?.image?.url ?? null,
+      url         : embedData.url ?? raw.url ?? toJSON?.url ?? null,
+      color       : getColor(),
+      timestamp   : Boolean(embedData.timestamp ?? raw.timestamp ?? toJSON?.timestamp),
+      fields      : extractFields(),
       view        : 'main',
     };
   }
