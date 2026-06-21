@@ -822,6 +822,18 @@ const MIGRATIONS = [
         CREATE INDEX IF NOT EXISTS idx_reminders_due
           ON reminders(remindAt) WHERE done = 0;
 
+        -- ── Casino / Coins ────────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS user_coins (
+          guildId   TEXT    NOT NULL,
+          userId    TEXT    NOT NULL,
+          coins     INTEGER NOT NULL DEFAULT 0,
+          lastDaily INTEGER DEFAULT 0,
+          createdAt INTEGER NOT NULL DEFAULT (unixepoch()),
+          updatedAt INTEGER NOT NULL DEFAULT (unixepoch()),
+          PRIMARY KEY (guildId, userId)
+        );
+        CREATE INDEX IF NOT EXISTS idx_coins_guild ON user_coins(guildId, coins DESC);
+
       `);
     }
   },
@@ -3442,6 +3454,270 @@ up(db) {
     },
   },
 
+  {
+    version: 105,
+    up(db) {
+      db.exec(`
+        -- ── Casino Config Avancée ────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS casino_config (
+          guildId             TEXT    PRIMARY KEY,
+          enabled             INTEGER NOT NULL DEFAULT 0,
+          panelChannelId      TEXT,
+          panelMessageId      TEXT,
+          rulesChannelId      TEXT,
+          rulesMessageId      TEXT,
+          allowedChannels     TEXT,
+          logChannelGains     TEXT,
+          logChannelGames     TEXT,
+          roleRequired        TEXT,
+          roleMultiplierId    TEXT,
+          statusMultiplier    INTEGER DEFAULT 0,
+          statusText          TEXT    DEFAULT '.gg/shibuya',
+          publicVocMultiplier INTEGER NOT NULL DEFAULT 2,
+          coinsPerVocHour     INTEGER NOT NULL DEFAULT 2000,
+          drawsPerVocHour     INTEGER NOT NULL DEFAULT 2,
+          coinsPerMsg         INTEGER NOT NULL DEFAULT 20,
+          msgsForCoins        INTEGER NOT NULL DEFAULT 100,
+          coinsPerMsgPack     INTEGER NOT NULL DEFAULT 2000,
+          drawPrice           INTEGER NOT NULL DEFAULT 15000,
+          dailyCoins          INTEGER NOT NULL DEFAULT 2000,
+          dailyDraws          INTEGER NOT NULL DEFAULT 1,
+          coteBlackjack       REAL    DEFAULT 2.0,
+          coteBlackjackBonus  REAL    DEFAULT 2.5,
+          coteCoinflip        REAL    DEFAULT 2.0,
+          coteCoinflipBonus   REAL    DEFAULT 2.5,
+          coteBonusRole       TEXT,
+          updatedAt           INTEGER NOT NULL DEFAULT (unixepoch())
+        );
+
+        -- ── Casino Users (Profils avec équipement) ───────────────────────────
+        CREATE TABLE IF NOT EXISTS casino_users (
+          guildId          TEXT    NOT NULL,
+          userId           TEXT    NOT NULL,
+          coins            INTEGER NOT NULL DEFAULT 0,
+          draws            INTEGER NOT NULL DEFAULT 0,
+          xp               INTEGER NOT NULL DEFAULT 0,
+          level            INTEGER NOT NULL DEFAULT 1,
+          totalSpent       INTEGER NOT NULL DEFAULT 0,
+          totalWon         INTEGER NOT NULL DEFAULT 0,
+          totalDraws       INTEGER NOT NULL DEFAULT 0,
+          totalGamesWon    INTEGER NOT NULL DEFAULT 0,
+          totalGamesLost   INTEGER NOT NULL DEFAULT 0,
+          vocMinutes       INTEGER NOT NULL DEFAULT 0,
+          msgCount         INTEGER NOT NULL DEFAULT 0,
+          lastDaily        INTEGER DEFAULT 0,
+          lastCollect      INTEGER DEFAULT 0,
+          equippedColorId  INTEGER,
+          equippedBadgeId  INTEGER,
+          equippedDecorId  INTEGER,
+          equippedSuccessId INTEGER,
+          vipTier          INTEGER NOT NULL DEFAULT 0,
+          createdAt        INTEGER NOT NULL DEFAULT (unixepoch()),
+          updatedAt        INTEGER NOT NULL DEFAULT (unixepoch()),
+          PRIMARY KEY (guildId, userId)
+        );
+        CREATE INDEX IF NOT EXISTS idx_casino_users_guild ON casino_users(guildId, coins DESC);
+        CREATE INDEX IF NOT EXISTS idx_casino_users_xp ON casino_users(guildId, xp DESC);
+
+        -- ── Casino Level Roles ───────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS casino_level_roles (
+          id          INTEGER PRIMARY KEY AUTOINCREMENT,
+          guildId     TEXT    NOT NULL,
+          level       INTEGER NOT NULL,
+          roleId      TEXT    NOT NULL,
+          UNIQUE(guildId, level)
+        );
+
+        -- ── Casino Managers ─────────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS casino_managers (
+          guildId  TEXT NOT NULL,
+          userId   TEXT NOT NULL,
+          addedBy  TEXT NOT NULL,
+          addedAt  INTEGER NOT NULL DEFAULT (unixepoch()),
+          PRIMARY KEY (guildId, userId)
+        );
+
+        -- ── Casino Blacklist ────────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS casino_blacklist (
+          guildId     TEXT NOT NULL,
+          userId      TEXT NOT NULL,
+          reason      TEXT,
+          addedBy     TEXT NOT NULL,
+          addedAt     INTEGER NOT NULL DEFAULT (unixepoch()),
+          PRIMARY KEY (guildId, userId)
+        );
+
+        -- ── Casino Shop Items ───────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS casino_shop (
+          id           INTEGER PRIMARY KEY AUTOINCREMENT,
+          guildId      TEXT    NOT NULL,
+          name         TEXT    NOT NULL,
+          description  TEXT,
+          price        INTEGER NOT NULL,
+          type         TEXT    NOT NULL CHECK(type IN ('role','color','badge','decor','item','draws','pillages','xp','sabotage','nitro')),
+          itemType     TEXT    DEFAULT NULL,
+          roleId       TEXT,
+          colorHex     TEXT,
+          stock        INTEGER DEFAULT -1,
+          quantity     INTEGER DEFAULT 1,
+          limited      INTEGER NOT NULL DEFAULT 0,
+          active       INTEGER NOT NULL DEFAULT 1,
+          createdAt    INTEGER NOT NULL DEFAULT (unixepoch()),
+          UNIQUE(guildId, name)
+        );
+
+        -- ── Casino Inventory ───────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS casino_inventory (
+          id          INTEGER PRIMARY KEY AUTOINCREMENT,
+          guildId     TEXT    NOT NULL,
+          userId      TEXT    NOT NULL,
+          itemId      INTEGER NOT NULL REFERENCES casino_shop(id),
+          quantity    INTEGER NOT NULL DEFAULT 1,
+          equipped    INTEGER NOT NULL DEFAULT 0,
+          equippedAt  INTEGER,
+          acquiredAt  INTEGER NOT NULL DEFAULT (unixepoch()),
+          UNIQUE(guildId, userId, itemId)
+        );
+
+        -- ── Casino Gacha Pool (Tirages) ────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS casino_gacha_pool (
+          id          INTEGER PRIMARY KEY AUTOINCREMENT,
+          guildId     TEXT    NOT NULL,
+          name        TEXT    NOT NULL,
+          type        TEXT    NOT NULL CHECK(type IN ('coins','role','color','badge','decor','draws','pillages','xp','sabotage','item','nitro')),
+          tier        TEXT    DEFAULT 'common' CHECK(tier IN ('common','rare','epic','legendary','secret')),
+          value       INTEGER,
+          roleId      TEXT,
+          weight      INTEGER NOT NULL DEFAULT 1,
+          limited     INTEGER NOT NULL DEFAULT 0,
+          active      INTEGER NOT NULL DEFAULT 1
+        );
+
+        -- ── Casino History ───────────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS casino_history (
+          id          INTEGER PRIMARY KEY AUTOINCREMENT,
+          guildId     TEXT    NOT NULL,
+          userId      TEXT    NOT NULL,
+          type        TEXT    NOT NULL,
+          amount      INTEGER,
+          result      TEXT,
+          details     TEXT,
+          createdAt   INTEGER NOT NULL DEFAULT (unixepoch())
+        );
+        CREATE INDEX IF NOT EXISTS idx_casino_history_user ON casino_history(guildId, userId, createdAt DESC);
+
+        -- ── Casino Duels ────────────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS casino_duels (
+          id            INTEGER PRIMARY KEY AUTOINCREMENT,
+          guildId       TEXT    NOT NULL,
+          challengerId  TEXT    NOT NULL,
+          opponentId    TEXT    NOT NULL,
+          bet           INTEGER NOT NULL,
+          game          TEXT    NOT NULL,
+          status        TEXT    NOT NULL DEFAULT 'pending',
+          winnerId      TEXT,
+          createdAt     INTEGER NOT NULL DEFAULT (unixepoch()),
+          endedAt       INTEGER
+        );
+
+        -- ── Giveaway Coins ─────────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS giveaway_coins (
+          id            INTEGER PRIMARY KEY AUTOINCREMENT,
+          guildId       TEXT    NOT NULL,
+          channelId     TEXT    NOT NULL,
+          messageId     TEXT,
+          hostId        TEXT    NOT NULL,
+          amount        INTEGER NOT NULL,
+          winnersCount  INTEGER NOT NULL DEFAULT 1,
+          durationMs    INTEGER NOT NULL,
+          endsAt        INTEGER NOT NULL,
+          status        TEXT    NOT NULL DEFAULT 'active',
+          entrants      TEXT    DEFAULT '[]',
+          winners       TEXT    DEFAULT '[]',
+          createdAt     INTEGER NOT NULL DEFAULT (unixepoch())
+        );
+      `);
+    },
+  },
+
+  {
+    version: 106,
+    up(db) {
+      db.exec(`
+        -- ── Casino Achievements ─────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS casino_achievements (
+          id            INTEGER PRIMARY KEY AUTOINCREMENT,
+          guildId       TEXT    NOT NULL,
+          key           TEXT    NOT NULL,
+          name          TEXT    NOT NULL,
+          description   TEXT    NOT NULL DEFAULT '',
+          icon          TEXT    NOT NULL DEFAULT '[*]',
+          requirement   INTEGER NOT NULL DEFAULT 0,
+          rewardCoins   INTEGER NOT NULL DEFAULT 0,
+          rewardDraws   INTEGER NOT NULL DEFAULT 0
+        );
+
+        -- ── Casino User Achievements ────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS casino_user_achievements (
+          id            INTEGER PRIMARY KEY AUTOINCREMENT,
+          guildId       TEXT    NOT NULL,
+          userId        TEXT    NOT NULL,
+          achievementKey TEXT   NOT NULL,
+          unlockedAt    INTEGER NOT NULL DEFAULT (unixepoch()),
+          UNIQUE(guildId, userId, achievementKey)
+        );
+      `);
+    },
+  },
+
+  {
+    version: 108,
+    up(db) {
+      const cols = db.prepare('PRAGMA table_info(casino_gacha_pool)').all().map(r => r.name);
+      if (!cols.includes('chance'))   db.exec('ALTER TABLE casino_gacha_pool ADD COLUMN chance   REAL    NOT NULL DEFAULT 100');
+      if (!cols.includes('valueMax')) db.exec('ALTER TABLE casino_gacha_pool ADD COLUMN valueMax INTEGER');
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS casino_gacha_owned (
+          guildId TEXT    NOT NULL,
+          userId  TEXT    NOT NULL,
+          itemId  INTEGER NOT NULL,
+          wonAt   INTEGER NOT NULL DEFAULT (unixepoch()),
+          UNIQUE(guildId, userId, itemId)
+        );
+      `);
+    },
+  },
+
+  {
+    version: 107,
+    up(db) {
+      db.exec(`
+        DROP TABLE IF EXISTS casino_user_achievements;
+        CREATE TABLE casino_user_achievements (
+          id            INTEGER PRIMARY KEY AUTOINCREMENT,
+          guildId       TEXT    NOT NULL,
+          userId        TEXT    NOT NULL,
+          achievementKey TEXT   NOT NULL,
+          unlockedAt    INTEGER NOT NULL DEFAULT (unixepoch()),
+          UNIQUE(guildId, userId, achievementKey)
+        );
+      `);
+    },
+  },
+
+  {
+    version: 108,
+    up(db) {
+      db.exec(`
+        ALTER TABLE casino_config ADD COLUMN coteBlackjack REAL DEFAULT 2.0;
+        ALTER TABLE casino_config ADD COLUMN coteBlackjackBonus REAL DEFAULT 2.5;
+        ALTER TABLE casino_config ADD COLUMN coteCoinflip REAL DEFAULT 2.0;
+        ALTER TABLE casino_config ADD COLUMN coteCoinflipBonus REAL DEFAULT 2.5;
+        ALTER TABLE casino_config ADD COLUMN coteBonusRole TEXT;
+      `);
+    },
+  },
+
 ];
 
 
@@ -3455,15 +3731,151 @@ function runMigrations(db) {
 
   const current = db.prepare('SELECT MAX(version) as v FROM schema_version').get().v || 0;
   const pending = MIGRATIONS.filter(m => m.version > current);
-  if (pending.length === 0) return;
 
-  db.transaction(() => {
-    for (const migration of pending) {
-      migration.up(db);
-      db.prepare('INSERT OR IGNORE INTO schema_version (version) VALUES (?)').run(migration.version);
+  if (pending.length > 0) {
+    db.transaction(() => {
+      for (const migration of pending) {
+        migration.up(db);
+        db.prepare('INSERT OR IGNORE INTO schema_version (version) VALUES (?)').run(migration.version);
+      }
+    })();
+  }
+
+  repairCasinoSchema(db);
+}
+
+
+function repairCasinoSchema(db) {
+  const hasColumn = (table, col) => {
+    try {
+      return db.prepare(`PRAGMA table_info(${table})`).all().some(r => r.name === col);
+    } catch (e) {
+      return false;
     }
-  })();
+  };
 
+  const casinoConfigColumns = [
+    { name: 'panelMessageId', type: 'TEXT', dflt: 'NULL' },
+    { name: 'rulesChannelId', type: 'TEXT', dflt: 'NULL' },
+    { name: 'rulesMessageId', type: 'TEXT', dflt: 'NULL' },
+    { name: 'coinsPerMsgPack', type: 'INTEGER', dflt: '2000' },
+    { name: 'drawPrice', type: 'INTEGER', dflt: '15000' },
+    { name: 'coteBlackjack', type: 'REAL', dflt: '2.0' },
+    { name: 'coteBlackjackBonus', type: 'REAL', dflt: '2.5' },
+    { name: 'coteCoinflip', type: 'REAL', dflt: '2.0' },
+    { name: 'coteCoinflipBonus', type: 'REAL', dflt: '2.5' },
+    { name: 'coteBonusRole', type: 'TEXT', dflt: 'NULL' },
+    { name: 'restrictedCommands', type: 'TEXT', dflt: 'NULL' },
+    { name: 'coteBlackjackStatus', type: 'REAL', dflt: '2.5' },
+    { name: 'coteCoinflipStatus', type: 'REAL', dflt: '2.5' },
+    { name: 'statusVocMultiplier', type: 'REAL', dflt: '2.0' },
+    { name: 'statusMsgMultiplier', type: 'REAL', dflt: '2.0' },
+    { name: 'coinsPerVocMin',      type: 'INTEGER', dflt: '50' },
+    { name: 'collectBonusRate',    type: 'REAL', dflt: '0.5' },
+    { name: 'limitBjMin',         type: 'INTEGER', dflt: '0' },
+    { name: 'limitBjMax',         type: 'INTEGER', dflt: '0' },
+    { name: 'limitCfMin',         type: 'INTEGER', dflt: '0' },
+    { name: 'limitCfMax',         type: 'INTEGER', dflt: '0' },
+    { name: 'limitRlMin',         type: 'INTEGER', dflt: '0' },
+    { name: 'limitRlMax',         type: 'INTEGER', dflt: '0' },
+    { name: 'cooldownBj',         type: 'INTEGER', dflt: '0' },
+    { name: 'cooldownCf',         type: 'INTEGER', dflt: '0' },
+    { name: 'cooldownRl',         type: 'INTEGER', dflt: '0' },
+    { name: 'cooldownDaily',      type: 'INTEGER', dflt: '0' },
+    { name: 'cooldownCollect',    type: 'INTEGER', dflt: '0' },
+    { name: 'limitMaxCoins',      type: 'INTEGER', dflt: '0' },
+    { name: 'limitGainsPeriod',   type: 'INTEGER', dflt: '0' },
+    { name: 'limitGainsMax',      type: 'INTEGER', dflt: '0' },
+    { name: 'limitDrawsPeriod',   type: 'INTEGER', dflt: '0' },
+    { name: 'limitDrawsMax',      type: 'INTEGER', dflt: '0' },
+    { name: 'limitMaxDraws',      type: 'INTEGER', dflt: '0' },
+    { name: 'giftMin',            type: 'INTEGER', dflt: '100' },
+    { name: 'giftMax',            type: 'INTEGER', dflt: '1000' },
+    { name: 'dailyMin',           type: 'INTEGER', dflt: '0' },
+    { name: 'dailyMax',           type: 'INTEGER', dflt: '0' },
+    { name: 'casinoRules',        type: 'TEXT',    dflt: 'NULL' },
+    { name: 'casinoPanelContent', type: 'TEXT',    dflt: 'NULL' },
+    { name: 'cooldownVol',        type: 'INTEGER', dflt: '3600' },
+    { name: 'volMinPercent',      type: 'INTEGER', dflt: '1' },
+    { name: 'volMaxPercent',      type: 'INTEGER', dflt: '5' },
+    { name: 'volStealXp',         type: 'INTEGER', dflt: '1' },
+    { name: 'volSuccessRate',     type: 'INTEGER', dflt: '60' },
+    { name: 'xpBjWin',            type: 'INTEGER', dflt: '50' },
+    { name: 'xpBjLoss',           type: 'INTEGER', dflt: '15' },
+    { name: 'xpBjPush',           type: 'INTEGER', dflt: '5' },
+    { name: 'xpCfWin',            type: 'INTEGER', dflt: '30' },
+    { name: 'xpCfLoss',           type: 'INTEGER', dflt: '10' },
+    { name: 'xpRlWin',            type: 'INTEGER', dflt: '40' },
+    { name: 'xpRlLoss',           type: 'INTEGER', dflt: '15' },
+    { name: 'shieldPrice1',       type: 'INTEGER', dflt: '15000' },
+    { name: 'shieldPrice3',       type: 'INTEGER', dflt: '40000' },
+    { name: 'shieldPrice5',       type: 'INTEGER', dflt: '60000' },
+    { name: 'shieldPrice10',      type: 'INTEGER', dflt: '115000' },
+    { name: 'jackpotAmount',      type: 'INTEGER', dflt: '0' },
+    { name: 'jackpotNumber',      type: 'INTEGER', dflt: '0' },
+    { name: 'jackpotCost',        type: 'INTEGER', dflt: '10000' },
+    { name: 'cooldownGift',       type: 'INTEGER', dflt: '0' },
+    { name: 'cooldownRussian',    type: 'INTEGER', dflt: '0' },
+    { name: 'cooldownMine',       type: 'INTEGER', dflt: '0' },
+    { name: 'limitRussianMin',    type: 'INTEGER', dflt: '0' },
+    { name: 'limitRussianMax',    type: 'INTEGER', dflt: '0' },
+    { name: 'limitMineMin',       type: 'INTEGER', dflt: '0' },
+    { name: 'limitMineMax',       type: 'INTEGER', dflt: '0' },
+    { name: 'limitMineBombs',     type: 'INTEGER', dflt: '3' },
+    { name: 'cooldownPlinko',     type: 'INTEGER', dflt: '0' },
+    { name: 'limitPlinkoMin',     type: 'INTEGER', dflt: '0' },
+    { name: 'limitPlinkoMax',     type: 'INTEGER', dflt: '0' },
+    { name: 'cooldownTower',      type: 'INTEGER', dflt: '0' },
+    { name: 'limitTowerMin',      type: 'INTEGER', dflt: '0' },
+    { name: 'limitTowerMax',      type: 'INTEGER', dflt: '0' },
+    { name: 'creationBonus',      type: 'INTEGER', dflt: '0' },
+    { name: 'cooldownDice',       type: 'INTEGER', dflt: '0' },
+    { name: 'limitDiceMin',       type: 'INTEGER', dflt: '0' },
+    { name: 'limitDiceMax',       type: 'INTEGER', dflt: '0' },
+  ];
+
+  for (const col of casinoConfigColumns) {
+    if (!hasColumn('casino_config', col.name)) {
+      db.exec(`ALTER TABLE casino_config ADD COLUMN ${col.name} ${col.type} DEFAULT ${col.dflt}`);
+    }
+  }
+
+  if (!hasColumn('casino_users', 'shields')) {
+    db.exec(`ALTER TABLE casino_users ADD COLUMN shields INTEGER NOT NULL DEFAULT 0`);
+  }
+
+  if (!hasColumn('giveaway_coins', 'durationMs')) {
+    db.exec(`ALTER TABLE giveaway_coins ADD COLUMN durationMs INTEGER NOT NULL DEFAULT 0`);
+  }
+
+  if (hasColumn('casino_duels', 'targetId') || !hasColumn('casino_duels', 'opponentId')) {
+    db.exec(`DROP TABLE IF EXISTS casino_duels`);
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS casino_duels (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        guildId       TEXT    NOT NULL,
+        challengerId  TEXT    NOT NULL,
+        opponentId    TEXT    NOT NULL,
+        bet           INTEGER NOT NULL,
+        game          TEXT    NOT NULL,
+        status        TEXT    NOT NULL DEFAULT 'pending',
+        winnerId      TEXT,
+        createdAt     INTEGER NOT NULL DEFAULT (unixepoch()),
+        endedAt       INTEGER
+      );
+    `);
+  }
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS casino_pending_bets (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      guildId     TEXT    NOT NULL,
+      userId      TEXT    NOT NULL,
+      amount      INTEGER NOT NULL,
+      game        TEXT    NOT NULL,
+      createdAt   INTEGER NOT NULL DEFAULT (unixepoch())
+    );
+  `);
 }
 
 
@@ -4688,6 +5100,32 @@ const db = {
   addXp(guildId, userId, xp) {
     getDb();
     _stmts.addXp.run(xp, Math.floor(Date.now() / 1000), guildId, userId);
+    const row = _stmts.getLevel.get(guildId, userId);
+    if (row) {
+      let level = 0, total = 0;
+      const xpForLevel = (lvl) => 5 * (lvl ** 2) + 50 * lvl + 100;
+      while (total + xpForLevel(level) <= (row.xp || 0)) {
+        total += xpForLevel(level);
+        level++;
+      }
+      if (level !== (row.level || 0)) {
+        _stmts.setLevel.run(level, row.xp, guildId, userId);
+      }
+    }
+  },
+
+  removeXp(guildId, userId, xp) {
+    getDb();
+    const row = _stmts.getLevel.get(guildId, userId);
+    if (!row) return;
+    const newXp = Math.max(0, (row.xp || 0) - xp);
+    let level = 0, total = 0;
+    const xpForLevel = (lvl) => 5 * (lvl ** 2) + 50 * lvl + 100;
+    while (total + xpForLevel(level) <= newXp) {
+      total += xpForLevel(level);
+      level++;
+    }
+    _stmts.setLevel.run(level, newXp, guildId, userId);
   },
 
   setLevel(guildId, userId, level, xp) {
@@ -5223,7 +5661,10 @@ const db = {
   },
 
   listEmbeds(guildId) {
-    return getDb().prepare('SELECT id, name, createdBy, createdAt FROM saved_embeds WHERE guildId = ?').all(guildId);
+    return getDb().prepare('SELECT id, name, createdBy, createdAt, data FROM saved_embeds WHERE guildId = ?').all(guildId).map(r => {
+      try { r.data = JSON.parse(r.data); } catch { r.data = {}; }
+      return r;
+    });
   },
 
   deleteEmbed(guildId, name) {
@@ -7339,6 +7780,657 @@ const db = {
     getDb().prepare(
       `DELETE FROM cmd_aliases WHERE guildId = ? AND commandName = ?`
     ).run(guildId, commandName);
+  },
+
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CASINO SYSTEM - COMPLETE
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  getCasinoConfig(guildId) {
+    getDb();
+    const row = getDb().prepare('SELECT * FROM casino_config WHERE guildId = ?').get(guildId);
+    if (!row) {
+      getDb().prepare('INSERT OR IGNORE INTO casino_config (guildId) VALUES (?)').run(guildId);
+      return getDb().prepare('SELECT * FROM casino_config WHERE guildId = ?').get(guildId);
+    }
+    return row;
+  },
+
+  setCasinoConfig(guildId, data) {
+    const d = getDb();
+    const cols = Object.keys(data).filter(k => k !== 'guildId');
+    if (!cols.length) return;
+    const sets = cols.map(c => `${c} = ?`).join(', ');
+    d.prepare(`UPDATE casino_config SET ${sets}, updatedAt = unixepoch() WHERE guildId = ?`)
+      .run(...cols.map(c => data[c]), guildId);
+  },
+
+  enableCasino(guildId, enabled = true) {
+    this.getCasinoConfig(guildId);
+    getDb().prepare('UPDATE casino_config SET enabled = ?, updatedAt = unixepoch() WHERE guildId = ?')
+      .run(enabled ? 1 : 0, guildId);
+  },
+
+  isCasinoEnabled(guildId) {
+    const row = getDb().prepare('SELECT enabled FROM casino_config WHERE guildId = ?').get(guildId);
+    return row?.enabled === 1;
+  },
+
+  // ─── Managers ────────────────────────────────────────────────────────────
+  addCasinoManager(guildId, userId, addedBy) {
+    getDb().prepare('INSERT OR REPLACE INTO casino_managers (guildId, userId, addedBy) VALUES (?, ?, ?)').run(guildId, userId, addedBy);
+  },
+
+  removeCasinoManager(guildId, userId) {
+    getDb().prepare('DELETE FROM casino_managers WHERE guildId = ? AND userId = ?').run(guildId, userId);
+  },
+
+  isCasinoManager(guildId, userId) {
+    const row = getDb().prepare('SELECT 1 FROM casino_managers WHERE guildId = ? AND userId = ?').get(guildId, userId);
+    return !!row;
+  },
+
+  getCasinoManagers(guildId) {
+    return getDb().prepare('SELECT * FROM casino_managers WHERE guildId = ?').all(guildId);
+  },
+
+  // ─── Blacklist ───────────────────────────────────────────────────────────
+  addCasinoBlacklist(guildId, userId, reason, addedBy) {
+    getDb().prepare('INSERT OR REPLACE INTO casino_blacklist (guildId, userId, reason, addedBy) VALUES (?, ?, ?, ?)')
+      .run(guildId, userId, reason, addedBy);
+  },
+
+  removeCasinoBlacklist(guildId, userId) {
+    getDb().prepare('DELETE FROM casino_blacklist WHERE guildId = ? AND userId = ?').run(guildId, userId);
+  },
+
+  isCasinoBlacklisted(guildId, userId) {
+    const row = getDb().prepare('SELECT 1 FROM casino_blacklist WHERE guildId = ? AND userId = ?').get(guildId, userId);
+    return !!row;
+  },
+
+  getCasinoBlacklist(guildId) {
+    return getDb().prepare('SELECT * FROM casino_blacklist WHERE guildId = ?').all(guildId);
+  },
+
+  // ─── Level Roles ─────────────────────────────────────────────────────────
+  addCasinoLevelRole(guildId, level, roleId) {
+    getDb().prepare('INSERT OR REPLACE INTO casino_level_roles (guildId, level, roleId) VALUES (?, ?, ?)').run(guildId, level, roleId);
+  },
+
+  getCasinoLevelRoles(guildId) {
+    return getDb().prepare('SELECT * FROM casino_level_roles WHERE guildId = ? ORDER BY level ASC').all(guildId);
+  },
+
+  deleteCasinoLevelRole(guildId, level) {
+    getDb().prepare('DELETE FROM casino_level_roles WHERE guildId = ? AND level = ?').run(guildId, level);
+  },
+
+
+  getCasinoUser(guildId, userId) {
+    getDb();
+    let row = getDb().prepare('SELECT * FROM casino_users WHERE guildId = ? AND userId = ?').get(guildId, userId);
+    if (!row) {
+      getDb().prepare('INSERT OR IGNORE INTO casino_users (guildId, userId) VALUES (?, ?)').run(guildId, userId);
+      const cfg = getDb().prepare('SELECT creationBonus FROM casino_config WHERE guildId = ?').get(guildId);
+      const bonus = cfg?.creationBonus ?? 0;
+      if (bonus > 0) {
+        getDb().prepare('UPDATE casino_users SET coins = coins + ?, updatedAt = unixepoch() WHERE guildId = ? AND userId = ?').run(bonus, guildId, userId);
+      }
+      row = getDb().prepare('SELECT * FROM casino_users WHERE guildId = ? AND userId = ?').get(guildId, userId);
+      row.__isNewProfile = true;
+      row.__creationBonusGiven = bonus;
+    }
+    return row;
+  },
+
+  getCasinoTop(guildId, limit = 10) {
+    getDb();
+    return getDb().prepare(
+      'SELECT userId, coins, totalWon, level FROM casino_users WHERE guildId = ? ORDER BY coins DESC LIMIT ?'
+    ).all(guildId, limit);
+  },
+
+  addCasinoCoins(guildId, userId, amount, type = 'add') {
+    if (!amount) return;
+    getDb().prepare(
+      `INSERT INTO casino_users (guildId, userId, coins, totalWon, updatedAt) VALUES (?, ?, ?, ?, unixepoch())
+       ON CONFLICT(guildId, userId) DO UPDATE SET
+       coins = coins + ?, totalWon = totalWon + ?, updatedAt = unixepoch()`
+    ).run(guildId, userId, amount, type === 'win' ? amount : 0, amount, type === 'win' ? amount : 0);
+  },
+
+  removeCasinoCoins(guildId, userId, amount, type = 'remove') {
+    if (!amount) return;
+    getDb().prepare(
+      `UPDATE casino_users SET coins = MAX(0, coins - ?), totalSpent = totalSpent + ?, updatedAt = unixepoch()
+       WHERE guildId = ? AND userId = ?`
+    ).run(amount, type === 'spend' ? amount : 0, guildId, userId);
+  },
+
+  refundCasinoBet(guildId, userId, amount) {
+    if (!amount) return;
+    getDb().prepare(
+      `UPDATE casino_users SET coins = coins + ?, totalSpent = MAX(0, totalSpent - ?), updatedAt = unixepoch()
+       WHERE guildId = ? AND userId = ?`
+    ).run(amount, amount, guildId, userId);
+  },
+
+  addCasinoDraws(guildId, userId, amount) {
+    getDb().prepare(
+      `UPDATE casino_users SET draws = draws + ?, updatedAt = unixepoch() WHERE guildId = ? AND userId = ?`
+    ).run(amount, guildId, userId);
+  },
+
+  removeCasinoDraws(guildId, userId, amount) {
+    getDb().prepare(
+      `UPDATE casino_users SET draws = MAX(0, draws - ?), updatedAt = unixepoch() WHERE guildId = ? AND userId = ?`
+    ).run(amount, guildId, userId);
+  },
+
+  addShields(guildId, userId, amount) {
+    getDb().prepare(
+      `UPDATE casino_users SET shields = MIN(shields + ?, 10), updatedAt = unixepoch() WHERE guildId = ? AND userId = ?`
+    ).run(amount, guildId, userId);
+  },
+
+  getShields(guildId, userId) {
+    const row = getDb().prepare('SELECT shields FROM casino_users WHERE guildId = ? AND userId = ?').get(guildId, userId);
+    return row?.shields ?? 0;
+  },
+
+  consumeShield(guildId, userId) {
+    const d = getDb();
+    const row = d.prepare('SELECT shields FROM casino_users WHERE guildId = ? AND userId = ?').get(guildId, userId);
+    if (!row || row.shields < 1) return false;
+    d.prepare('UPDATE casino_users SET shields = shields - 1, updatedAt = unixepoch() WHERE guildId = ? AND userId = ?').run(guildId, userId);
+    return true;
+  },
+
+  getJackpot(guildId) {
+    const row = getDb().prepare('SELECT jackpotAmount, jackpotNumber FROM casino_config WHERE guildId = ?').get(guildId);
+    let amount = row?.jackpotAmount ?? 0;
+    let number = row?.jackpotNumber ?? 0;
+    if (!number) {
+      number = Math.floor(Math.random() * 1000) + 1;
+      getDb().prepare('UPDATE casino_config SET jackpotNumber = ? WHERE guildId = ?').run(number, guildId);
+    }
+    return { amount, number };
+  },
+
+  addToJackpot(guildId, amount) {
+    getDb().prepare('UPDATE casino_config SET jackpotAmount = jackpotAmount + ? WHERE guildId = ?').run(amount, guildId);
+  },
+
+  resetJackpot(guildId) {
+    const newNumber = Math.floor(Math.random() * 1000) + 1;
+    getDb().prepare('UPDATE casino_config SET jackpotAmount = 0, jackpotNumber = ? WHERE guildId = ?').run(newNumber, guildId);
+  },
+
+  useCasinoDraw(guildId, userId) {
+    const d = getDb();
+    const user = d.prepare('SELECT draws FROM casino_users WHERE guildId = ? AND userId = ?').get(guildId, userId);
+    if (!user || user.draws < 1) return false;
+    d.prepare(
+      `UPDATE casino_users SET draws = draws - 1, totalDraws = totalDraws + 1, updatedAt = unixepoch()
+       WHERE guildId = ? AND userId = ?`
+    ).run(guildId, userId);
+    return true;
+  },
+
+  addVocMinutes(guildId, userId, minutes) {
+    getDb().prepare(
+      `UPDATE casino_users SET vocMinutes = vocMinutes + ?, updatedAt = unixepoch()
+       WHERE guildId = ? AND userId = ?`
+    ).run(minutes, guildId, userId);
+  },
+
+  resetVocMinutes(guildId, userId) {
+    getDb().prepare(
+      `UPDATE casino_users SET vocMinutes = 0, updatedAt = unixepoch()
+       WHERE guildId = ? AND userId = ?`
+    ).run(guildId, userId);
+  },
+
+  addMsgCount(guildId, userId, count = 1) {
+    getDb().prepare(
+      `UPDATE casino_users SET msgCount = msgCount + ?, updatedAt = unixepoch()
+       WHERE guildId = ? AND userId = ?`
+    ).run(count, guildId, userId);
+  },
+
+  getLastDaily(guildId, userId) {
+    const row = getDb().prepare('SELECT lastDaily FROM casino_users WHERE guildId = ? AND userId = ?').get(guildId, userId);
+    return row?.lastDaily ?? 0;
+  },
+
+  setLastDaily(guildId, userId, timestamp) {
+    getDb().prepare(
+      `UPDATE casino_users SET lastDaily = ?, updatedAt = unixepoch() WHERE guildId = ? AND userId = ?`
+    ).run(timestamp, guildId, userId);
+  },
+
+  getLastCollect(guildId, userId) {
+    const row = getDb().prepare('SELECT lastCollect FROM casino_users WHERE guildId = ? AND userId = ?').get(guildId, userId);
+    return row?.lastCollect ?? 0;
+  },
+
+  setLastCollect(guildId, userId, timestamp) {
+    getDb().prepare(
+      `UPDATE casino_users SET lastCollect = ?, updatedAt = unixepoch() WHERE guildId = ? AND userId = ?`
+    ).run(timestamp, guildId, userId);
+  },
+
+  getTopCasino(guildId, limit = 10) {
+    return getDb().prepare(
+      `SELECT userId, coins, draws, totalWon, vipTier FROM casino_users
+       WHERE guildId = ? ORDER BY coins DESC LIMIT ?`
+    ).all(guildId, limit);
+  },
+
+  // ─── Equipment (new schema) ──────────────────────────────────────────────
+  getEquippedItems(guildId, userId) {
+    const d = getDb();
+    const user = d.prepare('SELECT equippedColorId, equippedBadgeId, equippedDecorId, equippedSuccessId FROM casino_users WHERE guildId = ? AND userId = ?').get(guildId, userId);
+    if (!user) return {};
+    return {
+      color: user.equippedColorId,
+      badge: user.equippedBadgeId,
+      decor: user.equippedDecorId,
+      success: user.equippedSuccessId,
+    };
+  },
+
+  equipItem(guildId, userId, itemId) {
+    const d = getDb();
+    const item = d.prepare('SELECT type FROM casino_shop WHERE id = ?').get(itemId);
+    if (!item) return false;
+
+    const slotMap = { color: 'equippedColorId', badge: 'equippedBadgeId', decor: 'equippedDecorId', success: 'equippedSuccessId' };
+    const slot = slotMap[item.type];
+    if (!slot) return false;
+
+    d.prepare('UPDATE casino_users SET ' + slot + ' = ?, updatedAt = unixepoch() WHERE guildId = ? AND userId = ?').run(itemId, guildId, userId);
+    d.prepare('UPDATE casino_inventory SET equipped = 1, equippedAt = unixepoch() WHERE guildId = ? AND userId = ? AND itemId = ?').run(guildId, userId, itemId);
+    return true;
+  },
+
+  unequipItem(guildId, userId, type) {
+    const d = getDb();
+    const slotMap = { color: 'equippedColorId', badge: 'equippedBadgeId', decor: 'equippedDecorId', success: 'equippedSuccessId' };
+    const slot = slotMap[type];
+    if (!slot) return false;
+
+    d.prepare('UPDATE casino_users SET ' + slot + ' = NULL, updatedAt = unixepoch() WHERE guildId = ? AND userId = ?').run(guildId, userId);
+    d.prepare('UPDATE casino_inventory SET equipped = 0 WHERE guildId = ? AND userId = ? AND itemId IN (SELECT id FROM casino_shop WHERE type = ?)').run(guildId, userId, type);
+    return true;
+  },
+
+  getEquippedItemDetails(guildId, userId) {
+    const d = getDb();
+    const user = d.prepare('SELECT equippedColorId, equippedBadgeId, equippedDecorId, equippedSuccessId FROM casino_users WHERE guildId = ? AND userId = ?').get(guildId, userId);
+    if (!user) return {};
+
+    const result = {};
+    const slots = [
+      { key: 'color', id: user.equippedColorId },
+      { key: 'badge', id: user.equippedBadgeId },
+      { key: 'decor', id: user.equippedDecorId },
+      { key: 'success', id: user.equippedSuccessId },
+    ];
+
+    for (const slot of slots) {
+      if (slot.id) {
+        const item = d.prepare('SELECT * FROM casino_shop WHERE id = ?').get(slot.id);
+        if (item) result[slot.key] = item;
+      }
+    }
+    return result;
+  },
+
+
+  addShopItem(guildId, name, description, price, type, roleId = null, colorHex = null, stock = -1, limited = 0) {
+    const d = getDb();
+    d.prepare('DELETE FROM casino_shop WHERE guildId = ? AND name = ? AND active = 0').run(guildId, name);
+    return d.prepare(
+      `INSERT INTO casino_shop (guildId, name, description, price, type, roleId, colorHex, stock, limited)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(guildId, name, description, price, type, roleId, colorHex, stock, limited);
+  },
+
+  getShopItems(guildId) {
+    return getDb().prepare('SELECT * FROM casino_shop WHERE guildId = ? AND active = 1 ORDER BY price ASC').all(guildId);
+  },
+
+  getShopItem(guildId, itemId) {
+    return getDb().prepare('SELECT * FROM casino_shop WHERE guildId = ? AND id = ?').get(guildId, itemId);
+  },
+
+  deleteShopItem(guildId, itemId) {
+    getDb().prepare('UPDATE casino_shop SET active = 0 WHERE guildId = ? AND id = ?').run(guildId, itemId);
+  },
+
+  buyShopItem(guildId, userId, itemId) {
+    const d = getDb();
+    const item = d.prepare('SELECT * FROM casino_shop WHERE guildId = ? AND id = ?').get(guildId, itemId);
+    if (!item) return { ok: false, reason: 'notfound' };
+
+    const UNIQUE_TYPES = ['color', 'role', 'badge', 'decor', 'nitro'];
+    if (UNIQUE_TYPES.includes(item.type)) {
+      const existing = d.prepare('SELECT 1 FROM casino_inventory WHERE guildId = ? AND userId = ? AND itemId = ?').get(guildId, userId, itemId);
+      if (existing) return { ok: false, reason: 'alreadyowned' };
+    }
+
+    const user = d.prepare('SELECT coins FROM casino_users WHERE guildId = ? AND userId = ?').get(guildId, userId);
+    if (!user || user.coins < item.price) return { ok: false, reason: 'nomoney' };
+
+    if (item.stock > 0) {
+      d.prepare('UPDATE casino_shop SET stock = stock - 1 WHERE id = ?').run(itemId);
+    } else if (item.stock === 0) {
+      return { ok: false, reason: 'outofstock' };
+    }
+
+    d.prepare('UPDATE casino_users SET coins = coins - ?, totalSpent = totalSpent + ? WHERE guildId = ? AND userId = ?')
+      .run(item.price, item.price, guildId, userId);
+
+    d.prepare(
+      `INSERT INTO casino_inventory (guildId, userId, itemId) VALUES (?, ?, ?)
+       ON CONFLICT(guildId, userId, itemId) DO UPDATE SET quantity = quantity + 1`
+    ).run(guildId, userId, itemId);
+
+    return { ok: true, item };
+  },
+
+
+  getInventory(guildId, userId) {
+    return getDb().prepare(
+      `SELECT i.*, s.name, s.type, s.roleId, s.colorHex FROM casino_inventory i
+       JOIN casino_shop s ON i.itemId = s.id
+       WHERE i.guildId = ? AND i.userId = ?`
+    ).all(guildId, userId);
+  },
+
+  clearInventory(guildId, userId) {
+    const d = getDb();
+    const invItems = d.prepare('SELECT itemId, quantity FROM casino_inventory WHERE guildId = ? AND userId = ?').all(guildId, userId);
+    for (const inv of invItems) {
+      const shopItem = d.prepare('SELECT stock FROM casino_shop WHERE guildId = ? AND id = ?').get(guildId, inv.itemId);
+      if (shopItem && shopItem.stock >= 0) {
+        d.prepare('UPDATE casino_shop SET stock = stock + ? WHERE guildId = ? AND id = ?').run(inv.quantity, guildId, inv.itemId);
+      }
+    }
+    d.prepare('DELETE FROM casino_inventory WHERE guildId = ? AND userId = ?').run(guildId, userId);
+    d.prepare('DELETE FROM casino_gacha_owned WHERE guildId = ? AND userId = ?').run(guildId, userId);
+    d.prepare('UPDATE casino_users SET equippedColorId = NULL, equippedBadgeId = NULL, equippedDecorId = NULL, equippedSuccessId = NULL, updatedAt = unixepoch() WHERE guildId = ? AND userId = ?').run(guildId, userId);
+  },
+
+
+
+  addGachaItem(guildId, name, type, value, roleId, weight) {
+    getDb().prepare(
+      `INSERT INTO casino_gacha_pool (guildId, name, type, value, roleId, weight) VALUES (?, ?, ?, ?, ?, ?)`
+    ).run(guildId, name, type, value, roleId, weight);
+  },
+
+  getGachaPool(guildId) {
+    return getDb().prepare('SELECT * FROM casino_gacha_pool WHERE guildId = ? AND active = 1').all(guildId);
+  },
+
+  setGachaCoinConfig(guildId, min, max) {
+    const d = getDb();
+    const existing = d.prepare("SELECT id FROM casino_gacha_pool WHERE guildId = ? AND type = 'coins'").get(guildId);
+    if (existing) {
+      d.prepare('UPDATE casino_gacha_pool SET value = ?, valueMax = ?, active = 1 WHERE id = ?').run(min, max, existing.id);
+    } else {
+      d.prepare("INSERT INTO casino_gacha_pool (guildId, name, type, value, valueMax, chance, weight) VALUES (?, 'Mysoul Coins', 'coins', ?, ?, 100, 1)").run(guildId, min, max);
+    }
+  },
+
+  addGachaPoolItem(guildId, name, type, chance, roleId, value) {
+    getDb().prepare('INSERT INTO casino_gacha_pool (guildId, name, type, chance, value, roleId, weight) VALUES (?, ?, ?, ?, ?, ?, 1)').run(guildId, name, type, chance, value || null, roleId || null);
+  },
+
+  removeGachaPoolItem(guildId, itemId) {
+    getDb().prepare('UPDATE casino_gacha_pool SET active = 0 WHERE guildId = ? AND id = ?').run(guildId, itemId);
+  },
+
+  hasGachaOwned(guildId, userId, itemId) {
+    return !!getDb().prepare('SELECT 1 FROM casino_gacha_owned WHERE guildId = ? AND userId = ? AND itemId = ?').get(guildId, userId, itemId);
+  },
+
+  addGachaOwned(guildId, userId, itemId) {
+    try { getDb().prepare('INSERT OR IGNORE INTO casino_gacha_owned (guildId, userId, itemId) VALUES (?, ?, ?)').run(guildId, userId, itemId); } catch {}
+  },
+
+  drawGacha(guildId, userId) {
+    const pool = this.getGachaPool(guildId);
+    if (!pool.length) return null;
+
+    const UNIQUE = new Set(['color', 'role', 'badge', 'decor', 'nitro']);
+
+    // 1. Coins ・ always rewarded
+    const coinsConfig = pool.find(i => i.type === 'coins');
+    let coinsEarned = 0;
+    if (coinsConfig) {
+      const min = coinsConfig.value ?? 100;
+      const max = coinsConfig.valueMax ?? coinsConfig.value ?? 100;
+      coinsEarned = Math.floor(Math.random() * (max - min + 1)) + min;
+      if (coinsEarned > 0) this.addCasinoCoins(guildId, userId, coinsEarned, 'win');
+    }
+
+    // 2. Bonus item ・ cumulative chance, rarest first, skip already-owned unique items
+    const itemPool = pool
+      .filter(i => i.type !== 'coins' && (i.chance ?? 100) > 0)
+      .filter(i => !UNIQUE.has(i.type) || !this.hasGachaOwned(guildId, userId, i.id))
+      .sort((a, b) => (a.chance ?? 100) - (b.chance ?? 100));
+
+    let wonItem = null;
+    let cumulative = 0;
+    const roll = Math.random() * 100;
+    for (const item of itemPool) {
+      cumulative += (item.chance ?? 100);
+      if (roll < cumulative) {
+        wonItem = item;
+        if (UNIQUE.has(item.type)) this.addGachaOwned(guildId, userId, item.id);
+        this._applyGachaReward(guildId, userId, { ...item, value: item.value ?? 0 });
+        break;
+      }
+    }
+
+    return { coins: coinsEarned, item: wonItem };
+  },
+
+  _applyGachaReward(guildId, userId, item) {
+    const d = getDb();
+    switch (item.type) {
+      case 'coins':
+        this.addCasinoCoins(guildId, userId, item.value, 'win');
+        break;
+      case 'draws':
+        this.addCasinoDraws(guildId, userId, item.value);
+        break;
+      case 'xp':
+        this.addCasinoXP(guildId, userId, item.value);
+        break;
+      case 'pillages':
+      case 'sabotage':
+        d.prepare(
+          `INSERT INTO casino_inventory (guildId, userId, itemId, quantity) VALUES (?, ?, ?, ?)
+           ON CONFLICT(guildId, userId, itemId) DO UPDATE SET quantity = quantity + excluded.quantity`
+        ).run(guildId, userId, item.id, item.value || 1);
+        break;
+      case 'role':
+      case 'color':
+      case 'badge':
+      case 'decor':
+      case 'nitro':
+        d.prepare(
+          `INSERT INTO casino_inventory (guildId, userId, itemId, quantity) VALUES (?, ?, ?, 1)
+           ON CONFLICT(guildId, userId, itemId) DO UPDATE SET quantity = quantity + 1`
+        ).run(guildId, userId, item.id);
+        break;
+    }
+  },
+
+
+  getUnlockedAchievementKeys(guildId, userId) {
+    return new Set(
+      getDb().prepare('SELECT achievementKey FROM casino_user_achievements WHERE guildId = ? AND userId = ?')
+        .all(guildId, userId)
+        .map(r => r.achievementKey)
+    );
+  },
+
+  unlockAchievementByKey(guildId, userId, key) {
+    try {
+      getDb().prepare('INSERT OR IGNORE INTO casino_user_achievements (guildId, userId, achievementKey) VALUES (?, ?, ?)')
+        .run(guildId, userId, key);
+    } catch {}
+  },
+
+
+  addCasinoHistory(guildId, userId, type, amount, result, details) {
+    getDb().prepare(
+      `INSERT INTO casino_history (guildId, userId, type, amount, result, details) VALUES (?, ?, ?, ?, ?, ?)`
+    ).run(guildId, userId, type, amount, result, details);
+  },
+
+  getCasinoHistory(guildId, userId, limit = 50) {
+    return getDb().prepare(
+      `SELECT * FROM casino_history WHERE guildId = ? AND userId = ? ORDER BY createdAt DESC LIMIT ?`
+    ).all(guildId, userId, limit);
+  },
+
+
+  createDuel(guildId, challengerId, opponentId, bet, game) {
+    return getDb().prepare(
+      `INSERT INTO casino_duels (guildId, challengerId, opponentId, bet, game) VALUES (?, ?, ?, ?, ?)`
+    ).run(guildId, challengerId, opponentId, bet, game).lastInsertRowid;
+  },
+
+  getDuel(duelId) {
+    return getDb().prepare('SELECT * FROM casino_duels WHERE id = ?').get(duelId);
+  },
+
+  getPendingDuel(guildId, userId) {
+    return getDb().prepare(
+      `SELECT * FROM casino_duels WHERE guildId = ? AND status = 'pending'
+       AND (challengerId = ? OR opponentId = ?) LIMIT 1`
+    ).get(guildId, userId, userId);
+  },
+
+  acceptDuel(duelId, winnerId) {
+    getDb().prepare(
+      `UPDATE casino_duels SET status = 'accepted', winnerId = ? WHERE id = ?`
+    ).run(winnerId, duelId);
+  },
+
+  endDuel(duelId, winnerId) {
+    getDb().prepare(
+      `UPDATE casino_duels SET status = 'ended', winnerId = ?, endedAt = unixepoch() WHERE id = ?`
+    ).run(winnerId, duelId);
+  },
+
+  deleteDuel(duelId) {
+    getDb().prepare('DELETE FROM casino_duels WHERE id = ?').run(duelId);
+  },
+
+
+  resetCasinoUser(guildId, userId) {
+    const d = getDb();
+    d.prepare('DELETE FROM casino_users WHERE guildId = ? AND userId = ?').run(guildId, userId);
+    d.prepare('DELETE FROM casino_inventory WHERE guildId = ? AND userId = ?').run(guildId, userId);
+    d.prepare('DELETE FROM casino_user_achievements WHERE guildId = ? AND userId = ?').run(guildId, userId);
+    d.prepare('DELETE FROM casino_history WHERE guildId = ? AND userId = ?').run(guildId, userId);
+  },
+
+  resetCasinoGuild(guildId) {
+    const d = getDb();
+    d.prepare('DELETE FROM casino_config WHERE guildId = ?').run(guildId);
+    d.prepare('DELETE FROM casino_users WHERE guildId = ?').run(guildId);
+    d.prepare('DELETE FROM casino_level_roles WHERE guildId = ?').run(guildId);
+    d.prepare('DELETE FROM casino_managers WHERE guildId = ?').run(guildId);
+    d.prepare('DELETE FROM casino_blacklist WHERE guildId = ?').run(guildId);
+    d.prepare('DELETE FROM casino_shop WHERE guildId = ?').run(guildId);
+    d.prepare('DELETE FROM casino_inventory WHERE guildId = ?').run(guildId);
+    d.prepare('DELETE FROM casino_gacha_pool WHERE guildId = ?').run(guildId);
+    d.prepare('DELETE FROM casino_history WHERE guildId = ?').run(guildId);
+    d.prepare('DELETE FROM casino_duels WHERE guildId = ?').run(guildId);
+    d.prepare('DELETE FROM giveaway_coins WHERE guildId = ?').run(guildId);
+  },
+
+  recordPendingBet(guildId, userId, amount, game) {
+    getDb().prepare(
+      'INSERT INTO casino_pending_bets (guildId, userId, amount, game) VALUES (?, ?, ?, ?)'
+    ).run(guildId, userId, amount, game);
+  },
+
+  clearPendingBet(guildId, userId, game) {
+    getDb().prepare(
+      'DELETE FROM casino_pending_bets WHERE guildId = ? AND userId = ? AND game = ? ORDER BY id DESC LIMIT 1'
+    ).run(guildId, userId, game);
+  },
+
+  refundAllPendingBets() {
+    const d = getDb();
+    const rows = d.prepare('SELECT * FROM casino_pending_bets').all();
+    for (const row of rows) {
+      d.prepare(
+        'UPDATE casino_users SET coins = coins + ?, totalSpent = MAX(0, totalSpent - ?), updatedAt = unixepoch() WHERE guildId = ? AND userId = ?'
+      ).run(row.amount, row.amount, row.guildId, row.userId);
+    }
+    d.prepare('DELETE FROM casino_pending_bets').run();
+    return rows.length;
+  },
+
+  // ─── Giveaway Coins ──────────────────────────────────────────────────────
+  createGiveawayCoins(guildId, channelId, hostId, amount, winnersCount, durationMs) {
+    const endsAt = Math.floor(Date.now() / 1000) + Math.floor(durationMs / 1000);
+    return getDb().prepare(
+      `INSERT INTO giveaway_coins (guildId, channelId, hostId, amount, winnersCount, durationMs, endsAt, entrants, winners)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(guildId, channelId, hostId, amount, winnersCount, durationMs, endsAt, '[]', '[]').lastInsertRowid;
+  },
+
+  getGiveawayCoins(id) {
+    return getDb().prepare('SELECT * FROM giveaway_coins WHERE id = ?').get(id);
+  },
+
+  getActiveGiveawaysCoins(guildId) {
+    return getDb().prepare(
+      `SELECT * FROM giveaway_coins WHERE guildId = ? AND status = 'active' AND endsAt > ? ORDER BY endsAt ASC`
+    ).all(guildId, Math.floor(Date.now() / 1000));
+  },
+
+  endGiveawayCoins(id, winners) {
+    getDb().prepare(
+      `UPDATE giveaway_coins SET status = 'ended', winners = ?, messageId = ? WHERE id = ?`
+    ).run(JSON.stringify(winners), null, id);
+  },
+
+  addGiveawayEntrant(id, userId) {
+    const d = getDb();
+    const gw = d.prepare('SELECT entrants FROM giveaway_coins WHERE id = ?').get(id);
+    if (!gw) return false;
+    const entrants = JSON.parse(gw.entrants || '[]');
+    if (entrants.includes(userId)) return false;
+    entrants.push(userId);
+    d.prepare('UPDATE giveaway_coins SET entrants = ? WHERE id = ?').run(JSON.stringify(entrants), id);
+    return true;
+  },
+
+  getGiveawayEntrants(id) {
+    const gw = getDb().prepare('SELECT entrants FROM giveaway_coins WHERE id = ?').get(id);
+    return gw ? JSON.parse(gw.entrants || '[]') : [];
+  },
+
+  deleteGiveawayCoins(id) {
+    getDb().prepare('DELETE FROM giveaway_coins WHERE id = ?').run(id);
+  },
+
+  rerollGiveawayCoins(id, newWinners) {
+    getDb().prepare('UPDATE giveaway_coins SET winners = ? WHERE id = ?').run(JSON.stringify(newWinners), id);
   },
 
 };

@@ -15,13 +15,8 @@ const V2_AVAILABLE       = typeof ContainerBuilder    === 'function' &&
                            typeof TextDisplayBuilder === 'function' &&
                            typeof SeparatorBuilder   === 'function';
 
-function _hashScore(id1, id2) {
-  const key = [id1, id2].sort().join(':');
-  let h = 0;
-  for (let i = 0; i < key.length; i++) {
-    h = (Math.imul(31, h) + key.charCodeAt(i)) | 0;
-  }
-  return Math.abs(h) % 101;
+function _randomScore() {
+  return Math.floor(Math.random() * 101);
 }
 
 function _bar(percent) {
@@ -51,6 +46,7 @@ async function _resolveMember(guild, query) {
     const arr = [...members.values()];
     return arr[Math.floor(Math.random() * arr.length)];
   }
+  // exclude handled in caller
 
   const clean = query.replace(/[<@!>]/g, '');
   if (/^\d{17,20}$/.test(clean)) {
@@ -98,10 +94,24 @@ module.exports = {
       return;
     }
 
-    const [m1, m2] = await Promise.all([
-      _resolveMember(message.guild, query1),
-      _resolveMember(message.guild, query2),
-    ]);
+    let m1 = await _resolveMember(message.guild, query1);
+    let m2 = await _resolveMember(message.guild, query2);
+
+    if (m1 && m2 && m1.id === m2.id) {
+      if (query2.toLowerCase() === 'random') {
+        const members = message.guild.members.cache.filter(m => !m.user.bot && m.id !== m1.id);
+        if (members.size) {
+          const arr = [...members.values()];
+          m2 = arr[Math.floor(Math.random() * arr.length)];
+        }
+      } else if (query1.toLowerCase() === 'random') {
+        const members = message.guild.members.cache.filter(m => !m.user.bot && m.id !== m2.id);
+        if (members.size) {
+          const arr = [...members.values()];
+          m1 = arr[Math.floor(Math.random() * arr.length)];
+        }
+      }
+    }
 
     if (!m1) {
       const s = await embed.replyError(message, `Membre introuvable : \`${query1}\`.`, { timestamp: false }).catch(() => null);
@@ -114,7 +124,7 @@ module.exports = {
       return;
     }
 
-    const percent = _hashScore(m1.id, m2.id);
+    const percent = _randomScore();
     const bar     = _bar(percent);
     const comment = _comment(percent);
     const name1   = m1.displayName;

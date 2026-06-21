@@ -15,7 +15,7 @@ Système de niveaux et expérience (XP) pour votre serveur.
 
 Affiche votre carte de niveau ou celle d'un autre membre.
 
-**Usage:** `+rank [@user]`
+**Usage :** `+rank [@user]`
 
 **Alias:** `level`, `xp`, `profile`, `card`
 
@@ -37,7 +37,7 @@ Affiche votre carte de niveau ou celle d'un autre membre.
 
 Affiche le classement des niveaux.
 
-**Usage:** `+leaderboard [page]`
+**Usage :** `+leaderboard [page]`
 
 **Alias:** `lb`, `top`, `levels`
 
@@ -58,7 +58,7 @@ Affiche le classement des niveaux.
 
 Définit le niveau d'un membre (administration).
 
-**Usage:** `+setlevel <@user> <niveau>`
+**Usage :** `+setlevel <@user> <niveau>`
 
 **Permissions:** `Administrator`
 
@@ -73,7 +73,7 @@ Définit le niveau d'un membre (administration).
 
 Réinitialise les niveaux.
 
-**Usage:** `+resetlevel [@user|all]`
+**Usage :** `+resetlevel [@user|all]`
 
 **Permissions:** `Administrator`
 
@@ -89,7 +89,7 @@ Réinitialise les niveaux.
 +resetlevel all
 ```
 
-> **⚠️ Attention** : `resetlevel all` est irréversible !
+> **⚑ Attention** : `resetlevel all` est irréversible !
 
 ---
 
@@ -97,7 +97,7 @@ Réinitialise les niveaux.
 
 Configure le système de niveaux.
 
-**Usage:** `+levelconfig <option> [valeur]`
+**Usage :** `+levelconfig <option> [valeur]`
 
 **Permissions:** `Administrator`
 

@@ -15,7 +15,7 @@ Commandes de protection et sécurité du serveur contre les raids et abus.
 
 Configure la protection anti-raid globale du serveur.
 
-**Usage:** `+antiraid <on|off|status>`
+**Usage :** `+antiraid <on|off|status>`
 
 **Permissions:** `Administrator`
 
@@ -39,7 +39,7 @@ Configure la protection anti-raid globale du serveur.
 
 Configure la protection contre les bannissements massifs.
 
-**Usage:** `+antiban <on|off|limit> [valeur]`
+**Usage :** `+antiban <on|off|limit> [valeur]`
 
 **Permissions:** `Administrator`
 
@@ -63,7 +63,7 @@ Bloque les utilisateurs qui bannissent plus de X membres en Y secondes.
 
 Protection contre la suppression/modification massive de rôles.
 
-**Usage:** `+antirole <on|off|limit> [valeur]`
+**Usage :** `+antirole <on|off|limit> [valeur]`
 
 **Permissions:** `Administrator`
 
@@ -85,7 +85,7 @@ Détecte et annule les actions sur les rôles au-delà d'un certain seuil.
 
 Protection contre la création de webhooks malveillants.
 
-**Usage:** `+antiwebhook <on|off>`
+**Usage :** `+antiwebhook <on|off>`
 
 **Permissions:** `Administrator`
 
@@ -106,7 +106,7 @@ Protection contre la création de webhooks malveillants.
 
 Protection contre le vol de tokens (self-bots).
 
-**Usage:** `+antitoken <on|off>`
+**Usage :** `+antitoken <on|off>`
 
 **Permissions:** `Administrator`
 

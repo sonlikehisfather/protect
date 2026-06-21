@@ -16,7 +16,7 @@ Créez et gérez des tirages au sort facilement.
 
 Crée un nouveau giveaway.
 
-**Usage:** `+giveaway <durée> <gagnants> <prix>`
+**Usage :** `+giveaway <durée> <gagnants> <prix>`
 
 **Alias:** `gstart`, `start`, `gcreate`
 
@@ -69,7 +69,7 @@ Ajoutez des restrictions :
 
 Termine un giveaway prématurément.
 
-**Usage:** `+gend <message_id>`
+**Usage :** `+gend <message_id>`
 
 **Alias:** `end`, `gstop`
 
@@ -86,7 +86,7 @@ Termine un giveaway prématurément.
 
 Relance un nouveau gagnant.
 
-**Usage:** `+greroll <message_id> [nombre]`
+**Usage :** `+greroll <message_id> [nombre]`
 
 **Alias:** `reroll`
 
@@ -109,7 +109,7 @@ Relance un nouveau gagnant.
 
 Supprime un giveaway.
 
-**Usage:** `+gdelete <message_id>`
+**Usage :** `+gdelete <message_id>`
 
 **Alias:** `gdel`
 
@@ -126,7 +126,7 @@ Supprime un giveaway.
 
 Liste les giveaways actifs sur le serveur.
 
-**Usage:** `+glist`
+**Usage :** `+glist`
 
 **Alias:** `giveaways`, `gactive`
 
@@ -142,7 +142,7 @@ Liste les giveaways actifs sur le serveur.
 
 Affiche les détails d'un giveaway.
 
-**Usage:** `+ginfo <message_id>`
+**Usage :** `+ginfo <message_id>`
 
 ### Informations Affichées
 - Prix et nombre de gagnants

@@ -8,6 +8,8 @@
     ContainerBuilder,
     EmbedBuilder,
     ChannelType,
+    MediaGalleryBuilder,
+    MediaGalleryItemBuilder,
     MessageFlags,
     ModalBuilder,
     SeparatorBuilder,
@@ -137,7 +139,7 @@
           if (s && deleteReply) embed.scheduleDelete(s, deleteDelay);
           return;
         }
-        const lines = templates.slice(0, 25).map(t => `\`${t.name}\` - créé par <@${t.createdBy}>`);
+        const lines = templates.slice(0, 25).map(t => `\`${t.name}\`${t.data?.isV2 ? ' ◈' : ''} - créé par <@${t.createdBy}>`);
         if (templates.length > 25) lines.push(`…et ${templates.length - 25} autre(s).`);
         const s = await message.channel.send({
           embeds: [embed.build(guildId, lines.join('\n'), { title: 'Templates sauvegardés', timestamp: false })],
@@ -155,7 +157,10 @@
           messageId : null,
           embedData : null,
           saveData  : null,
+          isV2      : false,
+          v2Json    : null,
           status    : '',
+          busy      : false,
         };
 
         const _buildPanel = (disabled = false) => {
@@ -166,14 +171,16 @@
           if (captureState.status) {
             text = captureState.status;
           } else if (hasEmbed) {
+            const v2Tag = captureState.isV2 ? ' ◈ **Components V2**' : '';
             text = [
               `## Capture d'embed`,
               ``,
               `**Salon source** : <#${captureState.channelId}>`,
-              `**Titre** : ${rd.title ? `\`${String(rd.title).slice(0, 80)}\`` : '*Aucun*'}`,
-              `**Champs** : ${Array.isArray(rd.fields) ? rd.fields.length : 0}`,
+              captureState.isV2
+                ? `**Type** : Components V2 (${captureState.v2Json?.length || 0} composants)`
+                : `**Titre** : ${rd.title ? `\`${String(rd.title).slice(0, 80)}\`` : '*Aucun*'}`,
               ``,
-              `-# Clique sur **Aperçu** pour voir l'embed • **Enregistrer** pour sauvegarder`,
+              `-# Clique sur **Aperçu** pour voir • **Enregistrer** pour sauvegarder`,
             ].join('\n');
           } else {
             text = [
@@ -246,7 +253,7 @@
           if (i.customId === 'cap:list') {
             const templates = db.listEmbeds(guildId);
             const listText  = templates.length
-              ? templates.map(t => `\`${t.name}\` — par <@${t.createdBy}>`).join('\n')
+              ? templates.map(t => `\`${t.name}\`${t.data?.isV2 ? ' ◈' : ''} ・ par <@${t.createdBy}>`).join('\n')
               : '*Aucun template sauvegardé.*';
 
             const listContainer = new ContainerBuilder()
@@ -263,8 +270,21 @@
           }
 
           if (i.customId === 'cap:preview') {
-            if (!captureState.saveData) {
+            if (!captureState.saveData && !captureState.isV2) {
               await i.deferUpdate().catch(() => {});
+              return;
+            }
+            if (captureState.isV2 && captureState.v2Json) {
+              try {
+                const container = _rebuildV2Container(captureState.v2Json);
+                await i.reply({
+                  components      : [container],
+                  flags           : COMPONENTS_V2_FLAG | 64,
+                  allowedMentions : { parse: [] },
+                }).catch(() => {});
+              } catch {
+                await _ephemeral(i, guildId, 'Impossible de prévisualiser ce message V2.');
+              }
               return;
             }
             const rd = captureState.embedData;
@@ -290,6 +310,12 @@
           }
 
           if (i.customId === 'cap:add') {
+            if (captureState.busy) {
+              await i.deferUpdate().catch(() => {});
+              return;
+            }
+            captureState.busy = true;
+
             const modal = new ModalBuilder()
               .setCustomId('cap:modal:add')
               .setTitle("Charger un embed")
@@ -315,11 +341,10 @@
             await i.showModal(modal).catch(() => {});
 
             const submit = await i.awaitModalSubmit({ time: 120_000 }).catch(() => null);
-            if (!submit) return;
+            if (!submit) { captureState.busy = false; return; }
 
             console.log('[capture:add] modal soumis');
-            const deferRes = await submit.deferReply({ flags: 64 }).catch(e => { console.error('[capture:add] deferReply err:', e); return null; });
-            console.log('[capture:add] deferReply ok:', deferRes !== null);
+            await submit.deferReply({ flags: 64 }).catch(e => { console.error('[capture:add] deferReply err:', e); });
 
             const channelQuery = submit.fields.getTextInputValue('cap:input:channel').trim();
             const msgIdRaw     = submit.fields.getTextInputValue('cap:input:msgid').trim();
@@ -334,6 +359,7 @@
                 captureState.status = '';
                 await panelMsg.edit(_buildPanel()).catch(() => {});
               }, 5_000);
+              captureState.busy = false;
               return;
             }
 
@@ -344,6 +370,7 @@
                 captureState.status = '';
                 await panelMsg.edit(_buildPanel()).catch(() => {});
               }, 5_000);
+              captureState.busy = false;
               return;
             }
 
@@ -356,16 +383,43 @@
                 captureState.status = '';
                 await panelMsg.edit(_buildPanel()).catch(() => {});
               }, 5_000);
+              captureState.busy = false;
               return;
             }
 
             if (!targetMsg.embeds?.length) {
-              captureState.status = `## Aucun embed\nCe message ne contient pas d'embed.`;
-              await panelMsg.edit(_buildPanel()).catch(e => console.error('[capture:add] edit err (no embed):', e));
-              setTimeout(async () => {
-                captureState.status = '';
-                await panelMsg.edit(_buildPanel()).catch(() => {});
-              }, 5_000);
+              const v2Flag = MessageFlags?.IsComponentsV2 ?? (1 << 15);
+              const hasV2Flag = Boolean(targetMsg.flags & v2Flag);
+              const hasComponents = Boolean(targetMsg.components?.length);
+              console.log('[capture:add] V2 check: flags=', targetMsg.flags, 'v2Flag=', v2Flag, 'hasV2Flag=', hasV2Flag, 'hasComponents=', hasComponents);
+              const isV2Msg = hasV2Flag && hasComponents;
+              if (!isV2Msg) {
+                captureState.status = `## Aucun embed\nCe message ne contient pas d'embed.`;
+                await panelMsg.edit(_buildPanel()).catch(e => console.error('[capture:add] edit err (no embed):', e));
+                setTimeout(async () => {
+                  captureState.status = '';
+                  await panelMsg.edit(_buildPanel()).catch(() => {});
+                }, 5_000);
+                captureState.busy = false;
+                return;
+              }
+
+              const v2Json = [];
+              for (const comp of targetMsg.components) {
+                try { v2Json.push(comp.toJSON?.() ?? comp); } catch { v2Json.push(comp); }
+              }
+              console.log('[capture:add] V2 capturé:', v2Json.length, 'composants');
+
+              captureState.channelId = resolvedCh.id;
+              captureState.messageId = msgIdRaw;
+              captureState.isV2      = true;
+              captureState.v2Json    = v2Json;
+              captureState.embedData = { _v2: true };
+              captureState.saveData  = { isV2: true, components: v2Json };
+
+              await panelMsg.edit(_buildPanel()).catch(e => console.error('[capture:add] edit V2 err:', e));
+              submit.editReply({ content: '✓ Message V2 capturé.' }).catch(() => {});
+              captureState.busy = false;
               return;
             }
 
@@ -395,8 +449,9 @@
 
             console.log('[capture:add] tout ok, edition du panel');
             await panelMsg.edit(_buildPanel()).catch(e => console.error('[capture:add] edit final err:', e));
-            submit.deleteReply().catch(() => {});
+            submit.editReply({ content: '✓ Embed capturé.' }).catch(() => {});
             console.log('[capture:add] done');
+            captureState.busy = false;
             return;
           }
 
@@ -469,7 +524,7 @@
             collector.stop('saved');
             const doneContainer = new ContainerBuilder()
               .addTextDisplayComponents(new TextDisplayBuilder().setContent(
-                `## Template \`${rawName}\` sauvegardé !\n\nUtilise \`+embed ${rawName}\` pour l'envoyer.`
+                `## Template \`${rawName}\` sauvegardé !\n\nUtilise la commande \`${config?.prefix || '+'}embed\` puis le bouton **Load** pour l'envoyer.`
               ));
             await panelMsg.edit({
               components      : [doneContainer],
@@ -491,7 +546,7 @@
       }
 
       if (sub === 'delete' || sub === 'del' || sub === 'remove') {
-        const rawName = _normalizeTemplateName(args?.[1]);
+        const rawName = _normalizeTemplateName(args?.slice(1).join(' '));
         if (!rawName) {
           const s = await embed.replyError(message, 'Utilisation : `+embed delete <nom>`.', { timestamp: false }).catch(() => null);
           if (s && deleteReply) embed.scheduleDelete(s, deleteDelay);
@@ -546,7 +601,8 @@
       }
 
       if (sub && !RESERVED_NAMES.has(sub)) {
-        const s = await embed.replyError(message, `Pour charger un template, utilise \`+embed\` puis le bouton **Load**.`, { timestamp: false }).catch(() => null);
+        const p = config?.prefix || '+';
+        const s = await embed.replyError(message, `Pour charger un template, utilise la commande \`${p}embed\` puis clique sur le bouton **Load** pour sélectionner \`${sub}\`.`, { timestamp: false }).catch(() => null);
         if (s && deleteReply) embed.scheduleDelete(s, deleteDelay);
         return;
       }
@@ -712,7 +768,7 @@
 
           const _buildLoadPanel = (pg) => {
             const slice = templates.slice(pg * PAGE_SIZE, pg * PAGE_SIZE + PAGE_SIZE);
-            const lines = slice.map((t, i) => `**${pg * PAGE_SIZE + i + 1}.** \`${t.name}\``);
+            const lines = slice.map((t, i) => `**${pg * PAGE_SIZE + i + 1}.** \`${t.name}\`${t.data?.isV2 ? ' ◈' : ''}`);
             const text  = `## Templates sauvegardés\n\n${lines.join('\n')}`;
 
             const container = new ContainerBuilder()
@@ -793,6 +849,32 @@
 
               const saved = db.getEmbed(guildId, picked.name);
               if (!saved) return;
+
+              if (saved.data?.isV2) {
+                busy = true;
+                try {
+                  const container = _rebuildV2Container(saved.data.components);
+                  await x.followUp({
+                    components      : [container],
+                    flags           : COMPONENTS_V2_FLAG | 64,
+                    allowedMentions : { parse: [] },
+                  }).catch(() => {});
+                  await x.followUp({
+                    content         : `Template V2 \`${picked.name}\` chargé en aperçu. Utilise **Send** pour l'envoyer dans un salon.`,
+                    flags           : 64,
+                    allowedMentions : { parse: [] },
+                  }).catch(() => {});
+                  state._v2Template = saved.data;
+                } catch {
+                  await x.followUp({
+                    content         : `Erreur lors du chargement du template V2 \`${picked.name}\`.`,
+                    flags           : 64,
+                    allowedMentions : { parse: [] },
+                  }).catch(() => {});
+                }
+                busy = false;
+                return;
+              }
 
               busy = true;
               _loadTemplateIntoState(state, saved.data, defaultColor);
@@ -1133,6 +1215,68 @@
         if (id === 'embed:send') {
           busy = true;
 
+          if (state._v2Template) {
+            const modalId = `embed:send:${panel.id}:${interaction.id}`;
+            const shown = await interaction.showModal(
+              _buildModal(modalId, 'Envoyer le message V2', [
+                _input('channel', 'Salon cible', TextInputStyle.Short, {
+                  maxLength: 100, required: true, placeholder: '#salon, ID ou nom',
+                }),
+              ])
+            ).then(() => true).catch(() => false);
+
+            busy = false;
+            if (!shown) return;
+
+            const submit = await _awaitOwnModal(interaction, modalId);
+            if (!submit) { await _refresh(panel, state, mode); return; }
+
+            busy = true;
+            const query  = submit.fields.getTextInputValue('channel').trim();
+            const channel = await _resolveTextChannel(guild, query);
+
+            if (!channel) {
+              await _modalError(submit, guildId, 'Salon introuvable ou invalide.');
+              busy = false;
+              await _refresh(panel, state, mode);
+              return;
+            }
+
+            await submit.deferUpdate().catch(() => {});
+
+            try {
+              const container = _rebuildV2Container(state._v2Template.components);
+              const sentV2 = await channel.send({
+                components      : [container],
+                flags           : COMPONENTS_V2_FLAG,
+                allowedMentions : { parse: [] },
+              }).catch(() => null);
+
+              if (!sentV2) {
+                busy = false;
+                await _temporaryError(message, guildId, 'Impossible d\'envoyer le message V2 dans ce salon.');
+                await _refresh(panel, state, mode);
+                return;
+              }
+
+              await panel.delete().catch(() => {});
+              const sent = await message.channel.send({
+                embeds: [embed.build(guildId, `Message V2 envoyé dans ${channel}.`, { timestamp: false })],
+                allowedMentions: { repliedUser: false },
+              }).catch(() => null);
+              if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
+
+              busy = false;
+              collector.stop('sent');
+              return;
+            } catch {
+              busy = false;
+              await _temporaryError(message, guildId, 'Erreur lors de la reconstruction du message V2.');
+              await _refresh(panel, state, mode);
+              return;
+            }
+          }
+
           if (!_hasEmbedContent(state)) {
             state.description = 'Embed vide.';
           }
@@ -1351,7 +1495,7 @@
 
           const _buildLoadPanel = (pg) => {
             const slice = templates.slice(pg * PAGE_SIZE, pg * PAGE_SIZE + PAGE_SIZE);
-            const lines = slice.map((t, i) => `**${pg * PAGE_SIZE + i + 1}.** \`${t.name}\``);
+            const lines = slice.map((t, i) => `**${pg * PAGE_SIZE + i + 1}.** \`${t.name}\`${t.data?.isV2 ? ' ◈' : ''}`);
             const text = `## Templates sauvegardés\n\n${lines.join('\n')}`;
 
             const container = new ContainerBuilder()
@@ -1432,6 +1576,32 @@
 
               const saved = db.getEmbed(guildId, picked.name);
               if (!saved) return;
+
+              if (saved.data?.isV2) {
+                busy = true;
+                try {
+                  const container = _rebuildV2Container(saved.data.components);
+                  await x.followUp({
+                    components      : [container],
+                    flags           : COMPONENTS_V2_FLAG | 64,
+                    allowedMentions : { parse: [] },
+                  }).catch(() => {});
+                  await x.followUp({
+                    content         : `Template V2 \`${picked.name}\` chargé. Les templates V2 ne peuvent pas être édités ici.`,
+                    flags           : 64,
+                    allowedMentions : { parse: [] },
+                  }).catch(() => {});
+                  state._v2Template = saved.data;
+                } catch {
+                  await x.followUp({
+                    content         : `Erreur lors du chargement du template V2 \`${picked.name}\`.`,
+                    flags           : 64,
+                    allowedMentions : { parse: [] },
+                  }).catch(() => {});
+                }
+                busy = false;
+                return;
+              }
 
               busy = true;
               _loadTemplateIntoState(state, saved.data, defaultColor);
@@ -1742,6 +1912,8 @@
 
       return panel;
     },
+
+    _rebuildV2Container,
   };
 
   function _buildRows(mode) {
@@ -2786,4 +2958,65 @@
     if (!/^[a-z0-9_-]+$/.test(name)) return false;
     if (RESERVED_NAMES.has(name)) return false;
     return true;
+  }
+
+  function _rebuildV2Container(componentsJson) {
+    if (!Array.isArray(componentsJson)) throw new Error('Invalid V2 JSON');
+
+    let items = componentsJson;
+    if (items.length === 1 && (items[0]?.type === 17 || items[0]?.type === 'container')) {
+      items = items[0].components || [];
+    }
+
+    const container = new ContainerBuilder();
+    let count = 0;
+    const MAX = 40;
+
+    for (const raw of items) {
+      if (count >= MAX) break;
+      const type = raw?.type;
+      try {
+        if (type === 10 || type === 'textDisplay') {
+          container.addTextDisplayComponents(new TextDisplayBuilder().setContent(raw.content || ''));
+          count++;
+        } else if (type === 14 || type === 'separator') {
+          const sep = new SeparatorBuilder();
+          if (raw.spacing != null) sep.setSpacing(raw.spacing);
+          if (raw.divider != null) sep.setDivider(raw.divider);
+          container.addSeparatorComponents(sep);
+          count++;
+        } else if (type === 13 || type === 'mediaGallery') {
+          const gallery = new MediaGalleryBuilder();
+          if (Array.isArray(raw.items)) {
+            for (const item of raw.items) {
+              if (item?.url) gallery.addItems(new MediaGalleryItemBuilder().setURL(item.url));
+            }
+          }
+          container.addMediaGalleryComponents(gallery);
+          count++;
+        } else if (type === 1 || type === 'actionRow') {
+          const row = new ActionRowBuilder();
+          if (Array.isArray(raw.components)) {
+            for (const btn of raw.components) {
+              if (btn?.type === 2 || btn?.type === 'button') {
+                const b = new ButtonBuilder();
+                if (btn.style != null) b.setStyle(btn.style);
+                if (btn.label) b.setLabel(String(btn.label).slice(0, 80));
+                if (btn.emoji) { try { b.setEmoji(btn.emoji); } catch {} }
+                if (btn.url) b.setURL(btn.url);
+                if (btn.custom_id) b.setCustomId(btn.custom_id);
+                if (btn.disabled) b.setDisabled(true);
+                row.addComponents(b);
+              }
+            }
+          }
+          if (row.components.length) {
+            container.addActionRowComponents(row);
+            count++;
+          }
+        }
+      } catch {}
+    }
+
+    return container;
   }

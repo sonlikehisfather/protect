@@ -12,9 +12,9 @@ Le bot inclut plusieurs mini-jeux avec un **système de récompense XP** intégr
 |----------|-------------|---------------|
 | `+quiz` | Quiz de 5 questions générales | 100/80/60/40/20/10 selon score |
 | `+guess` | Devine le nombre (Plus ou Moins) | +15 par essai restant |
-| `+roulette` | Roulette casino | 200 (jackpot), 50 (win), 10 (perdu) |
-| `+blackjack` | Jeu de cartes 21 | 40 (win), 20 (égalité), 10 (perdu) |
-| `+coinflip` | Pile ou face | 30 (win), 10 (perdu) |
+| `+roulette` | Roulette casino | 200 (jackpot), 50 (win), 10 (Perdu) |
+| `+blackjack` | Jeu de cartes 21 | 40 (win), 20 (égalité), 10 (Perdu) |
+| `+coinflip` | Pile ou face | 30 (win), 10 (Perdu) |
 | `+roll` | Lancer de dé | 5 XP par lancer |
 | `+8ball` | Boule magique | 5 XP par question |
 | `+qi` | Test de QI rapide | - |

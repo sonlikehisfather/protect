@@ -16,7 +16,7 @@ Système de tickets pour le support utilisateur.
 
 Crée un nouveau ticket de support.
 
-**Usage:** `+ticket [raison]`
+**Usage :** `+ticket [raison]`
 
 **Alias:** `new`, `create`, `support`
 
@@ -46,7 +46,7 @@ Avant utilisation, configurez avec :
 
 Ferme le ticket actuel.
 
-**Usage:** `+close [raison]`
+**Usage :** `+close [raison]`
 
 **Alias:** `end`, `fermer`, `cloturer`
 
@@ -76,7 +76,7 @@ Ferme le ticket actuel.
 
 Ajoute un membre au ticket.
 
-**Usage:** `+add <@user>`
+**Usage :** `+add <@user>`
 
 **Permissions:** Créateur du ticket ou Staff
 
@@ -92,7 +92,7 @@ Ajoute un membre au ticket.
 
 Retire un membre du ticket.
 
-**Usage:** `+remove <@user>`
+**Usage :** `+remove <@user>`
 
 **Permissions:** Staff uniquement
 
@@ -107,7 +107,7 @@ Retire un membre du ticket.
 
 Renomme le salon du ticket.
 
-**Usage:** `+rename <nouveau_nom>`
+**Usage :** `+rename <nouveau_nom>`
 
 **Alias:** `renommer`
 
@@ -124,7 +124,7 @@ Renomme le salon du ticket.
 
 Génère un transcript du ticket sans le fermer.
 
-**Usage:** `+transcript`
+**Usage :** `+transcript`
 
 **Alias:** `save`, `archive`
 

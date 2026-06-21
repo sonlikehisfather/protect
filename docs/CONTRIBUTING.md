@@ -97,7 +97,7 @@ mysoul/
 module.exports = {
   name: 'nomCommande',
   description: 'Description',
-  usage: '<arg>',
+  Usage : '<arg>',
   
   async execute(message, args, client) {
     // Implémentation

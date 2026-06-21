@@ -67,7 +67,7 @@ module.exports = {
 
 function _fmtEntry(r) {
   const tag = r.action === 'add' ? '[+]' : '[-]';
-  return `\`${tag}\` <@&${r.roleId}> — <t:${r.changedAt}:R>`;
+  return `\`${tag}\` <@&${r.roleId}> ・ <t:${r.changedAt}:R>`;
 }
 
 function _buildPages(history) {

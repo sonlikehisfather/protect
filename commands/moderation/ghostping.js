@@ -99,7 +99,7 @@ module.exports = {
 
           container.addTextDisplayComponents(
             new TextDisplayBuilder().setContent(
-              '## ◈ Ghost Ping — Configuration\n' +
+              '## ◈ Ghost Ping ・ Configuration\n' +
               `**Statut :** ${status}\n` +
               `**Salons :** ${selectedChannels}\n\n` +
               `*Le bot pingera le membre à son arrivée dans chaque salon configuré et supprimera immédiatement le message.*`
@@ -122,7 +122,7 @@ module.exports = {
       return {
         embeds: [
           embed.build(guildId, null, {
-            title : '◈ Ghost Ping — Configuration',
+            title : '◈ Ghost Ping ・ Configuration',
             fields: [
               { name: 'Statut',  value: status,             inline: true },
               { name: 'Salons',  value: selectedChannels,   inline: false },

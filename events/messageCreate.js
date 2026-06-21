@@ -167,6 +167,68 @@ module.exports = {
       const lastMsg = message.content ? message.content.slice(0, 200) : null;
       db.updateSeen(message.author.id, guildId, message.channel.id, lastMsg);
       db.incrementMsgcount(message.author.id, guildId);
+
+      if (db.isCasinoEnabled(guildId) && !db.isCasinoBlacklisted(guildId, message.author.id)) {
+        db.addMsgCount(guildId, message.author.id, 1);
+
+        // Check for message rewards
+        const cfg = db.getCasinoConfig(guildId);
+        const user = db.getCasinoUser(guildId, message.author.id);
+
+        if (user.__isNewProfile && user.__creationBonusGiven > 0) {
+          const { sendCasinoLog } = require('../commands/casino/casino');
+          sendCasinoLog(message.guild, cfg, 'logChannelGains', {
+            icon  : '✦',
+            title : 'Bonus de création de profil',
+            color : 0x57F287,
+            user  : message.author.id,
+            lines : [
+              `Nouveau profil casino créé`,
+              `Bonus attribué : **+${embed.fmtCoins(user.__creationBonusGiven)}** coins`,
+              `Solde : **${embed.fmtCoins(user.coins)}** coins`,
+            ],
+          });
+        }
+
+        // Calculate if we should give coins (every X messages)
+        if (cfg.msgsForCoins > 0 && user.msgCount % cfg.msgsForCoins === 0) {
+          let multiplier = 1;
+
+          // Check role multiplier
+          if (cfg.roleMultiplierId && message.member?.roles?.cache?.has(cfg.roleMultiplierId)) {
+            multiplier *= 2;
+          }
+
+          // Check status multiplier
+          if (cfg.statusMultiplier && cfg.statusText) {
+            const activity = message.member?.presence?.activities?.find(a => a.type === 4);
+            const state = activity?.state?.toLowerCase() || '';
+            const keywords = cfg.statusText.split('|').map(t => t.trim().toLowerCase()).filter(Boolean);
+            if (keywords.some(kw => state.includes(kw))) {
+              multiplier *= (cfg.statusMsgMultiplier ?? 2.0);
+            }
+          }
+
+          const coins = Math.floor((cfg.coinsPerMsgPack || cfg.coinsPerMsg * cfg.msgsForCoins) * multiplier);
+          if (coins > 0) {
+            const { checkGainsPeriodLimit } = require('../commands/casino/casino');
+            if (checkGainsPeriodLimit(guildId, message.author.id, 'gains', coins)) return;
+            db.addCasinoCoins(guildId, message.author.id, coins, 'win');
+
+            // Log to gains channel (V2)
+            const { sendCasinoLog } = require('../commands/casino/casino');
+            sendCasinoLog(message.guild, cfg, 'logChannelGains', {
+              icon  : '✸',
+              title : 'Messages',
+              color : 0x57F287,
+              user  : message.author.id,
+              lines : [
+                `※ **+${embed.fmtCoins(coins)}** coins (x${multiplier})`,
+              ],
+            });
+          }
+        }
+      }
     } catch {}
 
     // detect which prefix (if any) is used from allowedPrefixes
@@ -290,6 +352,18 @@ module.exports = {
           deleteDelay,
           cooldown.shouldNotify
         );
+      }
+
+      if (command?.help?.category === 'casino' && !command?.help?.permissions?.length && cmdName !== 'casino') {
+        try {
+          const { checkCasinoChannel } = require('../commands/casino/casino');
+          const chErr = checkCasinoChannel(message, cmdName);
+          if (chErr) {
+            const sent = await embed.replyError(message, chErr, { timestamp: false }).catch(() => null);
+            if (sent && errorDeleteReply) embed.scheduleDelete(sent, deleteDelay);
+            return;
+          }
+        } catch {}
       }
 
       await errorHandler.run(

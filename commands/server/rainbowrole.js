@@ -238,7 +238,7 @@ module.exports = {
           const statusDot = row.active ? '◆' : '◇';
           const modeLbl = modeOptions.find((m) => m.value === row.mode)?.label || row.mode;
           const arrow = isSelected ? '**»**' : '\u00a0\u00a0';
-          lines.push(`${arrow} ${statusDot} ${roleName} — ${modeLbl} — \`${row.interval}s\``);
+          lines.push(`${arrow} ${statusDot} ${roleName} ・ ${modeLbl} ・ \`${row.interval}s\``);
         }
       }
 
@@ -248,7 +248,7 @@ module.exports = {
         if (selectedRow) {
           const stateIcon = selectedRow.active ? '◆ **Actif**' : '◇ **Désactivé**';
           const modeLbl = modeOptions.find((m) => m.value === selectedRow.mode)?.label || selectedRow.mode;
-          const colorPreview = selectedRow.color ? `\`${selectedRow.color}\`` : '`—`';
+          const colorPreview = selectedRow.color ? `\`${selectedRow.color}\`` : '`・`';
           details.push('');
           details.push(`${stateIcon}`);
           details.push(`› Intervalle : \`${selectedRow.interval}s\``);
@@ -256,7 +256,7 @@ module.exports = {
           details.push(`› Dernière couleur : ${colorPreview}`);
         } else {
           details.push('');
-          details.push('-# Nouveau rôle — configurez l\'intervalle et le style ci-dessous,');
+          details.push('-# Nouveau rôle ・ configurez l\'intervalle et le style ci-dessous,');
           details.push('-# puis cliquez sur **Enregistrer**.');
         }
       } else {
@@ -305,7 +305,7 @@ module.exports = {
 
       const accent = _hexToInt(embed.getGuildColor(guildId));
       const headerLines = entries.length
-        ? [`## ◈ Rainbow Role — ${entries.length} rôle${entries.length > 1 ? 's' : ''} configuré${entries.length > 1 ? 's' : ''}`, '', ...lines]
+        ? [`## ◈ Rainbow Role ・ ${entries.length} rôle${entries.length > 1 ? 's' : ''} configuré${entries.length > 1 ? 's' : ''}`, '', ...lines]
         : ['## ◈ Rainbow Role', '', ...lines];
 
       const container = new ContainerBuilder().setAccentColor(accent)
@@ -635,7 +635,7 @@ module.exports = {
                 const applyResult = await _applyImmediateRainbowRole(guild, row);
                 if (applyResult?.error) {
                   const errMsg = applyResult.error === 'missing_permissions' || applyResult.error === 'not_editable'
-                    ? '‼ Permissions insuffisantes — le bot ne peut pas modifier ce rôle (hiérarchie ou permissions manquantes).'
+                    ? '‼ Permissions insuffisantes ・ le bot ne peut pas modifier ce rôle (hiérarchie ou permissions manquantes).'
                     : '‼ Erreur lors de l\'application de la couleur.';
                   await interaction.followUp({ content: errMsg, flags: 64 }).catch(() => {});
                 }

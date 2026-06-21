@@ -2,7 +2,7 @@
 
 Commandes réservées au propriétaire du bot (`BUYER_ID` dans `.env`).
 
-> **⚠️ Attention** : Ces commandes sont puissantes et peuvent être dangereuses. Utilisez-les avec précaution.
+> **⚑ Attention** : Ces commandes sont puissantes et peuvent être dangereuses. Utilisez-les avec précaution.
 
 ## Table des matières
 - [eval](#eval) - Évaluation de code
@@ -21,7 +21,7 @@ Commandes réservées au propriétaire du bot (`BUYER_ID` dans `.env`).
 
 Exécute du code JavaScript (TRÈS DANGEREUX).
 
-**Usage:** `+eval <code>`
+**Usage :** `+eval <code>`
 
 **Alias:** `e`, `ev`
 
@@ -53,7 +53,7 @@ Exécute du code JavaScript (TRÈS DANGEREUX).
 
 Exécute une commande shell (TRÈS DANGEREUX).
 
-**Usage:** `+exec <commande>`
+**Usage :** `+exec <commande>`
 
 **Alias:** `shell`, `cmd`, `$`
 
@@ -70,7 +70,7 @@ Exécute une commande shell (TRÈS DANGEREUX).
 
 Envoie un message via le bot.
 
-**Usage:** `+say [#salon] <message>`
+**Usage :** `+say [#salon] <message>`
 
 **Alias:** `speak`, `send`
 
@@ -97,7 +97,7 @@ Champ 2: Valeur 2
 
 Change l'activité affichée du bot.
 
-**Usage:** `+activity <type> <texte>`
+**Usage :** `+activity <type> <texte>`
 
 **Alias:** `setactivity`, `playing`, `watching`, `listening`, `streaming`
 
@@ -123,7 +123,7 @@ Change l'activité affichée du bot.
 
 Change le statut de présence du bot.
 
-**Usage:** `+status <online|idle|dnd|invisible>`
+**Usage :** `+status <online|idle|dnd|invisible>`
 
 **Alias:** `setstatus`, `presence`
 
@@ -147,7 +147,7 @@ Change le statut de présence du bot.
 
 Liste tous les serveurs où le bot est présent.
 
-**Usage:** `+serverlist`
+**Usage :** `+serverlist`
 
 **Alias:** `guilds`, `servers`, `sl`
 
@@ -165,7 +165,7 @@ Liste tous les serveurs où le bot est présent.
 
 Génère un lien d'invitation pour rejoindre un serveur.
 
-**Usage:** `+invite <guild_id>`
+**Usage :** `+invite <guild_id>`
 
 **Alias:** `inv`, `getinvite`
 
@@ -183,7 +183,7 @@ Crée une invitation temporaire dans le premier salon disponible.
 
 Fait quitter un serveur au bot.
 
-**Usage:** `+leave <guild_id>`
+**Usage :** `+leave <guild_id>`
 
 **Alias:** `quit`, `remove`
 
@@ -200,7 +200,7 @@ Fait quitter un serveur au bot.
 
 Recharge les commandes/events sans redémarrer.
 
-**Usage:** `+reload [commands|events|all]`
+**Usage :** `+reload [commands|events|all]`
 
 **Alias:** `rl`, `r`
 
@@ -217,7 +217,7 @@ Recharge les commandes/events sans redémarrer.
 
 Envoie un message privé à un utilisateur.
 
-**Usage:** `+dm <user_id> <message>`
+**Usage :** `+dm <user_id> <message>`
 
 **Alias:** `mp`, `message`, `msg`
 
@@ -232,7 +232,7 @@ Envoie un message privé à un utilisateur.
 
 Gère la liste noire des utilisateurs/serveurs.
 
-**Usage:** `+blacklist <add|remove|list> <id>`
+**Usage :** `+blacklist <add|remove|list> <id>`
 
 ### Exemples
 ```

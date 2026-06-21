@@ -127,7 +127,7 @@ const LOG_DOCS = {
 exports.help = {
   name: 'logs doc',
   description: 'Documentation des logs disponibles.',
-  usage: 'logs doc',
+  Usage : 'logs doc',
   category: 'logs',
 };
 
@@ -247,7 +247,7 @@ function _buildV2Doc(state, guildId) {
     { id: 'members', label: 'Membres', emoji: '👥' },
     { id: 'structure', label: 'Structure', emoji: '#️⃣' },
     { id: 'ticket', label: 'Ticket', emoji: '🎫' },
-    { id: 'error', label: 'Erreur', emoji: '⚠️' },
+    { id: 'error', label: 'Erreur', emoji: '⚑' },
   ];
 
   const categoryRow = new ActionRowBuilder().addComponents(
@@ -349,7 +349,7 @@ function _buildClassicDoc(state, guildId) {
     { id: 'members', label: 'Membres', emoji: '👥' },
     { id: 'structure', label: 'Structure', emoji: '#️⃣' },
     { id: 'ticket', label: 'Ticket', emoji: '🎫' },
-    { id: 'error', label: 'Erreur', emoji: '⚠️' },
+    { id: 'error', label: 'Erreur', emoji: '⚑' },
   ];
 
   const categoryRow = new ActionRowBuilder().addComponents(

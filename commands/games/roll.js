@@ -19,7 +19,7 @@ exports.help = {
   description : 'Lance un dé (6 faces par défaut) ou plusieurs.',
   use         : 'roll [nombre] [faces]',
   usage       : 'roll [nombre] [faces]',
-  aliases     : ['dice', 'de', 'des'],
+  aliases     : [],
   category    : 'games',
 };
 

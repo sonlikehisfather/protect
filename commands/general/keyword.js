@@ -60,7 +60,7 @@ function buildMainPayload(ownerId, guildId, status = null, disabled = false, pag
   const container = new ContainerBuilder();
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      `## Mots-clés — notifications DM\nTu seras notifié en DM quand un mot-clé est mentionné dans ce serveur.`,
+      `## Mots-clés ・ notifications DM\nTu seras notifié en DM quand un mot-clé est mentionné dans ce serveur.`,
     ),
   );
   container.addSeparatorComponents(new SeparatorBuilder());
@@ -148,7 +148,7 @@ function buildConfigPayload(ownerId, guildId, selectedKw = null, status = null, 
   const container = new ContainerBuilder();
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      `## Config — Notifications par mot-clé\nChoisis un mot-clé puis sélectionne les personnes à notifier (multi-select).`,
+      `## Config ・ Notifications par mot-clé\nChoisis un mot-clé puis sélectionne les personnes à notifier (multi-select).`,
     ),
   );
   container.addSeparatorComponents(new SeparatorBuilder());
@@ -230,7 +230,7 @@ async function openPanel(channel, author, guildId, invokeMsg = null) {
       : 'Aucun mot-clé enregistré.';
     return channel.send({
       embeds: [embed.build(guildId, desc, {
-        title  : 'Mots-clés — notifications DM',
+        title  : 'Mots-clés ・ notifications DM',
         footer : `${list.length}/${MAX_KEYWORDS}`,
         timestamp: false,
       })],

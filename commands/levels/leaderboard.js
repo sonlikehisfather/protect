@@ -20,7 +20,7 @@ exports.help = {
   name       : 'leaderboard',
   description: 'Afficher le classement des niveaux.',
   use        : 'leaderboard [page]',
-  aliases    : ['lb', 'top', 'classement'],
+  aliases    : ['lb', 'classement'],
   category   : 'levels',
 };
 

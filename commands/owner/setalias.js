@@ -282,7 +282,7 @@ module.exports = {
 
           const headerText =
             `## ◈ Supprimer un alias` +
-            (totalPages > 1 ? ` — Page ${rmPage + 1}/${totalPages}` : '') +
+            (totalPages > 1 ? ` ・ Page ${rmPage + 1}/${totalPages}` : '') +
             `\n*Sélectionne la commande puis les alias à retirer.*`;
 
           if (V2_AVAILABLE) {

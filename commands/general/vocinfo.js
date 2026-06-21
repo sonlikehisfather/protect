@@ -311,7 +311,7 @@ async function _handleUser(message, args, guildId, deleteReply, deleteDelay) {
 
   let fiabilityStr = `> ${_code('OK')}`;
   if (stats?.lastStaleClearAt) {
-    fiabilityStr = `> ⚠️ Session interrompue lors d'un redémarrage · <t:${stats.lastStaleClearAt}:R>`;
+    fiabilityStr = `> ⚑ Session interrompue lors d'un redémarrage · <t:${stats.lastStaleClearAt}:R>`;
   }
 
   const fields = [

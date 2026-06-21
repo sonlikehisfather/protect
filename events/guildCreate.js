@@ -73,7 +73,7 @@ module.exports = {
 
         if (channel) {
           await channel.send({
-            content         : '⚠️ Ce serveur n\'est pas autorisé. Le bot quitte automatiquement.',
+            content         : '⚑ Ce serveur n\'est pas autorisé. Le bot quitte automatiquement.',
             allowedMentions : { parse: [] },
           }).catch(() => {});
         }

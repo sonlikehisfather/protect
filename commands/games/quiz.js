@@ -256,7 +256,7 @@ const QUESTIONS = [
 
 exports.help = {
   name        : 'quiz',
-  description : 'Quiz Vrai/Faux — 5 questions de culture générale.',
+  description : 'Quiz Vrai/Faux ・ 5 questions de culture générale.',
   use         : 'quiz',
   usage       : 'quiz',
   aliases     : ['question', 'trivia'],
@@ -366,11 +366,11 @@ exports.run = async (client, message, args) => {
 
   collector.on('end', async (_, reason) => {
     let emoji, title, desc, xpGain;
-    if (score === 5)       { emoji = '🥇'; title = 'PARFAIT !';         desc = `**5/5** — Incroyable !`;          xpGain = 100; }
-    else if (score === 4)  { emoji = '🌟'; title = 'EXCELLENT !';       desc = `**4/5** — Presque parfait !`;     xpGain = 80;  }
-    else if (score === 3)  { emoji = '👍'; title = 'PAS MAL !';         desc = `**3/5** — Bonne culture générale.`; xpGain = 60; }
-    else if (score >= 1)   { emoji = '📖'; title = 'PEUT MIEUX FAIRE';  desc = `**${score}/5** — Continue !`;    xpGain = 40;  }
-    else                   { emoji = '🤦'; title = 'CATASTROPHE';       desc = `**0/5** — Ouvre un livre !`;     xpGain = 10;  }
+    if (score === 5)       { emoji = '🥇'; title = 'PARFAIT !';         desc = `**5/5** ・ Incroyable !`;          xpGain = 100; }
+    else if (score === 4)  { emoji = '🌟'; title = 'EXCELLENT !';       desc = `**4/5** ・ Presque parfait !`;     xpGain = 80;  }
+    else if (score === 3)  { emoji = '👍'; title = 'PAS MAL !';         desc = `**3/5** ・ Bonne culture générale.`; xpGain = 60; }
+    else if (score >= 1)   { emoji = '📖'; title = 'PEUT MIEUX FAIRE';  desc = `**${score}/5** ・ Continue !`;    xpGain = 40;  }
+    else                   { emoji = '🤦'; title = 'CATASTROPHE';       desc = `**0/5** ・ Ouvre un livre !`;     xpGain = 10;  }
 
     db.addXp(guildId, message.author.id, xpGain);
     desc += `\n\n✨ **+${xpGain} XP** gagnés !`;

@@ -9,7 +9,7 @@ exports.help = {
   description: 'Affiche ton niveau avec une belle interface.',
   use        : 'rank [@membre]',
   usage      : 'rank @membre',
-  aliases    : ['profile', 'lvl', 'rang'],
+  aliases    : ['lvl', 'rang'],
   category   : 'levels',
 };
 

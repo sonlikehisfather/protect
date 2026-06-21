@@ -283,7 +283,7 @@ module.exports = {
   name: 'commandname',           // Nom unique
   aliases: ['alias1', 'alias2'],  // Alias optionnels
   description: 'Description',     // Pour l'aide
-  usage: '<arg1> [arg2]',        // Syntaxe
+  Usage : '<arg1> [arg2]',        // Syntaxe
   category: 'Category',          // Catégorie
   cooldown: 5,                   // Secondes de cooldown
   permissions: ['BanMembers'],   // Permissions requises

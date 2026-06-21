@@ -11,6 +11,7 @@ const {
   PermissionsBitField,
   StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder,
+  MessageFlags,
 } = require('discord.js');
 
 const perms         = require('../utils/permissions');
@@ -28,6 +29,8 @@ try { suggestionModule = require('../commands/general/suggestion'); } catch {}
 
 
 const _rolemenuBusy = new Set();
+const _casinoConfigPanels = new Map(); // guildId:userId -> panel message
+const _casinoConfigViews = new Map();
 const DEBUG_ROLEMENU = process.env.DEBUG_ROLEMENU === 'true';
 
 function _debugRolemenu(tag, data) {
@@ -156,6 +159,10 @@ module.exports = {
           return;
         }
 
+        if (cid.startsWith('csconf_')) {
+          return _handleCasinoConfigSelect(interaction, cid);
+        }
+
         return embed.replyExpiredPanel(interaction);
       }
 
@@ -222,6 +229,60 @@ async function _handleButton(client, interaction) {
     return;
   }
 
+  if (id.startsWith('plinko:')) {
+    return;
+  }
+
+  if (id.startsWith('tower:')) {
+    return;
+  }
+
+  if (id.startsWith('chicken:')) {
+    return;
+  }
+
+  if (id.startsWith('dice:')) {
+    return;
+  }
+
+  if (id.startsWith('csconf_')) {
+    console.log(`[CASINO] Handling config button: ${id} from user ${interaction.user.id}`);
+    return _handleCasinoConfigButton(client, interaction, id);
+  }
+
+  if (id.startsWith('cs_panel_')) {
+    let casino = null;
+    try { casino = require('../commands/casino/casino'); } catch {}
+    if (casino?.handleInteraction) {
+      return casino.handleInteraction(interaction, id);
+    }
+    return interaction.deferUpdate().catch(() => {});
+  }
+
+  if (id.startsWith('cs_ach_')) {
+    let casino = null;
+    try { casino = require('../commands/casino/casino'); } catch {}
+    if (casino?.handleAchievementInteraction) {
+      return casino.handleAchievementInteraction(interaction, id);
+    }
+    return interaction.deferUpdate().catch(() => {});
+  }
+
+  // Handle panel navigation and draws globally (no collector dependency)
+  if (id === 'cs_page_nav') {
+    let casino = null;
+    try { casino = require('../commands/casino/casino'); } catch {}
+    if (casino?.handlePanelNav) return casino.handlePanelNav(interaction);
+    return interaction.deferUpdate().catch(() => {});
+  }
+
+  if (id.startsWith('cs_do_tirage')) {
+    let casino = null;
+    try { casino = require('../commands/casino/casino'); } catch {}
+    if (casino?.handlePanelDraw) return casino.handlePanelDraw(interaction, id);
+    return interaction.deferUpdate().catch(() => {});
+  }
+
   if (id.startsWith('embed:')) {
     return embed.replyExpiredPanel(interaction);
   }
@@ -260,7 +321,7 @@ async function _handleButton(client, interaction) {
   }
 
 
-  if (id.startsWith('al:') || id.startsWith('inv:') || id.startsWith('cap:') || id.startsWith('local:capture:') || id.startsWith('eload:') || id.startsWith('local:translate:') || id.startsWith('local:joke:')) {
+  if (id.startsWith('al:') || id.startsWith('inv:') || id.startsWith('cap:') || id.startsWith('local:capture:') || id.startsWith('eload:') || id.startsWith('mye:') || id.startsWith('local:translate:') || id.startsWith('local:joke:') || id.startsWith('local:blcasino:')) {
     return;
   }
 
@@ -291,10 +352,19 @@ async function _handleButton(client, interaction) {
 
   if (id.startsWith('tp_') || id.startsWith('to_') || id.startsWith('tpe:') || id.startsWith('mybot:') ||
       id.startsWith('coinflip:') || id.startsWith('guess:') || id.startsWith('quiz:') ||
-      id.startsWith('roulette:') || id.startsWith('bj:')) {
+      id.startsWith('roulette:') || id.startsWith('bj:') || id.startsWith('gift:') ||
+      id.startsWith('russian:') || id.startsWith('mine:')) {
     return;
   }
 
+  // Casino handlers
+  if (id.startsWith('gcoins_')) {
+    let gcoins = null;
+    try { gcoins = require('../commands/casino/gcoins'); } catch {}
+    if (gcoins?.handleInteraction) {
+      return gcoins.handleInteraction(interaction, id);
+    }
+  }
 
   if (
     id.startsWith('gw_set_') ||
@@ -525,7 +595,7 @@ async function _handleServerLeaveButton(client, interaction, id) {
 
 async function _handleSelectMenu(client, interaction) {
   const id = interaction.customId;
-
+  console.log(`[SELECT-MENU] Received: ${id}, type=${interaction.componentType}, user=${interaction.user.id}`);
 
   if (id.startsWith('rr:')) {
     return;
@@ -537,6 +607,48 @@ async function _handleSelectMenu(client, interaction) {
 
   if (id.startsWith('bp:')) {
     return;
+  }
+
+  if (id === 'cs_shop_select') {
+    let casino = null;
+    try { casino = require('../commands/casino/casino'); } catch {}
+    if (casino?.handleShopSelect) return casino.handleShopSelect(interaction);
+    return interaction.deferUpdate().catch(() => {});
+  }
+
+  if (id === 'cs_shop_category') {
+    let casino = null;
+    try { casino = require('../commands/casino/casino'); } catch {}
+    if (casino?.handleShopCategory) return casino.handleShopCategory(interaction);
+    return interaction.deferUpdate().catch(() => {});
+  }
+
+  if (id === 'cs_shop_shield_select') {
+    let casino = null;
+    try { casino = require('../commands/casino/casino'); } catch {}
+    if (casino?.handleShopShieldSelect) return casino.handleShopShieldSelect(interaction);
+    return interaction.deferUpdate().catch(() => {});
+  }
+
+  if (id === 'cs_ach_catsel' || id === 'cs_ach_owned_catsel') {
+    let casino = null;
+    try { casino = require('../commands/casino/casino'); } catch {}
+    if (casino?.handleAchievementInteraction) return casino.handleAchievementInteraction(interaction, id);
+    return interaction.deferUpdate().catch(() => {});
+  }
+
+  // Casino config select menus (ephemeral, handled directly)
+  if (id.startsWith('csconf_')) {
+    console.log(`[CASINO] Handling config select: ${id} from user ${interaction.user.id}`);
+    return _handleCasinoConfigSelect(interaction, id);
+  }
+
+  // Handle panel navigation globally (no collector dependency)
+  if (id === 'cs_page_nav') {
+    let casino = null;
+    try { casino = require('../commands/casino/casino'); } catch {}
+    if (casino?.handlePanelNav) return casino.handlePanelNav(interaction);
+    return interaction.deferUpdate().catch(() => {});
   }
 
 
@@ -571,7 +683,7 @@ async function _handleSelectMenu(client, interaction) {
   }
 
 
-  if (id.startsWith('al:') || id.startsWith('cap:') || id.startsWith('local:capture:') || id.startsWith('eload:') || id.startsWith('local:translate:') || id.startsWith('local:joke:')) {
+  if (id.startsWith('al:') || id.startsWith('cap:') || id.startsWith('local:capture:') || id.startsWith('eload:') || id.startsWith('mye:') || id.startsWith('local:translate:') || id.startsWith('local:joke:') || id.startsWith('local:blcasino:')) {
     return;
   }
 
@@ -604,6 +716,7 @@ async function _handleSelectMenu(client, interaction) {
 
 async function _handleModal(client, interaction) {
   const id = interaction.customId;
+  const guildId = interaction.guild?.id;
 
 
   if (id.startsWith('embed:')) {
@@ -636,6 +749,252 @@ async function _handleModal(client, interaction) {
 
   if (id.startsWith('myvc:')) {
     return;
+  }
+
+  if (id.startsWith('dice:')) {
+    return;
+  }
+
+  if (id === 'csconf_gains_modal') {
+    return _handleCasinoGainsModal(interaction);
+  }
+
+  if (id === 'csconf_statustext_modal') {
+    const raw = interaction.fields.getTextInputValue('status_texts') || '';
+    const texts = raw.split('\n').map(t => t.trim()).filter(Boolean).join('|');
+    db.setCasinoConfig(guildId, { statusText: texts });
+    await interaction.reply({ content: `✓ Texte(s) statut mis à jour : \`${texts || 'aucun'}\``, flags: MessageFlags.Ephemeral }).catch(() => {});
+    await _refreshCasinoConfigPanel(interaction);
+    return;
+  }
+
+  // Cotes modals
+  if (id === 'csconf_cotes_bj_modal') {
+    const coteNormal = parseFloat(interaction.fields.getTextInputValue('cote_bj'));
+    const coteBonus = parseFloat(interaction.fields.getTextInputValue('cote_bj_bonus'));
+    if (!isNaN(coteNormal) && coteNormal > 0) {
+      db.setCasinoConfig(guildId, { coteBlackjack: coteNormal });
+    }
+    if (!isNaN(coteBonus) && coteBonus > 0) {
+      db.setCasinoConfig(guildId, { coteBlackjackBonus: coteBonus });
+    }
+    await interaction.reply({ content: `Cotes Blackjack mises à jour : x${coteNormal} (normal) / x${coteBonus || 'N/A'} (bonus)`, flags: MessageFlags.Ephemeral }).catch(() => {});
+    await _refreshCasinoConfigPanel(interaction);
+    return;
+  }
+
+  if (id === 'csconf_cotes_cf_modal') {
+    const coteNormal = parseFloat(interaction.fields.getTextInputValue('cote_cf'));
+    const coteBonus = parseFloat(interaction.fields.getTextInputValue('cote_cf_bonus'));
+    if (!isNaN(coteNormal) && coteNormal > 0) {
+      db.setCasinoConfig(guildId, { coteCoinflip: coteNormal });
+    }
+    if (!isNaN(coteBonus) && coteBonus > 0) {
+      db.setCasinoConfig(guildId, { coteCoinflipBonus: coteBonus });
+    }
+    await interaction.reply({ content: `Cotes Coinflip mises à jour : x${coteNormal} (normal) / x${coteBonus || 'N/A'} (bonus)`, flags: MessageFlags.Ephemeral }).catch(() => {});
+    await _refreshCasinoConfigPanel(interaction);
+    return;
+  }
+
+  if (id.startsWith('csconf_limits_mises_modal')) {
+    const cmd = id.split(':')[1];
+    const parse = v => { const n = parseInt(v); return isNaN(n) || n < 0 ? 0 : n; };
+    const min = parse(interaction.fields.getTextInputValue('min'));
+    const max = parse(interaction.fields.getTextInputValue('max'));
+    if (cmd === 'bj')  db.setCasinoConfig(guildId, { limitBjMin: min, limitBjMax: max });
+    if (cmd === 'cf')  db.setCasinoConfig(guildId, { limitCfMin: min, limitCfMax: max });
+    if (cmd === 'rl')  db.setCasinoConfig(guildId, { limitRlMin: min, limitRlMax: max });
+    if (cmd === 'russian') db.setCasinoConfig(guildId, { limitRussianMin: min, limitRussianMax: max });
+    if (cmd === 'mine')    {
+      let bombs = parseInt(interaction.fields.getTextInputValue('bombs'));
+      if (isNaN(bombs) || bombs < 1) bombs = 3;
+      if (bombs > 24) bombs = 24;
+      db.setCasinoConfig(guildId, { limitMineMin: min, limitMineMax: max, limitMineBombs: bombs });
+    }
+    if (cmd === 'plinko') db.setCasinoConfig(guildId, { limitPlinkoMin: min, limitPlinkoMax: max });
+    if (cmd === 'tower')  db.setCasinoConfig(guildId, { limitTowerMin: min, limitTowerMax: max });
+    const labelMap = { bj: 'Blackjack', cf: 'Coinflip', rl: 'Roulette', russian: 'Russian', mine: 'Mine', plinko: 'Plinko', tower: 'Tower' };
+    const label = labelMap[cmd] || cmd;
+    await interaction.reply({ content: `✓ Mises ${label} ・ min: ${min || 'aucune'} / max: ${max || 'illimité'}`, flags: MessageFlags.Ephemeral }).catch(() => {});
+    await _refreshCasinoConfigPanel(interaction);
+    return;
+  }
+
+  if (id.startsWith('csconf_limits_cd_modal')) {
+    const cmd = id.split(':')[1];
+    const parseDur = v => {
+      if (!v || !v.trim()) return 0;
+      const m = v.trim().match(/^(\d+(?:\.\d+)?)\s*([smhj]?)$/i);
+      if (!m) return 0;
+      const mult = { s: 1, m: 60, h: 3600, j: 86400 }[(m[2] || 's').toLowerCase()] ?? 1;
+      return Math.max(0, Math.round(parseFloat(m[1]) * mult));
+    };
+    const secs = parseDur(interaction.fields.getTextInputValue('duration'));
+    const cdMap = { bj: 'cooldownBj', cf: 'cooldownCf', rl: 'cooldownRl', collect: 'cooldownCollect', vol: 'cooldownVol', gift: 'cooldownGift', russian: 'cooldownRussian', mine: 'cooldownMine', plinko: 'cooldownPlinko', tower: 'cooldownTower' };
+    const labelMap = { bj: 'Blackjack', cf: 'Coinflip', rl: 'Roulette', collect: 'Collect', vol: 'Vol', gift: 'Gift', russian: 'Russian', mine: 'Mine', plinko: 'Plinko', tower: 'Tower' };
+    if (cdMap[cmd]) db.setCasinoConfig(guildId, { [cdMap[cmd]]: secs });
+    const fmtCd = s => s > 0 ? (s % 86400 === 0 ? `${s/86400}j` : s % 3600 === 0 ? `${s/3600}h` : s % 60 === 0 ? `${s/60}m` : `${s}s`) : 'aucun';
+    await interaction.reply({ content: `✓ Cooldown ${labelMap[cmd]} : ${fmtCd(secs)}`, flags: MessageFlags.Ephemeral }).catch(() => {});
+    await _refreshCasinoConfigPanel(interaction);
+    return;
+  }
+
+  if (id.startsWith('csconf_limits_cap_modal')) {
+    const type = id.split(':')[1];
+    const parseInt_ = v => { const n = parseInt(v); return isNaN(n) || n < 0 ? 0 : n; };
+    const parseDur  = v => {
+      if (!v || !v.trim()) return 0;
+      const m = v.trim().match(/^(\d+(?:\.\d+)?)\s*([smhj]?)$/i);
+      if (!m) return 0;
+      const mult = { s: 1, m: 60, h: 3600, j: 86400 }[(m[2] || 's').toLowerCase()] ?? 1;
+      return Math.max(0, Math.round(parseFloat(m[1]) * mult));
+    };
+    if (type === 'max_coins') {
+      const val = parseInt_(interaction.fields.getTextInputValue('value'));
+      db.setCasinoConfig(guildId, { limitMaxCoins: val });
+      await interaction.reply({ content: `✓ Coins max détenus : ${val > 0 ? val.toLocaleString() : 'illimité'}`, flags: MessageFlags.Ephemeral }).catch(() => {});
+    } else if (type === 'max_draws') {
+      const val = parseInt_(interaction.fields.getTextInputValue('value'));
+      db.setCasinoConfig(guildId, { limitMaxDraws: val });
+      await interaction.reply({ content: `✓ Tirages max détenus : ${val > 0 ? val : 'illimité'}`, flags: MessageFlags.Ephemeral }).catch(() => {});
+    } else if (type === 'gains') {
+      const val    = parseInt_(interaction.fields.getTextInputValue('value'));
+      const period = parseDur(interaction.fields.getTextInputValue('period'));
+      const fmtCd  = s => s > 0 ? (s % 86400 === 0 ? `${s/86400}j` : s % 3600 === 0 ? `${s/3600}h` : s % 60 === 0 ? `${s/60}m` : `${s}s`) : 'off';
+      db.setCasinoConfig(guildId, { limitGainsMax: val, limitGainsPeriod: period });
+      await interaction.reply({ content: `✓ Gains max : ${val > 0 ? val.toLocaleString() + ' coins' : 'illimité'} / ${fmtCd(period)}`, flags: MessageFlags.Ephemeral }).catch(() => {});
+    } else if (type === 'draws') {
+      const val    = parseInt_(interaction.fields.getTextInputValue('value'));
+      const period = parseDur(interaction.fields.getTextInputValue('period'));
+      const fmtCd  = s => s > 0 ? (s % 86400 === 0 ? `${s/86400}j` : s % 3600 === 0 ? `${s/3600}h` : s % 60 === 0 ? `${s/60}m` : `${s}s`) : 'off';
+      db.setCasinoConfig(guildId, { limitDrawsMax: val, limitDrawsPeriod: period });
+      await interaction.reply({ content: `✓ Tirages max : ${val > 0 ? val : 'illimité'} / ${fmtCd(period)}`, flags: MessageFlags.Ephemeral }).catch(() => {});
+    }
+    await _refreshCasinoConfigPanel(interaction);
+    return;
+  }
+
+  if (id === 'csconf_gains_gift_modal') {
+    const parse = v => { const n = parseInt(v); return isNaN(n) || n < 0 ? 0 : n; };
+    const giftMin = parse(interaction.fields.getTextInputValue('gift_min'));
+    const giftMax = parse(interaction.fields.getTextInputValue('gift_max'));
+    if (giftMin > 0 && giftMax >= giftMin) db.setCasinoConfig(guildId, { giftMin, giftMax });
+    await interaction.reply({ content: `✓ Gift : **${embed.fmtCoins(giftMin)}** ・ **${embed.fmtCoins(giftMax)}** coins`, flags: MessageFlags.Ephemeral }).catch(() => {});
+    await _refreshCasinoConfigPanel(interaction);
+    return;
+  }
+
+  if (id === 'csconf_jackpot_cost_modal') {
+    const parse = v => { const n = parseInt(v); return isNaN(n) || n < 1 ? 0 : n; };
+    const cost = parse(interaction.fields.getTextInputValue('jackpot_cost'));
+    if (cost > 0) db.setCasinoConfig(guildId, { jackpotCost: cost });
+    await interaction.reply({ content: `✓ Cout jackpot : **${embed.fmtCoins(cost)}** coins par tentative`, flags: MessageFlags.Ephemeral }).catch(() => {});
+    await _refreshCasinoConfigPanel(interaction);
+    return;
+  }
+
+  if (id === 'csconf_creation_bonus_modal') {
+    const parse = v => { const n = parseInt(v); return isNaN(n) || n < 0 ? 0 : n; };
+    const bonus = parse(interaction.fields.getTextInputValue('creation_bonus'));
+    db.setCasinoConfig(guildId, { creationBonus: bonus });
+    await interaction.reply({ content: `✓ Bonus creation de profil : **${embed.fmtCoins(bonus)}** coins`, flags: MessageFlags.Ephemeral }).catch(() => {});
+    await _refreshCasinoConfigPanel(interaction);
+    return;
+  }
+
+  if (id === 'csconf_gains_daily_range_modal') {
+    const parse = v => { const n = parseInt(v); return isNaN(n) || n < 0 ? 0 : n; };
+    const dailyMin = parse(interaction.fields.getTextInputValue('daily_min'));
+    const dailyMax = parse(interaction.fields.getTextInputValue('daily_max'));
+    const dailyDraws = parse(interaction.fields.getTextInputValue('daily_draws'));
+    db.setCasinoConfig(guildId, { dailyMin, dailyMax, dailyDraws });
+    const msg = dailyMin > 0 && dailyMax >= dailyMin
+      ? `✓ Plage daily : **${embed.fmtCoins(dailyMin)}** ・ **${embed.fmtCoins(dailyMax)}** coins • **${dailyDraws}** tirage(s)/jour`
+      : `✓ Plage daily désactivée ・ valeur fixe utilisée. • **${dailyDraws}** tirage(s)/jour`;
+    await interaction.reply({ content: msg, flags: MessageFlags.Ephemeral }).catch(() => {});
+    await _refreshCasinoConfigPanel(interaction);
+    return;
+  }
+
+  if (id === 'csconf_gains_status_modal') {
+    const vocMul = parseFloat(interaction.fields.getTextInputValue('status_voc_mul'));
+    const msgMul = parseFloat(interaction.fields.getTextInputValue('status_msg_mul'));
+    if (!isNaN(vocMul) && vocMul > 0) db.setCasinoConfig(guildId, { statusVocMultiplier: vocMul });
+    if (!isNaN(msgMul) && msgMul > 0) db.setCasinoConfig(guildId, { statusMsgMultiplier: msgMul });
+    await interaction.reply({ content: `✓ Multiplicateurs statut mis à jour : vocal x${vocMul} / messages x${msgMul}`, flags: MessageFlags.Ephemeral }).catch(() => {});
+    await _refreshCasinoConfigPanel(interaction);
+    return;
+  }
+
+  if (id === 'csconf_cotes_bonus_modal') {
+    const bjBonus = parseFloat(interaction.fields.getTextInputValue('cote_bj_bonus'));
+    const cfBonus = parseFloat(interaction.fields.getTextInputValue('cote_cf_bonus'));
+    if (!isNaN(bjBonus) && bjBonus > 0) db.setCasinoConfig(guildId, { coteBlackjackBonus: bjBonus });
+    if (!isNaN(cfBonus) && cfBonus > 0) db.setCasinoConfig(guildId, { coteCoinflipBonus: cfBonus });
+    await interaction.reply({ content: `✓ Cotes bonus rôle mises à jour : Blackjack x${bjBonus} / Coinflip x${cfBonus}`, flags: MessageFlags.Ephemeral }).catch(() => {});
+    await _refreshCasinoConfigPanel(interaction);
+    return;
+  }
+
+  if (id === 'csconf_cotes_status_modal') {
+    const bjStatus = parseFloat(interaction.fields.getTextInputValue('cote_bj_status'));
+    const cfStatus = parseFloat(interaction.fields.getTextInputValue('cote_cf_status'));
+    if (!isNaN(bjStatus) && bjStatus > 0) db.setCasinoConfig(guildId, { coteBlackjackStatus: bjStatus });
+    if (!isNaN(cfStatus) && cfStatus > 0) db.setCasinoConfig(guildId, { coteCoinflipStatus: cfStatus });
+    await interaction.reply({ content: `✓ Cotes bonus statut mises à jour : Blackjack x${bjStatus} / Coinflip x${cfStatus}`, flags: MessageFlags.Ephemeral }).catch(() => {});
+    await _refreshCasinoConfigPanel(interaction);
+    return;
+  }
+
+  if (id === 'csconf_xp_config_modal') {
+    const xpBjWin  = parseInt(interaction.fields.getTextInputValue('xp_bj_win'), 10);
+    const xpBjLoss = parseInt(interaction.fields.getTextInputValue('xp_bj_loss'), 10);
+    const xpBjPush = parseInt(interaction.fields.getTextInputValue('xp_bj_push'), 10);
+    const xpCfWin  = parseInt(interaction.fields.getTextInputValue('xp_cf_win'), 10);
+    const xpCfLoss = parseInt(interaction.fields.getTextInputValue('xp_cf_loss'), 10);
+    const updates = {};
+    if (!isNaN(xpBjWin) && xpBjWin >= 0) updates.xpBjWin = xpBjWin;
+    if (!isNaN(xpBjLoss) && xpBjLoss >= 0) updates.xpBjLoss = xpBjLoss;
+    if (!isNaN(xpBjPush) && xpBjPush >= 0) updates.xpBjPush = xpBjPush;
+    if (!isNaN(xpCfWin) && xpCfWin >= 0) updates.xpCfWin = xpCfWin;
+    if (!isNaN(xpCfLoss) && xpCfLoss >= 0) updates.xpCfLoss = xpCfLoss;
+    if (Object.keys(updates).length) db.setCasinoConfig(guildId, updates);
+    await interaction.reply({ content: `✓ XP BJ+PF mis à jour : BJ ${updates.xpBjWin ?? '?'}/${updates.xpBjLoss ?? '?'}/${updates.xpBjPush ?? '?'} • PF ${updates.xpCfWin ?? '?'}/${updates.xpCfLoss ?? '?'}`, flags: MessageFlags.Ephemeral }).catch(() => {});
+    await _refreshCasinoConfigPanel(interaction);
+    return;
+  }
+
+  if (id === 'csconf_xp_roulette_modal') {
+    const xpRlWin  = parseInt(interaction.fields.getTextInputValue('xp_rl_win'), 10);
+    const xpRlLoss = parseInt(interaction.fields.getTextInputValue('xp_rl_loss'), 10);
+    const updates = {};
+    if (!isNaN(xpRlWin) && xpRlWin >= 0) updates.xpRlWin = xpRlWin;
+    if (!isNaN(xpRlLoss) && xpRlLoss >= 0) updates.xpRlLoss = xpRlLoss;
+    if (Object.keys(updates).length) db.setCasinoConfig(guildId, updates);
+    await interaction.reply({ content: `✓ XP Roulette mis à jour : victoire ${updates.xpRlWin ?? '?'} / défaite ${updates.xpRlLoss ?? '?'}`, flags: MessageFlags.Ephemeral }).catch(() => {});
+    await _refreshCasinoConfigPanel(interaction);
+    return;
+  }
+
+  if (id === 'csconf_shield_prices_modal') {
+    const s1  = parseInt(interaction.fields.getTextInputValue('shield_1'), 10);
+    const s3  = parseInt(interaction.fields.getTextInputValue('shield_3'), 10);
+    const s5  = parseInt(interaction.fields.getTextInputValue('shield_5'), 10);
+    const s10 = parseInt(interaction.fields.getTextInputValue('shield_10'), 10);
+    const updates = {};
+    if (!isNaN(s1) && s1 >= 0) updates.shieldPrice1 = s1;
+    if (!isNaN(s3) && s3 >= 0) updates.shieldPrice3 = s3;
+    if (!isNaN(s5) && s5 >= 0) updates.shieldPrice5 = s5;
+    if (!isNaN(s10) && s10 >= 0) updates.shieldPrice10 = s10;
+    if (Object.keys(updates).length) db.setCasinoConfig(guildId, updates);
+    await interaction.reply({ content: `✓ Prix boucliers mis à jour : x1 ${updates.shieldPrice1 ?? '?'} / x3 ${updates.shieldPrice3 ?? '?'} / x5 ${updates.shieldPrice5 ?? '?'} / x10 ${updates.shieldPrice10 ?? '?'}`, flags: MessageFlags.Ephemeral }).catch(() => {});
+    await _refreshCasinoConfigPanel(interaction);
+    return;
+  }
+
+  if (id === 'csconf_shop_add_modal' || id === 'csconf_gacha_add_modal' || id === 'csconf_gacha_coins_modal' || id === 'csconf_level_add_modal' || id === 'csconf_rules_add_modal' || id.startsWith('csconf_rules_edit_modal:') || id === 'csconf_panel_add_modal' || id.startsWith('csconf_panel_edit_modal:')) {
+    return _handleCasinoModuleModal(interaction, id);
   }
 
   if (id.startsWith('kw:modal:')) {
@@ -1970,4 +2329,1169 @@ async function _replyCustomError(interaction, content) {
     embeds : [embed.build(interaction.guild?.id, content, { color: '#ED4245', timestamp: false })],
     flags  : 64,
   }).catch(() => {});
+}
+
+async function _handleCasinoConfigButton(client, interaction, id) {
+  const guildId = interaction.guild?.id;
+  console.log(`[CASINO-BUTTON] Handling ${id} for guild ${guildId}`);
+
+  if (!guildId) {
+    console.log(`[CASINO-BUTTON] No guildId, deferring`);
+    return interaction.deferUpdate().catch(() => {});
+  }
+
+  try {
+    const key = `${guildId}:${interaction.user.id}`;
+    if (interaction.message) {
+      _casinoConfigPanels.set(key, interaction.message);
+      if (!_casinoConfigViews.has(key)) _casinoConfigViews.set(key, 'overview');
+    }
+
+    // Close button
+    if (id === 'csconf_close') {
+      console.log(`[CASINO-BUTTON] Closing panel`);
+      await interaction.deferUpdate().catch(() => {});
+      return interaction.message.delete().catch(() => {});
+    }
+
+    // Toggle enabled
+    if (id === 'csconf_toggle') {
+      const cfg = db.getCasinoConfig(guildId);
+      db.enableCasino(guildId, !cfg.enabled);
+      await interaction.deferUpdate().catch(() => {});
+      await _refreshCasinoConfigPanel(interaction);
+      return;
+    }
+
+    if (id === 'csconf_gains_gift') {
+      const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+      const cfg = db.getCasinoConfig(guildId);
+      const key = `${guildId}:${interaction.user.id}`;
+      _casinoConfigViews.set(key, 'gains');
+      const modal = new ModalBuilder().setCustomId('csconf_gains_gift_modal').setTitle('Config Gift');
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('gift_min').setLabel('Récompense minimum').setStyle(TextInputStyle.Short).setValue(String(cfg.giftMin ?? 100)).setRequired(true)),
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('gift_max').setLabel('Récompense maximum').setStyle(TextInputStyle.Short).setValue(String(cfg.giftMax ?? 1000)).setRequired(true)),
+      );
+      return interaction.showModal(modal).catch(() => {});
+    }
+
+    if (id === 'csconf_jackpot_cost') {
+      const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+      const cfg = db.getCasinoConfig(guildId);
+      const key = `${guildId}:${interaction.user.id}`;
+      _casinoConfigViews.set(key, 'gains');
+      const modal = new ModalBuilder().setCustomId('csconf_jackpot_cost_modal').setTitle('Cout Jackpot');
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('jackpot_cost').setLabel('Cout par tentative (coins)').setStyle(TextInputStyle.Short).setValue(String(cfg.jackpotCost ?? 1000)).setRequired(true)),
+      );
+      return interaction.showModal(modal).catch(() => {});
+    }
+
+    if (id === 'csconf_creation_bonus') {
+      const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+      const cfg = db.getCasinoConfig(guildId);
+      const key = `${guildId}:${interaction.user.id}`;
+      _casinoConfigViews.set(key, 'gains');
+      const modal = new ModalBuilder().setCustomId('csconf_creation_bonus_modal').setTitle('Bonus Creation de Profil');
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('creation_bonus').setLabel('Coins a attribuer (0 = aucun)').setStyle(TextInputStyle.Short).setValue(String(cfg.creationBonus ?? 0)).setRequired(false)),
+      );
+      return interaction.showModal(modal).catch(() => {});
+    }
+
+    if (id === 'csconf_jackpot_reset') {
+      db.resetJackpot(guildId);
+      await interaction.reply({ content: `✓ Cagnotte jackpot remise a zero. Un nouveau numero gagnant a ete genere.`, flags: MessageFlags.Ephemeral }).catch(() => {});
+      await _refreshCasinoConfigPanel(interaction);
+      return;
+    }
+
+    if (id === 'csconf_gains_daily_range') {
+      const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+      const cfg = db.getCasinoConfig(guildId);
+      const key = `${guildId}:${interaction.user.id}`;
+      _casinoConfigViews.set(key, 'gains');
+      const modal = new ModalBuilder().setCustomId('csconf_gains_daily_range_modal').setTitle('Plage Daily (coins + tirages)');
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('daily_min').setLabel('Coins minimum (0 = désactiver la plage)').setStyle(TextInputStyle.Short).setValue(String(cfg.dailyMin ?? 0)).setRequired(false)),
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('daily_max').setLabel('Coins maximum').setStyle(TextInputStyle.Short).setValue(String(cfg.dailyMax ?? 0)).setRequired(false)),
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('daily_draws').setLabel('Tirages par jour').setStyle(TextInputStyle.Short).setValue(String(cfg.dailyDraws ?? 0)).setRequired(false)),
+      );
+      return interaction.showModal(modal).catch(() => {});
+    }
+
+    if (id === 'csconf_gains_status') {
+      const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+      const cfg = db.getCasinoConfig(guildId);
+      const key = `${guildId}:${interaction.user.id}`;
+      _casinoConfigViews.set(key, 'gains');
+      const modal = new ModalBuilder().setCustomId('csconf_gains_status_modal').setTitle('Multiplicateurs Statut');
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('status_voc_mul').setLabel('Multiplicateur vocal (ex: 2.0 = x2)').setStyle(TextInputStyle.Short).setValue(String(cfg.statusVocMultiplier ?? 2.0)).setRequired(true)),
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('status_msg_mul').setLabel('Multiplicateur messages (ex: 2.0 = x2)').setStyle(TextInputStyle.Short).setValue(String(cfg.statusMsgMultiplier ?? 2.0)).setRequired(true)),
+      );
+      return interaction.showModal(modal).catch(() => {});
+    }
+
+    if (id === 'csconf_statusmul') {
+      const cfg = db.getCasinoConfig(guildId);
+      db.setCasinoConfig(guildId, { statusMultiplier: cfg.statusMultiplier ? 0 : 1 });
+      await interaction.deferUpdate().catch(() => {});
+      await _refreshCasinoConfigPanel(interaction);
+      return;
+    }
+
+    if (id === 'csconf_statustext') {
+      const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+      const cfg = db.getCasinoConfig(guildId);
+      const modal = new ModalBuilder().setCustomId('csconf_statustext_modal').setTitle('Textes de statut');
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(
+          new TextInputBuilder()
+            .setCustomId('status_texts')
+            .setLabel('Texte(s) requis dans le statut Discord')
+            .setStyle(TextInputStyle.Paragraph)
+            .setValue(cfg.statusText || '')
+            .setPlaceholder('Un texte par ligne. Ex:\n.gg/monserveur\nmon texte custom')
+            .setRequired(false)
+        ),
+      );
+      return interaction.showModal(modal).catch(() => {});
+    }
+
+    if (id === 'csconf_publish') {
+      let casino = null;
+      try { casino = require('../commands/casino/casino'); } catch {}
+      const payload = casino?.buildCasinoHomePanel?.(guildId);
+      const cfg = db.getCasinoConfig(guildId);
+      const channel = cfg.panelChannelId
+        ? await interaction.guild.channels.fetch(cfg.panelChannelId).catch(() => null)
+        : interaction.channel;
+      if (!payload || !channel?.send) {
+        return interaction.reply({ content: 'Salon panel introuvable.', flags: 64 }).catch(() => {});
+      }
+      if (cfg.panelMessageId && cfg.panelChannelId) {
+        try {
+          const oldMsg = await channel.messages.fetch(cfg.panelMessageId).catch(() => null);
+          if (oldMsg) await oldMsg.delete().catch(() => {});
+        } catch {}
+      }
+      const sent = await channel.send(payload).catch(() => null);
+      if (sent) {
+        db.setCasinoConfig(guildId, { panelMessageId: sent.id, panelChannelId: channel.id });
+        if (casino?.handlePanelInteractions) {
+          casino.handlePanelInteractions(sent, { author: interaction.user, guild: interaction.guild });
+        }
+      }
+      return interaction.reply({ content: `Panel casino publié dans <#${channel.id}>.`, flags: 64 }).catch(() => {});
+    }
+
+    const viewByButton = {
+      csconf_shop: 'shop_admin',
+      csconf_gacha: 'gacha_admin',
+      csconf_lvlroles: 'levels_admin',
+      csconf_panel: 'panel_admin',
+      csconf_back_modules: 'modules',
+    };
+    if (viewByButton[id]) {
+      _casinoConfigViews.set(key, viewByButton[id]);
+      await interaction.deferUpdate().catch(() => {});
+      await _refreshCasinoConfigPanel(interaction);
+      return;
+    }
+
+    // Panel channel selector
+    if (id === 'csconf_panelch') {
+      console.log(`[CASINO-BUTTON] Sending channel selector`);
+      const { ChannelSelectMenuBuilder, ActionRowBuilder, ChannelType, MessageFlags } = require('discord.js');
+      const select = new ChannelSelectMenuBuilder()
+        .setCustomId('csconf_panelch_sel')
+        .setChannelTypes(ChannelType.GuildText)
+        .setPlaceholder('Select panel channel');
+      const result = await interaction.reply({ components: [new ActionRowBuilder().addComponents(select)], flags: MessageFlags.Ephemeral }).catch((e) => {
+        console.log(`[CASINO-BUTTON] Failed to send selector: ${e?.message}`);
+        return null;
+      });
+      console.log(`[CASINO-BUTTON] Selector sent: ${result ? 'success' : 'failed'}`);
+      return result;
+    }
+
+    // Allowed channels selector
+    if (id === 'csconf_allowed') {
+      const { ChannelSelectMenuBuilder, ActionRowBuilder, ChannelType, MessageFlags } = require('discord.js');
+      const select = new ChannelSelectMenuBuilder()
+        .setCustomId('csconf_allowed_sel')
+        .setChannelTypes(ChannelType.GuildText)
+        .setMinValues(1).setMaxValues(10)
+        .setPlaceholder('Select allowed channels');
+      return interaction.reply({ components: [new ActionRowBuilder().addComponents(select)], flags: MessageFlags.Ephemeral }).catch(() => {});
+    }
+
+    // Logs selector
+    if (id === 'csconf_logs') {
+      const { StringSelectMenuBuilder, ActionRowBuilder, MessageFlags } = require('discord.js');
+      const select = new StringSelectMenuBuilder()
+        .setCustomId('csconf_logs_sel')
+        .setPlaceholder('Log type')
+        .addOptions(
+          { label: '[G] Gains', value: 'gains', description: 'Vocal, messages, draws, daily' },
+          { label: '[J] Games', value: 'games', description: 'Roulette, blackjack, duels' },
+        );
+      return interaction.reply({ components: [new ActionRowBuilder().addComponents(select)], flags: MessageFlags.Ephemeral }).catch(() => {});
+    }
+
+    // Roles selector
+    if (id === 'csconf_roles') {
+      const { StringSelectMenuBuilder, ActionRowBuilder, MessageFlags } = require('discord.js');
+      const select = new StringSelectMenuBuilder()
+        .setCustomId('csconf_roles_sel')
+        .setPlaceholder('Role type')
+        .addOptions(
+          { label: '[R] Required role', value: 'required', description: 'Role needed for casino' },
+          { label: '[M] Multiplier role', value: 'multiplier', description: 'Role that doubles gains' },
+        );
+      return interaction.reply({ components: [new ActionRowBuilder().addComponents(select)], flags: MessageFlags.Ephemeral }).catch(() => {});
+    }
+
+    // Gains modal
+    if (id === 'csconf_gains') {
+      const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+      const cfg = db.getCasinoConfig(guildId);
+      const modal = new ModalBuilder().setCustomId('csconf_gains_modal').setTitle('Gains settings');
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('c_voc_min').setLabel('Coins/min vocal').setStyle(TextInputStyle.Short).setValue(String(cfg.coinsPerVocMin ?? 0)).setRequired(false)),
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('d_voc').setLabel('Draws/h vocal').setStyle(TextInputStyle.Short).setValue(String(cfg.drawsPerVocHour)).setRequired(false)),
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('c_msg').setLabel('Coins/msg').setStyle(TextInputStyle.Short).setValue(String(cfg.coinsPerMsg)).setRequired(false)),
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('collect_bonus').setLabel('Collect bonus (0.5 = +50%)').setStyle(TextInputStyle.Short).setValue(String(cfg.collectBonusRate ?? 0.5)).setRequired(false)),
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('mul_pub').setLabel('Public vocal multiplier').setStyle(TextInputStyle.Short).setValue(String(cfg.publicVocMultiplier)).setRequired(false)),
+      );
+      return interaction.showModal(modal).catch(() => {});
+    }
+
+    // Cotes configuration modals
+    if (id === 'csconf_cotes_bj') {
+      const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+      const cfg = db.getCasinoConfig(guildId);
+      const key = `${guildId}:${interaction.user.id}`;
+      _casinoConfigViews.set(key, 'cotes'); // Ensure view is stored as cotes
+      const modal = new ModalBuilder().setCustomId('csconf_cotes_bj_modal').setTitle('Cote Blackjack');
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('cote_bj').setLabel('Cote normale (ex: 2.0)').setStyle(TextInputStyle.Short).setValue(String(cfg.coteBlackjack ?? 2.0)).setRequired(true)),
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('cote_bj_bonus').setLabel('Cote bonus (ex: 2.5)').setStyle(TextInputStyle.Short).setValue(String(cfg.coteBlackjackBonus ?? 2.5)).setRequired(false)),
+      );
+      return interaction.showModal(modal).catch(() => {});
+    }
+
+    if (id === 'csconf_cotes_cf') {
+      const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+      const cfg = db.getCasinoConfig(guildId);
+      const key = `${guildId}:${interaction.user.id}`;
+      _casinoConfigViews.set(key, 'cotes'); // Ensure view is stored as cotes
+      const modal = new ModalBuilder().setCustomId('csconf_cotes_cf_modal').setTitle('Cote Coinflip');
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('cote_cf').setLabel('Cote normale (ex: 2.0)').setStyle(TextInputStyle.Short).setValue(String(cfg.coteCoinflip ?? 2.0)).setRequired(true)),
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('cote_cf_bonus').setLabel('Cote bonus (ex: 2.5)').setStyle(TextInputStyle.Short).setValue(String(cfg.coteCoinflipBonus ?? 2.5)).setRequired(false)),
+      );
+      return interaction.showModal(modal).catch(() => {});
+    }
+
+    if (id === 'csconf_cotes_status') {
+      const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+      const cfg = db.getCasinoConfig(guildId);
+      const key = `${guildId}:${interaction.user.id}`;
+      _casinoConfigViews.set(key, 'cotes');
+      const modal = new ModalBuilder().setCustomId('csconf_cotes_status_modal').setTitle('Cotes Bonus Statut');
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('cote_bj_status').setLabel('Cote Blackjack (statut)').setStyle(TextInputStyle.Short).setValue(String(cfg.coteBlackjackStatus ?? 2.5)).setRequired(true)),
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('cote_cf_status').setLabel('Cote Coinflip (statut)').setStyle(TextInputStyle.Short).setValue(String(cfg.coteCoinflipStatus ?? 2.5)).setRequired(true)),
+      );
+      return interaction.showModal(modal).catch(() => {});
+    }
+
+    if (id === 'csconf_cotes_bonus') {
+      const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+      const cfg = db.getCasinoConfig(guildId);
+      const key = `${guildId}:${interaction.user.id}`;
+      _casinoConfigViews.set(key, 'cotes');
+      const modal = new ModalBuilder().setCustomId('csconf_cotes_bonus_modal').setTitle('Cotes Bonus Rôle');
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('cote_bj_bonus').setLabel('Cote Blackjack (bonus rôle)').setStyle(TextInputStyle.Short).setValue(String(cfg.coteBlackjackBonus ?? 2.5)).setRequired(true)),
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('cote_cf_bonus').setLabel('Cote Coinflip (bonus rôle)').setStyle(TextInputStyle.Short).setValue(String(cfg.coteCoinflipBonus ?? 2.5)).setRequired(true)),
+      );
+      return interaction.showModal(modal).catch(() => {});
+    }
+
+    if (id === 'csconf_xp_config') {
+      const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+      const cfg = db.getCasinoConfig(guildId);
+      const key = `${guildId}:${interaction.user.id}`;
+      _casinoConfigViews.set(key, 'cotes');
+      const modal = new ModalBuilder().setCustomId('csconf_xp_config_modal').setTitle('Config XP BJ + PF');
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('xp_bj_win').setLabel('BJ Victoire').setStyle(TextInputStyle.Short).setValue(String(cfg.xpBjWin ?? 50)).setRequired(true)),
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('xp_bj_loss').setLabel('BJ Défaite').setStyle(TextInputStyle.Short).setValue(String(cfg.xpBjLoss ?? 15)).setRequired(true)),
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('xp_bj_push').setLabel('BJ Égalité').setStyle(TextInputStyle.Short).setValue(String(cfg.xpBjPush ?? 5)).setRequired(true)),
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('xp_cf_win').setLabel('PF Victoire').setStyle(TextInputStyle.Short).setValue(String(cfg.xpCfWin ?? 30)).setRequired(true)),
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('xp_cf_loss').setLabel('PF Défaite').setStyle(TextInputStyle.Short).setValue(String(cfg.xpCfLoss ?? 10)).setRequired(true)),
+      );
+      return interaction.showModal(modal).catch(() => {});
+    }
+
+    if (id === 'csconf_xp_roulette') {
+      const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+      const cfg = db.getCasinoConfig(guildId);
+      const key = `${guildId}:${interaction.user.id}`;
+      _casinoConfigViews.set(key, 'cotes');
+      const modal = new ModalBuilder().setCustomId('csconf_xp_roulette_modal').setTitle('Config XP Roulette');
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('xp_rl_win').setLabel('Roulette Victoire').setStyle(TextInputStyle.Short).setValue(String(cfg.xpRlWin ?? 40)).setRequired(true)),
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('xp_rl_loss').setLabel('Roulette Défaite').setStyle(TextInputStyle.Short).setValue(String(cfg.xpRlLoss ?? 15)).setRequired(true)),
+      );
+      return interaction.showModal(modal).catch(() => {});
+    }
+
+    if (id === 'csconf_shield_prices') {
+      const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+      const cfg = db.getCasinoConfig(guildId);
+      const key = `${guildId}:${interaction.user.id}`;
+      _casinoConfigViews.set(key, 'shop_admin');
+      const modal = new ModalBuilder().setCustomId('csconf_shield_prices_modal').setTitle('Prix des Boucliers');
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('shield_1').setLabel('Prix x1 bouclier').setStyle(TextInputStyle.Short).setValue(String(cfg.shieldPrice1 ?? 500)).setRequired(true)),
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('shield_3').setLabel('Prix x3 boucliers').setStyle(TextInputStyle.Short).setValue(String(cfg.shieldPrice3 ?? 1200)).setRequired(true)),
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('shield_5').setLabel('Prix x5 boucliers').setStyle(TextInputStyle.Short).setValue(String(cfg.shieldPrice5 ?? 1800)).setRequired(true)),
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('shield_10').setLabel('Prix x10 boucliers').setStyle(TextInputStyle.Short).setValue(String(cfg.shieldPrice10 ?? 3000)).setRequired(true)),
+      );
+      return interaction.showModal(modal).catch(() => {});
+    }
+
+    if (id === 'csconf_cotes_role') {
+      const { RoleSelectMenuBuilder, ActionRowBuilder, MessageFlags, ButtonBuilder, ButtonStyle } = require('discord.js');
+      const select = new RoleSelectMenuBuilder()
+        .setCustomId('csconf_cotes_role_sel')
+        .setPlaceholder('Sélectionne le rôle bonus')
+        .setMinValues(0)
+        .setMaxValues(1);
+      const btnReset = new ButtonBuilder()
+        .setCustomId('csconf_cotes_role_reset')
+        .setLabel('Réinitialiser le rôle')
+        .setStyle(ButtonStyle.Danger);
+      return interaction.reply({
+        content: 'Choisis le rôle qui bénéficie des cotes bonus rôle.',
+        components: [
+          new ActionRowBuilder().addComponents(select),
+          new ActionRowBuilder().addComponents(btnReset)
+        ],
+        flags: MessageFlags.Ephemeral
+      }).catch(() => {});
+    }
+
+    if (id === 'csconf_cotes_role_reset') {
+      db.setCasinoConfig(guildId, { coteBonusRole: '' });
+      await interaction.update({ content: '✓ Rôle bonus supprimé', components: [] }).catch(() => {});
+
+      // Try to refresh, if failed recreate panel in channel
+      const refreshed = await _refreshCasinoConfigPanel(interaction);
+      if (!refreshed) {
+        // Panel was deleted, recreate it
+        const key = `${guildId}:${interaction.user.id}`;
+        const view = _casinoConfigViews.get(key) || 'overview';
+        const casino = require('../commands/casino/casino');
+        if (casino.buildConfigPanel) {
+          const container = await casino.buildConfigPanel(interaction.guild, view);
+          const newPanel = await interaction.channel?.send({ components: [container] }).catch(() => null);
+          if (newPanel) {
+            _casinoConfigPanels.set(key, newPanel);
+            await interaction.followUp({ content: '✓ Panel recréé (l\'ancien était supprimé)', flags: MessageFlags.Ephemeral }).catch(() => {});
+          }
+        }
+      }
+      return;
+    }
+
+    if (id === 'csconf_shop_add') {
+      const select = new StringSelectMenuBuilder()
+        .setCustomId('csconf_shop_type_sel')
+        .setPlaceholder('Choisir le type d\'item')
+        .addOptions(
+          { label: 'Rôle', value: 'role', description: 'Attribue un rôle Discord' },
+          { label: 'Tirages', value: 'draws', description: 'Offre des tirages casino' },
+          { label: 'Couleur', value: 'color', description: 'Couleur de pseudo' },
+          { label: 'Badge', value: 'badge', description: 'Badge de profil' },
+          { label: 'Décor', value: 'decor', description: 'Décor de profil' },
+          { label: 'XP', value: 'xp', description: 'Points d\'expérience' },
+          { label: 'Nitro', value: 'nitro', description: 'Récompense Nitro' },
+          { label: 'Autre', value: 'item', description: 'Item générique' },
+        );
+      return interaction.reply({ content: 'Choisis le type d\'item à ajouter.', components: [new ActionRowBuilder().addComponents(select)], flags: MessageFlags.Ephemeral }).catch(() => {});
+    }
+
+    if (id === 'csconf_shop_remove') {
+      const items = db.getShopItems(guildId).slice(0, 25);
+      if (!items.length) return interaction.reply({ content: 'Aucun item à supprimer.', flags: 64 }).catch(() => {});
+      const select = new StringSelectMenuBuilder()
+        .setCustomId('csconf_shop_remove_sel')
+        .setPlaceholder('Choisir l\'item à supprimer')
+        .addOptions(items.map(item => ({
+          label: item.name.slice(0, 100),
+          value: String(item.id),
+          description: `${embed.fmtCoins(item.price)} coins • ${item.type}`.slice(0, 100),
+        })));
+      return interaction.reply({ content: 'Sélectionne l\'item à supprimer.', components: [new ActionRowBuilder().addComponents(select)], flags: MessageFlags.Ephemeral }).catch(() => {});
+    }
+
+    if (id === 'csconf_gacha_coins') {
+      const { ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
+      const modal = new ModalBuilder().setCustomId('csconf_gacha_coins_modal').setTitle('Config coins par tirage');
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('min').setLabel('Coins minimum par tirage').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('ex: 500')),
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('max').setLabel('Coins maximum par tirage').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('ex: 2000')),
+      );
+      return interaction.showModal(modal).catch(() => {});
+    }
+
+    if (id === 'csconf_gacha_add') {
+      const select = new StringSelectMenuBuilder()
+        .setCustomId('csconf_gacha_type_sel')
+        .setPlaceholder('Choisir le type d\'item bonus')
+        .addOptions(
+          { label: 'R\u00f4le', value: 'role', description: 'Attribue un r\u00f4le Discord au joueur' },
+          { label: 'Couleur', value: 'color', description: 'Couleur de pseudo' },
+          { label: 'Badge', value: 'badge', description: 'Badge de profil' },
+          { label: 'D\u00e9cor', value: 'decor', description: 'D\u00e9cor de profil' },
+          { label: 'Nitro', value: 'nitro', description: 'R\u00e9compense Nitro' },
+          { label: 'Tirages', value: 'draws', description: 'Offre des tirages casino' },
+          { label: 'XP', value: 'xp', description: 'Points d\'exp\u00e9rience' },
+        );
+      return interaction.reply({ content: 'Choisis le type d\'item bonus \u00e0 ajouter aux tirages.', components: [new ActionRowBuilder().addComponents(select)], flags: MessageFlags.Ephemeral }).catch(() => {});
+    }
+
+    if (id === 'csconf_gacha_remove') {
+      const items = db.getGachaPool(guildId).filter(i => i.type !== 'coins').slice(0, 25);
+      if (!items.length) return interaction.reply({ content: 'Aucun item bonus à supprimer.', flags: 64 }).catch(() => {});
+      const select = new StringSelectMenuBuilder()
+        .setCustomId('csconf_gacha_remove_sel')
+        .setPlaceholder('Choisir l\'item à supprimer')
+        .addOptions(items.map(item => ({
+          label: item.name.slice(0, 100),
+          value: String(item.id),
+          description: `${item.chance}% de chance (${item.type})`,
+        })));
+      return interaction.reply({ content: 'Sélectionne l\'item à supprimer.', components: [new ActionRowBuilder().addComponents(select)], flags: 64 }).catch(() => {});
+    }
+
+    if (id === 'csconf_level_add') {
+      const modal = new ModalBuilder().setCustomId('csconf_level_add_modal').setTitle('Ajouter rôle niveau');
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('level').setLabel('Niveau').setStyle(TextInputStyle.Short).setRequired(true)),
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('roleId').setLabel('Role ID').setStyle(TextInputStyle.Short).setRequired(true)),
+      );
+      return interaction.showModal(modal).catch(() => {});
+    }
+
+    if (id === 'csconf_rules_add') {
+      const modal = new ModalBuilder().setCustomId('csconf_rules_add_modal').setTitle('Ajouter une section');
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('title').setLabel('Titre de la section').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(100)),
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('content').setLabel('Contenu (markdown, > pour citation)').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(1800)),
+      );
+      return interaction.showModal(modal).catch(() => {});
+    }
+
+    if (id === 'csconf_rules_edit') {
+      const { getRulesSections } = require('../commands/casino/casino');
+      const sections = getRulesSections(guildId);
+      if (!sections.length) return interaction.deferUpdate().catch(() => {});
+      const options = sections.map((s, i) => ({ label: `${i + 1}. ${s.title.slice(0, 90)}`, value: String(i) }));
+      return interaction.reply({
+        content: 'Choisis la section à modifier :',
+        components: [new ActionRowBuilder().addComponents(
+          new StringSelectMenuBuilder().setCustomId('csconf_rules_edit_sel').setPlaceholder('Sélectionner une section').addOptions(options)
+        )],
+        flags: MessageFlags.Ephemeral,
+      }).catch(() => {});
+    }
+
+    if (id === 'csconf_rules_del') {
+      const { getRulesSections } = require('../commands/casino/casino');
+      const sections = getRulesSections(guildId);
+      if (!sections.length) return interaction.deferUpdate().catch(() => {});
+      const options = sections.map((s, i) => ({ label: `${i + 1}. ${s.title.slice(0, 90)}`, value: String(i) }));
+      return interaction.reply({
+        content: 'Choisis la section à supprimer :',
+        components: [new ActionRowBuilder().addComponents(
+          new StringSelectMenuBuilder().setCustomId('csconf_rules_del_sel').setPlaceholder('Sélectionner une section').addOptions(options)
+        )],
+        flags: MessageFlags.Ephemeral,
+      }).catch(() => {});
+    }
+
+    if (id === 'csconf_rules_reset') {
+      db.setCasinoConfig(guildId, { casinoRules: null });
+      await interaction.reply({ content: '✓ Règlement réinitialisé aux valeurs par défaut.', flags: MessageFlags.Ephemeral }).catch(() => {});
+      await _refreshCasinoConfigPanel(interaction);
+      return;
+    }
+
+    if (id === 'csconf_panel_add') {
+      const modal = new ModalBuilder().setCustomId('csconf_panel_add_modal').setTitle('Ajouter une section panel');
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('title').setLabel('Titre de la section').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(100)),
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('content').setLabel('Contenu (markdown, > pour citation)').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(1800)),
+      );
+      return interaction.showModal(modal).catch(() => {});
+    }
+
+    if (id === 'csconf_panel_edit') {
+      const { getPanelSections } = require('../commands/casino/casino');
+      const sections = getPanelSections(guildId);
+      if (!sections.length) return interaction.deferUpdate().catch(() => {});
+      const options = sections.map((s, i) => ({ label: `${i + 1}. ${s.title.slice(0, 90)}`, value: String(i) }));
+      return interaction.reply({
+        content: 'Choisis la section à modifier :',
+        components: [new ActionRowBuilder().addComponents(
+          new StringSelectMenuBuilder().setCustomId('csconf_panel_edit_sel').setPlaceholder('Sélectionner une section').addOptions(options)
+        )],
+        flags: MessageFlags.Ephemeral,
+      }).catch(() => {});
+    }
+
+    if (id === 'csconf_panel_del') {
+      const { getPanelSections } = require('../commands/casino/casino');
+      const sections = getPanelSections(guildId);
+      if (!sections.length) return interaction.deferUpdate().catch(() => {});
+      const options = sections.map((s, i) => ({ label: `${i + 1}. ${s.title.slice(0, 90)}`, value: String(i) }));
+      return interaction.reply({
+        content: 'Choisis la section à supprimer :',
+        components: [new ActionRowBuilder().addComponents(
+          new StringSelectMenuBuilder().setCustomId('csconf_panel_del_sel').setPlaceholder('Sélectionner une section').addOptions(options)
+        )],
+        flags: MessageFlags.Ephemeral,
+      }).catch(() => {});
+    }
+
+    if (id === 'csconf_panel_reset') {
+      db.setCasinoConfig(guildId, { casinoPanelContent: null });
+      await interaction.reply({ content: '✓ Panel réinitialisé aux valeurs par défaut.', flags: MessageFlags.Ephemeral }).catch(() => {});
+      await _refreshCasinoConfigPanel(interaction);
+      return;
+    }
+
+    return interaction.deferUpdate().catch(() => {})
+  } catch (err) {
+    console.error('[CASINO-BUTTON] Caught error:', err?.message, err?.stack?.split('\n')[1]);
+    return interaction.deferUpdate().catch(() => {});
+  }
+}
+
+async function _refreshCasinoConfigPanel(interaction) {
+  const guildId = interaction.guild?.id;
+  const userId = interaction.user?.id;
+  const key = `${guildId}:${userId}`;
+  const view = _casinoConfigViews.get(key) || 'overview';
+
+  try {
+    let panel = _casinoConfigPanels.get(key);
+
+    if (!panel && interaction.channel?.messages) {
+      try {
+        const messages = await interaction.channel.messages.fetch({ limit: 20 });
+        panel = messages.find(m =>
+          m.author?.id === interaction.client.user?.id &&
+          m.components?.some(c => c?.type === 17)
+        );
+        if (panel) {
+          _casinoConfigPanels.set(key, panel);
+          console.log(`[CASINO-REFRESH] Found panel in channel for ${key}`);
+        }
+      } catch (fetchErr) {
+        console.log(`[CASINO-REFRESH] Failed to search for panel: ${fetchErr?.message}`);
+      }
+    }
+
+    if (!panel) {
+      console.log(`[CASINO-REFRESH] No stored panel for ${key}`);
+      return false;
+    }
+
+    console.log(`[CASINO-REFRESH] Refreshing panel for ${key}, view=${view}`);
+    const casino = require('../commands/casino/casino');
+    if (!casino.buildConfigPanel) return false;
+
+    const container = await casino.buildConfigPanel(interaction.guild, view);
+
+    try {
+      await panel.edit({ components: [container] });
+      console.log(`[CASINO-REFRESH] Panel edited successfully for ${key}`);
+      return true;
+    } catch (editErr) {
+      // Try to fetch fresh message if edit fails (Unknown Message)
+      if (editErr?.message?.includes('Unknown Message') && panel.channel?.messages) {
+        try {
+          const fetched = await panel.channel.messages.fetch(panel.id);
+          if (fetched) {
+            _casinoConfigPanels.set(key, fetched);
+            await fetched.edit({ components: [container] });
+            console.log(`[CASINO-REFRESH] Panel fetched and edited successfully for ${key}`);
+            return true;
+          }
+        } catch (fetchErr) {
+          console.log(`[CASINO-REFRESH] Failed to fetch panel: ${fetchErr?.message}`);
+          // Clean up stored reference if message is gone
+          _casinoConfigPanels.delete(key);
+          console.log(`[CASINO-REFRESH] Cleaned up panel reference for ${key}`);
+        }
+      } else if (editErr?.message?.includes('Unknown Message')) {
+        // Clean up if we can't even try to fetch
+        _casinoConfigPanels.delete(key);
+        console.log(`[CASINO-REFRESH] Cleaned up panel reference for ${key} (no channel access)`);
+      }
+      return false;
+    }
+  } catch (e) {
+    console.log(`[CASINO-REFRESH] Failed to refresh panel: ${e?.message}`);
+    return false;
+  }
+}
+
+// Export for casino.js to register panels
+module.exports.registerCasinoConfigPanel = (guildId, userId, panelMessage) => {
+  const key = `${guildId}:${userId}`;
+  _casinoConfigPanels.set(key, panelMessage);
+  _casinoConfigViews.set(key, 'overview');
+  console.log(`[CASINO] Registered panel for ${key}`);
+};
+
+async function _handleCasinoConfigSelect(interaction, id) {
+  const guildId = interaction.guild?.id;
+  console.log(`[CASINO-SELECT] Entered handler for ${id}, guild=${guildId}`);
+
+  if (!guildId) {
+    console.log(`[CASINO-SELECT] No guildId, deferring`);
+    return interaction.deferUpdate().catch(() => {});
+  }
+
+  try {
+    console.log(`[CASINO-SELECT] Checking types: isChannelSelect=${interaction.isChannelSelectMenu?.()}, isRoleSelect=${interaction.isRoleSelectMenu?.()}, isStringSelect=${interaction.isStringSelectMenu?.()}`);
+
+    // Channel select menus
+    if (interaction.isChannelSelectMenu?.()) {
+      console.log(`[CASINO-SELECT] Channel select detected for ${id}`);
+      if (id === 'csconf_panelch_sel') {
+        db.setCasinoConfig(guildId, { panelChannelId: interaction.values[0] });
+        console.log(`[CASINO-SELECT] Updated panel channel to ${interaction.values[0]}`);
+        await interaction.update({ content: '✓ Panel channel updated', components: [] }).catch(() => {});
+        await _refreshCasinoConfigPanel(interaction);
+        return;
+      }
+      if (id === 'csconf_allowed_sel') {
+        db.setCasinoConfig(guildId, { allowedChannels: interaction.values.join(',') });
+        await interaction.update({ content: '✓ Allowed channels updated', components: [] }).catch(() => {});
+        await _refreshCasinoConfigPanel(interaction);
+        return;
+      }
+      if (id === 'csconf_logch_sel') {
+        const type = interaction.message.components?.[0]?.components?.[0]?.placeholder?.includes('Gains') ? 'logChannelGains' : 'logChannelGames';
+        db.setCasinoConfig(guildId, { [type]: interaction.values[0] });
+        await interaction.update({ content: '✓ Log channel updated', components: [] }).catch(() => {});
+        await _refreshCasinoConfigPanel(interaction);
+        return;
+      }
+    }
+
+    // Role select menus
+    if (interaction.isRoleSelectMenu?.()) {
+      console.log(`[CASINO-SELECT] Role select detected for ${id}`);
+      if (id === 'csconf_rolereq_sel') {
+        db.setCasinoConfig(guildId, { roleRequired: interaction.values[0] });
+        await interaction.update({ content: '✓ Required role updated', components: [] }).catch(() => {});
+        await _refreshCasinoConfigPanel(interaction);
+        return;
+      }
+      if (id === 'csconf_rolemul_sel') {
+        db.setCasinoConfig(guildId, { roleMultiplierId: interaction.values[0] });
+        await interaction.update({ content: '✓ Multiplier role updated', components: [] }).catch(() => {});
+        await _refreshCasinoConfigPanel(interaction);
+        return;
+      }
+      if (id === 'csconf_shop_role_sel' || id.startsWith('csconf_shop_role_sel:')) {
+        const type = id.includes(':') ? id.split(':')[1] : 'role';
+        const roleId = interaction.values[0];
+        return interaction.showModal(_buildShopAddModal(type, roleId)).catch(() => {});
+      }
+      if (id === 'csconf_cotes_role_sel') {
+        const roleId = interaction.values[0] || '';
+        db.setCasinoConfig(guildId, { coteBonusRole: roleId });
+        await interaction.update({ content: roleId ? `✓ Rôle bonus: <@&${roleId}>` : '✓ Rôle bonus supprimé', components: [] }).catch(() => {});
+        await _refreshCasinoConfigPanel(interaction);
+        return;
+      }
+    }
+
+    // String select menus (intermediate steps)
+    if (interaction.isStringSelectMenu?.()) {
+      console.log(`[CASINO-SELECT] String select detected for ${id}`);
+      if (id === 'csconf_view') {
+        const view = interaction.values?.[0] || 'overview';
+        const key = `${guildId}:${interaction.user.id}`;
+        _casinoConfigPanels.set(key, interaction.message);
+        _casinoConfigViews.set(key, view);
+        const casino = require('../commands/casino/casino');
+        const container = casino.buildConfigPanel(interaction.guild, view);
+        const V2_FLAG = MessageFlags?.IsComponentsV2 ?? (1 << 15);
+        return interaction.update({ flags: V2_FLAG, components: [container] }).catch(() => {});
+      }
+      if (id === 'csconf_logs_sel') {
+        const type = interaction.values[0];
+        const { ChannelSelectMenuBuilder, ActionRowBuilder, ChannelType } = require('discord.js');
+        const select = new ChannelSelectMenuBuilder()
+          .setCustomId('csconf_logch_sel')
+          .setChannelTypes(ChannelType.GuildText)
+          .setPlaceholder(type === 'gains' ? '[G] Gains channel' : '[J] Games channel');
+        return interaction.update({ components: [new ActionRowBuilder().addComponents(select)] }).catch(() => {});
+      }
+      if (id === 'csconf_roles_sel') {
+        const type = interaction.values[0];
+        const { RoleSelectMenuBuilder, ActionRowBuilder } = require('discord.js');
+        const select = new RoleSelectMenuBuilder()
+          .setCustomId(type === 'required' ? 'csconf_rolereq_sel' : 'csconf_rolemul_sel')
+          .setPlaceholder(type === 'required' ? '[R] Required role' : '[M] Multiplier role');
+        return interaction.update({ components: [new ActionRowBuilder().addComponents(select)] }).catch(() => {});
+      }
+      if (id === 'csconf_limits_sel') {
+        const { StringSelectMenuBuilder, ActionRowBuilder, MessageFlags } = require('discord.js');
+        const sub = interaction.values[0];
+        const key = `${guildId}:${interaction.user.id}`;
+        _casinoConfigViews.set(key, 'limits');
+
+        if (sub === 'mises') {
+          return interaction.reply({
+            content: '**⊘ Mises** ・ Choisir la commande à configurer :',
+            components: [new ActionRowBuilder().addComponents(
+              new StringSelectMenuBuilder().setCustomId('csconf_limits_mises_cmd').setPlaceholder('Sélectionne une commande').addOptions(
+                { label: 'Blackjack', value: 'bj', description: 'Configurer les mises min/max du Blackjack' },
+                { label: 'Coinflip',  value: 'cf', description: 'Configurer les mises min/max du Coinflip' },
+                { label: 'Roulette',  value: 'rl', description: 'Configurer les mises min/max de la Roulette' },
+                { label: 'Russian',   value: 'russian', description: 'Configurer les mises min/max du Russian' },
+                { label: 'Mine',      value: 'mine', description: 'Configurer les mises min/max du Mine' },
+                { label: 'Plinko',    value: 'plinko', description: 'Configurer les mises min/max du Plinko' },
+                { label: 'Tower',     value: 'tower',  description: 'Configurer les mises min/max du Tower' },
+                { label: 'Dice',      value: 'dice',   description: 'Configurer les mises min/max du Dice' },
+              )
+            )],
+            flags: MessageFlags.Ephemeral,
+          }).catch(() => {});
+        }
+
+        if (sub === 'cooldowns') {
+          return interaction.reply({
+            content: '**⏱ Cooldowns** ・ Choisir la commande à configurer :',
+            components: [new ActionRowBuilder().addComponents(
+              new StringSelectMenuBuilder().setCustomId('csconf_limits_cd_cmd').setPlaceholder('Sélectionne une commande').addOptions(
+                { label: 'Blackjack', value: 'bj',      description: 'Cooldown entre chaque .blackjack' },
+                { label: 'Coinflip',  value: 'cf',      description: 'Cooldown entre chaque .coinflip' },
+                { label: 'Roulette',  value: 'rl',      description: 'Cooldown entre chaque .roulette' },
+                { label: 'Collect',   value: 'collect', description: 'Cooldown du .collect' },
+                { label: 'Vol',       value: 'vol',     description: 'Cooldown du .vol' },
+                { label: 'Gift',      value: 'gift',    description: 'Cooldown du .gift' },
+                { label: 'Russian',   value: 'russian', description: 'Cooldown du .russian' },
+                { label: 'Mine',      value: 'mine',    description: 'Cooldown du .mine' },
+                { label: 'Plinko',    value: 'plinko',  description: 'Cooldown du .plinko' },
+                { label: 'Tower',     value: 'tower',   description: 'Cooldown du .tower' },
+                { label: 'Dice',      value: 'dice',    description: 'Cooldown du .dice' },
+              )
+            )],
+            flags: MessageFlags.Ephemeral,
+          }).catch(() => {});
+        }
+
+        if (sub === 'plafonds') {
+          return interaction.reply({
+            content: '**⬆ Plafonds** ・ Choisir le type à configurer :',
+            components: [new ActionRowBuilder().addComponents(
+              new StringSelectMenuBuilder().setCustomId('csconf_limits_cap_cmd').setPlaceholder('Sélectionne un type').addOptions(
+                { label: 'Coins max détenus', value: 'max_coins', description: 'Plafond de coins qu\'un joueur peut avoir' },
+                { label: 'Tirages max détenus', value: 'max_draws', description: 'Plafond de tirages qu\'un joueur peut avoir' },
+                { label: 'Gains max par période', value: 'gains', description: 'Limite de coins gagnés sur une période' },
+                { label: 'Tirages max par période', value: 'draws', description: 'Limite de tirages gagnés sur une période' },
+              )
+            )],
+            flags: MessageFlags.Ephemeral,
+          }).catch(() => {});
+        }
+        return interaction.deferUpdate().catch(() => {});
+      }
+
+      if (id === 'csconf_limits_mises_cmd') {
+        const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+        const cmd = interaction.values[0];
+        const cfg = db.getCasinoConfig(guildId);
+        const minMap = { bj: 'limitBjMin', cf: 'limitCfMin', rl: 'limitRlMin', russian: 'limitRussianMin', mine: 'limitMineMin', plinko: 'limitPlinkoMin', tower: 'limitTowerMin', dice: 'limitDiceMin' };
+        const maxMap = { bj: 'limitBjMax', cf: 'limitCfMax', rl: 'limitRlMax', russian: 'limitRussianMax', mine: 'limitMineMax', plinko: 'limitPlinkoMax', tower: 'limitTowerMax', dice: 'limitDiceMax' };
+        const labelMap = { bj: 'Blackjack', cf: 'Coinflip', rl: 'Roulette', russian: 'Russian', mine: 'Mine', plinko: 'Plinko', tower: 'Tower', dice: 'Dice' };
+        const modal = new ModalBuilder()
+          .setCustomId(`csconf_limits_mises_modal:${cmd}`)
+          .setTitle(`Mises ・ ${labelMap[cmd]}`);
+        modal.addComponents(
+          new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('min').setLabel(`Mise minimum (0 = aucune)`).setStyle(TextInputStyle.Short).setValue(String(cfg[minMap[cmd]] ?? 0)).setRequired(false)),
+          new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('max').setLabel(`Mise maximum (0 = illimité)`).setStyle(TextInputStyle.Short).setValue(String(cfg[maxMap[cmd]] ?? 0)).setRequired(false)),
+        );
+        if (cmd === 'mine') {
+          modal.addComponents(
+            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('bombs').setLabel(`Nombre de bombes (1-24, défaut 3)`).setStyle(TextInputStyle.Short).setValue(String(cfg.limitMineBombs ?? 3)).setRequired(false)),
+          );
+        }
+        return interaction.showModal(modal).catch(() => {});
+      }
+
+      if (id === 'csconf_limits_cd_cmd') {
+        const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+        const cmd = interaction.values[0];
+        const cfg = db.getCasinoConfig(guildId);
+        const fmtCd = s => s > 0 ? (s % 86400 === 0 ? `${s/86400}j` : s % 3600 === 0 ? `${s/3600}h` : s % 60 === 0 ? `${s/60}m` : `${s}s`) : '0';
+        const cdMap = { bj: 'cooldownBj', cf: 'cooldownCf', rl: 'cooldownRl', collect: 'cooldownCollect', vol: 'cooldownVol', gift: 'cooldownGift', russian: 'cooldownRussian', mine: 'cooldownMine', plinko: 'cooldownPlinko', tower: 'cooldownTower' };
+        const labelMap = { bj: 'Blackjack', cf: 'Coinflip', rl: 'Roulette', collect: 'Collect', vol: 'Vol', gift: 'Gift', russian: 'Russian', mine: 'Mine', plinko: 'Plinko', tower: 'Tower' };
+        const modal = new ModalBuilder()
+          .setCustomId(`csconf_limits_cd_modal:${cmd}`)
+          .setTitle(`Cooldown ・ ${labelMap[cmd]}`);
+        modal.addComponents(
+          new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('duration').setLabel('Durée (ex: 30s, 2m, 1h, 1j ・ 0 = aucun)').setStyle(TextInputStyle.Short).setValue(fmtCd(cfg[cdMap[cmd]] ?? 0)).setRequired(false)),
+        );
+        return interaction.showModal(modal).catch(() => {});
+      }
+
+      if (id === 'csconf_limits_cap_cmd') {
+        const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+        const type = interaction.values[0];
+        const cfg  = db.getCasinoConfig(guildId);
+        const fmtCd = s => s > 0 ? (s % 86400 === 0 ? `${s/86400}j` : s % 3600 === 0 ? `${s/3600}h` : s % 60 === 0 ? `${s/60}m` : `${s}s`) : '0';
+        const modal = new ModalBuilder().setCustomId(`csconf_limits_cap_modal:${type}`);
+        if (type === 'max_coins') {
+          modal.setTitle('Plafond ・ Coins max détenus');
+          modal.addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('value').setLabel('Coins maximum (0 = illimité)').setStyle(TextInputStyle.Short).setValue(String(cfg.limitMaxCoins ?? 0)).setRequired(false)));
+        } else if (type === 'max_draws') {
+          modal.setTitle('Plafond ・ Tirages max détenus');
+          modal.addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('value').setLabel('Tirages maximum (0 = illimité)').setStyle(TextInputStyle.Short).setValue(String(cfg.limitMaxDraws ?? 0)).setRequired(false)));
+        } else if (type === 'gains') {
+          modal.setTitle('Plafond ・ Gains max par période');
+          modal.addComponents(
+            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('value').setLabel('Gains max (coins, 0 = illimité)').setStyle(TextInputStyle.Short).setValue(String(cfg.limitGainsMax ?? 0)).setRequired(false)),
+            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('period').setLabel('Période (ex: 1h, 30m, 1j ・ 0 = off)').setStyle(TextInputStyle.Short).setValue(fmtCd(cfg.limitGainsPeriod ?? 0)).setRequired(false)),
+          );
+        } else if (type === 'draws') {
+          modal.setTitle('Plafond ・ Tirages max par période');
+          modal.addComponents(
+            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('value').setLabel('Tirages max (0 = illimité)').setStyle(TextInputStyle.Short).setValue(String(cfg.limitDrawsMax ?? 0)).setRequired(false)),
+            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('period').setLabel('Période (ex: 1h, 30m, 1j ・ 0 = off)').setStyle(TextInputStyle.Short).setValue(fmtCd(cfg.limitDrawsPeriod ?? 0)).setRequired(false)),
+          );
+        }
+        return interaction.showModal(modal).catch(() => {});
+      }
+
+      if (id === 'csconf_commands_sel') {
+        const commands = interaction.values?.join(',') || '';
+        db.setCasinoConfig(guildId, { restrictedCommands: commands });
+        await interaction.deferUpdate().catch(() => {});
+        await _refreshCasinoConfigPanel(interaction);
+        return;
+      }
+      if (id === 'csconf_cotes_role_sel') {
+        const roleId = interaction.values[0] || '';
+        db.setCasinoConfig(guildId, { coteBonusRole: roleId });
+        await interaction.update({ content: roleId ? `✓ Rôle bonus: <@&${roleId}>` : '✓ Rôle bonus supprimé', components: [] }).catch(() => {});
+        await _refreshCasinoConfigPanel(interaction);
+        return;
+      }
+      if (id === 'csconf_shop_type_sel') {
+        const type = interaction.values[0];
+        if (type === 'role' || type === 'color') {
+          const { RoleSelectMenuBuilder, ActionRowBuilder } = require('discord.js');
+          const select = new RoleSelectMenuBuilder()
+            .setCustomId(`csconf_shop_role_sel:${type}`)
+            .setPlaceholder(type === 'color' ? 'Choisir le rôle couleur à vendre' : 'Choisir le rôle à vendre');
+          return interaction.update({ content: `Sélectionne le rôle ${type === 'color' ? 'couleur ' : ''}à vendre dans la boutique.`, components: [new ActionRowBuilder().addComponents(select)] }).catch(() => {});
+        }
+        return interaction.showModal(_buildShopAddModal(type)).catch(() => {});
+      }
+      if (id === 'csconf_gacha_type_sel') {
+        const type = interaction.values[0];
+        return interaction.showModal(_buildGachaAddModal(type)).catch(() => {});
+      }
+      if (id === 'csconf_shop_remove_sel') {
+        const itemId = parseInt(interaction.values[0], 10);
+        db.deleteShopItem(guildId, itemId);
+        const key = `${guildId}:${interaction.user.id}`;
+        _casinoConfigViews.set(key, 'shop_admin');
+        await interaction.update({ content: `✓ Item supprimé.`, components: [] }).catch(() => {});
+        await _refreshCasinoConfigPanel(interaction);
+        return;
+      }
+      if (id === 'csconf_gacha_remove_sel') {
+        const itemId = parseInt(interaction.values[0], 10);
+        db.removeGachaPoolItem(guildId, itemId);
+        const key = `${guildId}:${interaction.user.id}`;
+        _casinoConfigViews.set(key, 'gacha_admin');
+        await interaction.update({ content: `✓ Item bonus supprimé.`, components: [] }).catch(() => {});
+        await _refreshCasinoConfigPanel(interaction);
+        return;
+      }
+
+      if (id === 'csconf_rules_edit_sel') {
+        const { getRulesSections } = require('../commands/casino/casino');
+        const idx = parseInt(interaction.values[0], 10);
+        const sections = getRulesSections(guildId);
+        const section = sections[idx];
+        if (!section) return interaction.update({ content: 'Section introuvable.', components: [] }).catch(() => {});
+        const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder: AR } = require('discord.js');
+        const modal = new ModalBuilder().setCustomId(`csconf_rules_edit_modal:${idx}`).setTitle(`Modifier section ${idx + 1}`);
+        modal.addComponents(
+          new AR().addComponents(new TextInputBuilder().setCustomId('title').setLabel('Titre').setStyle(TextInputStyle.Short).setValue(section.title).setRequired(true).setMaxLength(100)),
+          new AR().addComponents(new TextInputBuilder().setCustomId('content').setLabel('Contenu').setStyle(TextInputStyle.Paragraph).setValue(section.content).setRequired(true).setMaxLength(1800)),
+        );
+        return interaction.showModal(modal).catch(() => {});
+      }
+
+      if (id === 'csconf_rules_del_sel') {
+        const { getRulesSections } = require('../commands/casino/casino');
+        const idx = parseInt(interaction.values[0], 10);
+        const sections = getRulesSections(guildId);
+        sections.splice(idx, 1);
+        db.setCasinoConfig(guildId, { casinoRules: sections.length ? JSON.stringify(sections) : null });
+        const key = `${guildId}:${interaction.user.id}`;
+        _casinoConfigViews.set(key, 'rules');
+        await interaction.update({ content: `✓ Section supprimée.`, components: [] }).catch(() => {});
+        await _refreshCasinoConfigPanel(interaction);
+        return;
+      }
+
+      if (id === 'csconf_panel_edit_sel') {
+        const { getPanelSections } = require('../commands/casino/casino');
+        const idx = parseInt(interaction.values[0], 10);
+        const sections = getPanelSections(guildId);
+        const section = sections[idx];
+        if (!section) return interaction.update({ content: 'Section introuvable.', components: [] }).catch(() => {});
+        const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder: AR } = require('discord.js');
+        const modal = new ModalBuilder().setCustomId(`csconf_panel_edit_modal:${idx}`).setTitle(`Modifier section panel ${idx + 1}`);
+        modal.addComponents(
+          new AR().addComponents(new TextInputBuilder().setCustomId('title').setLabel('Titre').setStyle(TextInputStyle.Short).setValue(section.title).setRequired(true).setMaxLength(100)),
+          new AR().addComponents(new TextInputBuilder().setCustomId('content').setLabel('Contenu').setStyle(TextInputStyle.Paragraph).setValue(section.content).setRequired(true).setMaxLength(1800)),
+        );
+        return interaction.showModal(modal).catch(() => {});
+      }
+
+      if (id === 'csconf_panel_del_sel') {
+        const { getPanelSections } = require('../commands/casino/casino');
+        const idx = parseInt(interaction.values[0], 10);
+        const sections = getPanelSections(guildId);
+        sections.splice(idx, 1);
+        db.setCasinoConfig(guildId, { casinoPanelContent: sections.length ? JSON.stringify(sections) : null });
+        const key = `${guildId}:${interaction.user.id}`;
+        _casinoConfigViews.set(key, 'panel_admin');
+        await interaction.update({ content: `✓ Section supprimée.`, components: [] }).catch(() => {});
+        await _refreshCasinoConfigPanel(interaction);
+        return;
+      }
+    }
+
+    console.log(`[CASINO-SELECT] No handler matched for ${id}, deferring`);
+    return interaction.deferUpdate().catch(() => {});
+  } catch (err) {
+    console.log(`[CASINO-SELECT] Error: ${err?.message}`);
+    return interaction.deferUpdate().catch(() => {});
+  }
+}
+
+function _buildGachaAddModal(type) {
+  const modal = new ModalBuilder().setCustomId('csconf_gacha_add_modal').setTitle(`Ajouter item bonus \u2014 ${type}`);
+  const needsRole = ['role', 'color', 'badge', 'decor', 'nitro'].includes(type);
+  const needsValue = ['draws', 'xp'].includes(type);
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder().setCustomId('name').setLabel('Nom de l\'item').setStyle(TextInputStyle.Short).setRequired(true)
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder().setCustomId('type').setLabel('Type').setStyle(TextInputStyle.Short).setValue(type).setRequired(true)
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder().setCustomId('chance').setLabel('Chance d\'obtenir (ex: 5 ou 0.5 pour 0,5%)').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('ex: 10')
+    ),
+  );
+  if (needsRole) {
+    modal.addComponents(new ActionRowBuilder().addComponents(
+      new TextInputBuilder().setCustomId('roleId').setLabel('Role ID Discord').setStyle(TextInputStyle.Short).setRequired(false)
+    ));
+  }
+  if (needsValue) {
+    modal.addComponents(new ActionRowBuilder().addComponents(
+      new TextInputBuilder().setCustomId('value').setLabel(`Quantit\u00e9 (${type === 'draws' ? 'nb tirages' : 'points XP'})`).setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('ex: 5')
+    ));
+  }
+  return modal;
+}
+
+function _buildShopAddModal(type, presetValue = '') {
+  const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+  const modal = new ModalBuilder().setCustomId('csconf_shop_add_modal').setTitle('Ajouter item boutique');
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('name').setLabel('Nom d\'affichage').setStyle(TextInputStyle.Short).setRequired(true)),
+    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('description').setLabel('Description').setStyle(TextInputStyle.Paragraph).setRequired(false)),
+    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('price').setLabel('Prix en coins').setStyle(TextInputStyle.Short).setRequired(true)),
+    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('type').setLabel('Type').setStyle(TextInputStyle.Short).setValue(type).setRequired(true)),
+    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('value').setLabel('Valeur / Role ID / Couleur / Stock').setStyle(TextInputStyle.Short).setValue(presetValue).setRequired(false)),
+  );
+  return modal;
+}
+
+async function _handleCasinoModuleModal(interaction, id) {
+  const guildId = interaction.guild?.id;
+  if (!guildId) return interaction.deferUpdate().catch(() => {});
+
+  try {
+    const key = `${guildId}:${interaction.user.id}`;
+
+    if (id === 'csconf_shop_add_modal') {
+      const name = interaction.fields.getTextInputValue('name')?.trim();
+      const description = interaction.fields.getTextInputValue('description')?.trim() || '';
+      const price = parseInt(interaction.fields.getTextInputValue('price'), 10) || 0;
+      const type = interaction.fields.getTextInputValue('type')?.trim()?.toLowerCase();
+      const value = interaction.fields.getTextInputValue('value')?.trim() || '';
+      if (!name || price < 1) {
+        return interaction.reply({ content: 'Nom ou prix invalide.', flags: 64 }).catch(() => {});
+      }
+      const roleId = type === 'role' ? value.replace(/[<@&>]/g, '') : null;
+      const colorHex = type === 'color' ? value : null;
+      const stock = (type === 'draws' || type === 'xp') ? (parseInt(value, 10) || 1) : -1;
+      console.log(`[CASINO-MODAL] Adding shop item: name=${name}, type=${type}, price=${price}, roleId=${roleId}`);
+      db.addShopItem(guildId, name, description, price, type, roleId, colorHex, stock);
+      console.log(`[CASINO-MODAL] Shop item added successfully`);
+      _casinoConfigViews.set(key, 'shop_admin');
+      await _refreshCasinoConfigPanel(interaction);
+      return interaction.reply({ content: `Item boutique **${name}** ajouté.`, flags: 64 }).catch(() => {});
+    }
+
+    if (id === 'csconf_gacha_coins_modal') {
+      const min = parseInt(interaction.fields.getTextInputValue('min'), 10) || 0;
+      const max = parseInt(interaction.fields.getTextInputValue('max'), 10) || min;
+      if (min < 0 || max < min) return interaction.reply({ content: 'Valeurs invalides (max doit être ≥ min).', flags: 64 }).catch(() => {});
+      db.setGachaCoinConfig(guildId, min, max);
+      _casinoConfigViews.set(key, 'gacha_admin');
+      await _refreshCasinoConfigPanel(interaction);
+      return interaction.reply({ content: `Coins configurés : **${embed.fmtCoins(min)}** → **${embed.fmtCoins(max)}** par tirage.`, flags: 64 }).catch(() => {});
+    }
+
+    if (id === 'csconf_gacha_add_modal') {
+      const name = interaction.fields.getTextInputValue('name')?.trim();
+      const type = interaction.fields.getTextInputValue('type')?.trim()?.toLowerCase();
+      const chanceRaw = interaction.fields.getTextInputValue('chance')?.replace(',', '.');
+      const chance = parseFloat(chanceRaw) || 0;
+      let roleId = null;
+      try { const r = interaction.fields.getTextInputValue('roleId')?.trim(); if (r) roleId = r.replace(/[<@&>]/g, ''); } catch {}
+      let value = 0;
+      try { value = parseInt(interaction.fields.getTextInputValue('value'), 10) || 0; } catch {}
+      if (!name || !type || chance <= 0 || chance > 100) return interaction.reply({ content: 'Nom, type ou chance invalide (chance: 0.01 – 100).', flags: 64 }).catch(() => {});
+      db.addGachaPoolItem(guildId, name, type, chance, roleId, value);
+      _casinoConfigViews.set(key, 'gacha_admin');
+      await _refreshCasinoConfigPanel(interaction);
+      return interaction.reply({ content: `Item bonus **${name}** ajouté (${chance}% de chance).`, flags: 64 }).catch(() => {});
+    }
+
+    if (id === 'csconf_level_add_modal') {
+      const level = parseInt(interaction.fields.getTextInputValue('level'), 10);
+      const roleId = interaction.fields.getTextInputValue('roleId')?.trim()?.replace(/[<@&>]/g, '');
+      if (!level || !roleId) return interaction.reply({ content: 'Niveau ou rôle invalide.', flags: 64 }).catch(() => {});
+      db.addCasinoLevelRole(guildId, level, roleId);
+      _casinoConfigViews.set(key, 'levels_admin');
+      await _refreshCasinoConfigPanel(interaction);
+      return interaction.reply({ content: `Rôle niveau **${level}** ajouté.`, flags: 64 }).catch(() => {});
+    }
+
+    if (id === 'csconf_rules_add_modal') {
+      const { getRulesSections } = require('../commands/casino/casino');
+      const title   = interaction.fields.getTextInputValue('title').trim();
+      const content = interaction.fields.getTextInputValue('content').trim();
+      const sections = getRulesSections(guildId);
+      sections.push({ title, content });
+      db.setCasinoConfig(guildId, { casinoRules: JSON.stringify(sections) });
+      _casinoConfigViews.set(key, 'rules');
+      await _refreshCasinoConfigPanel(interaction);
+      return interaction.reply({ content: `✓ Section **${title}** ajoutée.`, flags: 64 }).catch(() => {});
+    }
+
+    if (id.startsWith('csconf_rules_edit_modal:')) {
+      const { getRulesSections } = require('../commands/casino/casino');
+      const idx     = parseInt(id.split(':')[1], 10);
+      const title   = interaction.fields.getTextInputValue('title').trim();
+      const content = interaction.fields.getTextInputValue('content').trim();
+      const sections = getRulesSections(guildId);
+      if (sections[idx]) {
+        sections[idx] = { title, content };
+        db.setCasinoConfig(guildId, { casinoRules: JSON.stringify(sections) });
+      }
+      _casinoConfigViews.set(key, 'rules');
+      await _refreshCasinoConfigPanel(interaction);
+      return interaction.reply({ content: `✓ Section **${title}** mise à jour.`, flags: 64 }).catch(() => {});
+    }
+
+    if (id === 'csconf_panel_add_modal') {
+      const { getPanelSections } = require('../commands/casino/casino');
+      const title   = interaction.fields.getTextInputValue('title').trim();
+      const content = interaction.fields.getTextInputValue('content').trim();
+      const sections = getPanelSections(guildId);
+      sections.push({ title, content });
+      db.setCasinoConfig(guildId, { casinoPanelContent: JSON.stringify(sections) });
+      _casinoConfigViews.set(key, 'panel_admin');
+      await _refreshCasinoConfigPanel(interaction);
+      return interaction.reply({ content: `✓ Section **${title}** ajoutée au panel.`, flags: 64 }).catch(() => {});
+    }
+
+    if (id.startsWith('csconf_panel_edit_modal:')) {
+      const { getPanelSections } = require('../commands/casino/casino');
+      const idx     = parseInt(id.split(':')[1], 10);
+      const title   = interaction.fields.getTextInputValue('title').trim();
+      const content = interaction.fields.getTextInputValue('content').trim();
+      const sections = getPanelSections(guildId);
+      if (sections[idx]) {
+        sections[idx] = { title, content };
+        db.setCasinoConfig(guildId, { casinoPanelContent: JSON.stringify(sections) });
+      }
+      _casinoConfigViews.set(key, 'panel_admin');
+      await _refreshCasinoConfigPanel(interaction);
+      return interaction.reply({ content: `✓ Section **${title}** mise à jour.`, flags: 64 }).catch(() => {});
+    }
+
+    return interaction.deferUpdate().catch(() => {});
+  } catch (err) {
+    console.log(`[CASINO-MODAL-ERROR] ${err?.message || err}`);
+    return interaction.reply({ content: `Erreur: ${err?.message || 'Impossible de sauvegarder ce module casino.'}`, flags: 64 }).catch(() => {});
+  }
+}
+
+async function _handleCasinoGainsModal(interaction) {
+  const guildId = interaction.guild?.id;
+  if (!guildId) return interaction.deferUpdate().catch(() => {});
+
+  try {
+    const c_voc_min = interaction.fields.getTextInputValue('c_voc_min');
+    const d_voc = interaction.fields.getTextInputValue('d_voc');
+    const c_msg = interaction.fields.getTextInputValue('c_msg');
+    const collect_bonus = interaction.fields.getTextInputValue('collect_bonus');
+    const mul_pub = interaction.fields.getTextInputValue('mul_pub');
+
+    const updates = {};
+    if (c_voc_min !== undefined && c_voc_min !== '') updates.coinsPerVocMin = parseInt(c_voc_min) || 0;
+    if (d_voc !== undefined && d_voc !== '') updates.drawsPerVocHour = parseInt(d_voc) || 0;
+    if (c_msg !== undefined && c_msg !== '') updates.coinsPerMsg = parseInt(c_msg) || 0;
+    if (collect_bonus !== undefined && collect_bonus !== '') updates.collectBonusRate = parseFloat(collect_bonus) || 0;
+    if (mul_pub !== undefined && mul_pub !== '') updates.publicVocMultiplier = parseInt(mul_pub) || 2;
+
+    db.setCasinoConfig(guildId, updates);
+    const key = `${guildId}:${interaction.user.id}`;
+    _casinoConfigViews.set(key, 'gains');
+    await _refreshCasinoConfigPanel(interaction);
+
+    return interaction.reply({ content: 'Paramètres de gains mis à jour.', flags: 64 }).catch(() => {});
+  } catch (err) {
+    return interaction.reply({ content: 'Impossible de mettre à jour les paramètres.', flags: 64 }).catch(() => {});
+  }
 }

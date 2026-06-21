@@ -35,6 +35,7 @@ const CATEGORY_LABELS = {
   moderation   : 'Modération',
   tickets      : 'Tickets',
   levels       : 'Niveaux',
+  casino       : 'Casino',
   games        : 'Jeux',
   giveaways    : 'Giveaways',
   backups      : 'Backups',
@@ -53,6 +54,7 @@ const CATEGORY_DESCRIPTIONS = {
   moderation   : 'Sanctions, warns, mute, ban',
   tickets      : 'Support et panels tickets',
   levels       : 'XP et classements',
+  casino       : 'Système de casino complet',
   games        : 'Jeux et divertissements',
   giveaways    : 'Création et gestion des giveaways',
   backups      : 'Sauvegardes et restaurations serveur',
@@ -71,6 +73,7 @@ const CATEGORY_ORDER = [
   'moderation',
   'tickets',
   'levels',
+  'casino',
   'games',
   'giveaways',
   'backups',
@@ -107,6 +110,7 @@ const CATEGORY_ALIASES = {
   moderation   : ['moderation', 'modération', 'modo'],
   tickets      : ['tickets', 'ticket'],
   levels       : ['niveaux', 'levels', 'level'],
+  casino       : ['casino', 'casinos'],
   games        : ['jeux', 'games', 'game', 'jeu'],
   giveaways    : ['giveaways', 'giveaway'],
   backups      : ['backups', 'backup', 'sauvegardes', 'sauvegarde'],
@@ -159,6 +163,30 @@ module.exports = {
     }
 
     if (query) {
+      const lowered = query.toLowerCase();
+
+      // Check for exact command match first (before category)
+      const allCmds = _getDisplayCommands(client, message);
+      const exactCommand = allCmds.find(cmd => {
+        const name = (cmd.help?.name ?? cmd.name ?? '').toLowerCase();
+        if (name === lowered) return true;
+        const aliases = cmd.help?.aliases ?? cmd.aliases ?? [];
+        return aliases.some(a => a.toLowerCase() === lowered);
+      });
+
+      if (exactCommand) {
+        return _handleCommandLookup(
+          client,
+          message,
+          query,
+          guildId,
+          prefix,
+          deleteReply,
+          deleteDelay,
+          helpAliasEnabled
+        );
+      }
+
       const categories      = _getCategories(client, message);
       const matchedCategory = _matchCategory(categories, query);
 

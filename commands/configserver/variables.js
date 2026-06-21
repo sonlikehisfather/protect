@@ -209,7 +209,7 @@ function _buildVariablesEmbed(guild, guildId) {
       {
         name  : 'Exemple VC',
         value : [
-          '`{guild} - Statistiques`',
+          '`{guild}`',
           '`Membre : **{members}**\\nEn ligne : **{online}**\\nEn vocal : **{voice}**\\nBoost : **{boost}**`',
         ].join('\n'),
         inline: false,

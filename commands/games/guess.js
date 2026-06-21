@@ -16,7 +16,7 @@ const V2_AVAILABLE       = typeof ContainerBuilder    === 'function' &&
 
 exports.help = {
   name        : 'guess',
-  description : 'Jeu du Plus ou Moins — Écris un nombre, le bot dit + ou -.',
+  description : 'Jeu du Plus ou Moins ・ Écris un nombre, le bot dit + ou -.',
   use         : 'guess [max]',
   usage       : 'guess 100',
   aliases     : ['devine', 'nombre', 'plusmoins'],
@@ -48,7 +48,7 @@ exports.run = async (client, message, args) => {
     ``,
     `J'ai choisi un nombre entre **0** et **${maxNumber}**…`,
     ``,
-    `Écris un nombre dans le chat — je te dirai ⬆️ PLUS ou ⬇️ MOINS !`,
+    `Écris un nombre dans le chat ・ je te dirai ⬆️ PLUS ou ⬇️ MOINS !`,
     `**Essais max** : ${maxAttempts}`,
   ].join('\n');
 
@@ -90,7 +90,7 @@ exports.run = async (client, message, args) => {
       await sent.edit(_v2([
         `## ${hint}`,
         ``,
-        `**Essai ${attempts}/${maxAttempts}** — tu as proposé **${guess}**`,
+        `**Essai ${attempts}/${maxAttempts}** ・ tu as proposé **${guess}**`,
         ``,
         `\`${bar}\` (${remaining} restant${remaining > 1 ? 's' : ''})`,
       ].join('\n'))).catch(() => {});
@@ -98,7 +98,7 @@ exports.run = async (client, message, args) => {
       await sent.edit({
         embeds: [embed.build(guildId, null, {
           title: hint,
-          description: `Essai **${attempts}/${maxAttempts}** — proposé **${guess}**`,
+          description: `Essai **${attempts}/${maxAttempts}** ・ proposé **${guess}**`,
           color: guess < target ? '#E74C3C' : '#3498DB', timestamp: false,
         })],
       }).catch(() => {});
@@ -110,12 +110,12 @@ exports.run = async (client, message, args) => {
     if (reason === 'won') {
       xpGain = Math.max((maxAttempts - attempts) * 15, 10);
       db.addXp(guildId, message.author.id, xpGain);
-      text = `## 🎉 BRAVO — TROUVÉ !\n\n Le nombre était **${target}** !\nTrouvé en **${attempts}** essai${attempts > 1 ? 's' : ''} !\n\n✨ **+${xpGain} XP** gagnés !`;
+      text = `## 🎉 BRAVO ・ TROUVÉ !\n\n Le nombre était **${target}** !\nTrouvé en **${attempts}** essai${attempts > 1 ? 's' : ''} !\n\n✨ **+${xpGain} XP** gagnés !`;
     } else if (reason === 'lost') {
       db.addXp(guildId, message.author.id, 5);
       text = `## 💥 GAME OVER\n\n Plus d'essais !\nLe nombre mystère était **${target}**.\n\n✨ **+5 XP** pour la participation !`;
     } else {
-      text = `## Temps écoulé !\n\nPartie abandonnée — le nombre était **${target}**.`;
+      text = `## Temps écoulé !\n\nPartie abandonnée ・ le nombre était **${target}**.`;
     }
 
     if (V2_AVAILABLE) {

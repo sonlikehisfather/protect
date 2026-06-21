@@ -35,7 +35,7 @@ module.exports = {
 
     const lines = rows.map((r, i) => {
       const total = r.regular + r.bonus;
-      return `**${i + 1}.** <@${r.userId}> — \`${total}\` *(${r.regular} reg · ${r.bonus} bonus · ${r.left_count} partis)*`;
+      return `**${i + 1}.** <@${r.userId}> ・ \`${total}\` *(${r.regular} reg · ${r.bonus} bonus · ${r.left_count} partis)*`;
     });
 
     const sent = await message.channel.send({

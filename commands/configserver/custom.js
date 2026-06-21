@@ -819,7 +819,7 @@ async function _openPanel(client, message, guildId, custom, deleteReply, deleteD
       await submit.followUp({
         embeds: [embed.build(gId,
           'Custom renommée.\n' +
-          '⚠️ Les anciens messages contenant des boutons ou menus liés à cette custom doivent être renvoyés, ' +
+          '⚑ Les anciens messages contenant des boutons ou menus liés à cette custom doivent être renvoyés, ' +
           'car leurs composants utilisent encore l\'ancien nom.',
           { color: '#FAA61A', timestamp: false }
         )],

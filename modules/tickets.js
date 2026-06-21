@@ -752,7 +752,7 @@ async function _sendRatingDm(client, ticket, guildId) {
     : 'Inconnu';
 
   const ratingEmbed = embed.build(guildId, null, {
-    title  : `Évaluation — Ticket #${ticket.id}`,
+    title  : `Évaluation ・ Ticket #${ticket.id}`,
     fields : [
       { name: 'Serveur',       value: guildName,                     inline: true },
       { name: 'Ouvert le',     value: openedAt,                      inline: true },
@@ -800,7 +800,7 @@ async function _sendRatingDm(client, ticket, guildId) {
       title  : 'Merci pour ton évaluation !',
       fields : [
         { name: 'Ticket',         value: `#${ticket.id}`,               inline: true },
-        { name: 'Note',           value: `${stars} — ${labels[rating]}`, inline: true },
+        { name: 'Note',           value: `${stars} ・ ${labels[rating]}`, inline: true },
         { name: 'Pris en charge', value: claimedBy,                      inline: true },
       ],
       color    : '#57F287',
@@ -816,10 +816,10 @@ async function _sendRatingDm(client, ticket, guildId) {
       const ratingChannel = guild?.channels.cache.get(ratingChannelId);
       if (ratingChannel?.isTextBased()) {
         const logEmbed = embed.build(guildId, null, {
-          title  : `Évaluation reçue — Ticket #${ticket.id}`,
+          title  : `Évaluation reçue ・ Ticket #${ticket.id}`,
           fields : [
             { name: 'Membre',         value: `<@${ticket.userId}>`,        inline: true },
-            { name: 'Note',           value: `${stars} — ${labels[rating]}`, inline: true },
+            { name: 'Note',           value: `${stars} ・ ${labels[rating]}`, inline: true },
             { name: 'Pris en charge', value: claimedBy,                      inline: true },
             { name: 'Serveur',        value: guildName,                      inline: true },
             { name: 'Ouvert le',      value: openedAt,                       inline: true },

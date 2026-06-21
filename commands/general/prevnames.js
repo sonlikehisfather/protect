@@ -125,7 +125,7 @@ async function resolveUser(client, message, args) {
 }
 
 function _fmtEntry(r) {
-  return `\`${r.name}\` — <t:${r.changedAt}:R>`;
+  return `\`${r.name}\` ・ <t:${r.changedAt}:R>`;
 }
 
 function _buildPages(usernames, globalNames, nicknames) {

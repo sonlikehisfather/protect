@@ -88,7 +88,7 @@ async function _fetchRows(client, guildId, days) {
 function _formatRows(rows) {
   if (!rows.length) return 'Aucune activité enregistrée sur cette période.';
   return rows.map(r => {
-    return `**${r.rank}.** **${r.name}** — \`${r.total}\` msg${r.total > 1 ? 's' : ''}`;
+    return `**${r.rank}.** **${r.name}** ・ \`${r.total}\` msg${r.total > 1 ? 's' : ''}`;
   }).join('\n');
 }
 

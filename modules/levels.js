@@ -134,8 +134,9 @@ async function _onLevelUp(client, message, newLevel, guildId, config) {
       }
     } catch {}
 
-    const levelRoles = db.getLevelRoles(guildId);
-    if (!levelRoles.length) return;
+    const serverLevelRoles = db.getLevelRoles(guildId);
+    const casinoLevelRoles = db.getCasinoLevelRoles(guildId);
+    if (!serverLevelRoles.length && !casinoLevelRoles.length) return;
 
     const guild  = message.guild;
     const member = message.member;
@@ -145,12 +146,20 @@ async function _onLevelUp(client, message, newLevel, guildId, config) {
 
     if (!me || !me.permissions.has('ManageRoles')) return;
 
-    const toAdd = config.levelCumul
-      ? levelRoles.filter(r => r.level <= newLevel)
-      : levelRoles.filter(r => r.level === newLevel);
-    const toRemove = config.levelCumul
+    // Server level roles: respect levelCumul setting
+    const serverToAdd = config.levelCumul
+      ? serverLevelRoles.filter(r => r.level <= newLevel)
+      : serverLevelRoles.filter(r => r.level === newLevel);
+    const serverToRemove = config.levelCumul
       ? []
-      : levelRoles.filter(r => r.level !== newLevel && r.level < newLevel);
+      : serverLevelRoles.filter(r => r.level !== newLevel && r.level < newLevel);
+
+    // Casino level roles: always replace (remove old level role, give new one)
+    const casinoToAdd    = casinoLevelRoles.filter(r => r.level === newLevel);
+    const casinoToRemove = casinoLevelRoles.filter(r => r.level < newLevel);
+
+    const toAdd    = [...serverToAdd,    ...casinoToAdd];
+    const toRemove = [...serverToRemove, ...casinoToRemove];
 
     for (const row of toAdd) {
       const role = guild.roles.cache.get(row.roleId);

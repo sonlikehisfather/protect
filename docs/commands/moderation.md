@@ -22,7 +22,7 @@ Outils complets de modération pour gérer votre communauté.
 
 Bannit un membre du serveur.
 
-**Usage:** `+ban <@user|id> [durée] [raison]`
+**Usage :** `+ban <@user|id> [durée] [raison]`
 
 **Permissions:** `BanMembers`
 **Bot Permissions:** `BanMembers`
@@ -48,7 +48,7 @@ Bannit un membre du serveur.
 
 Expulse un membre du serveur (il peut revenir).
 
-**Usage:** `+kick <@user> [raison]`
+**Usage :** `+kick <@user> [raison]`
 
 **Permissions:** `KickMembers`
 **Bot Permissions:** `KickMembers`
@@ -65,7 +65,7 @@ Expulse un membre du serveur (il peut revenir).
 
 Réduit un membre au silence (timeout Discord ou rôle mute).
 
-**Usage:** `+mute <@user> <durée> [raison]`
+**Usage :** `+mute <@user> <durée> [raison]`
 
 **Permissions:** `ModerateMembers`
 **Bot Permissions:** `ModerateMembers`, `ManageRoles`
@@ -94,7 +94,7 @@ Réduit un membre au silence (timeout Discord ou rôle mute).
 
 Retire le silence d'un membre.
 
-**Usage:** `+unmute <@user> [raison]`
+**Usage :** `+unmute <@user> [raison]`
 
 **Permissions:** `ModerateMembers`
 
@@ -110,7 +110,7 @@ Retire le silence d'un membre.
 
 Émet un avertissement à un membre.
 
-**Usage:** `+warn <@user> <raison>`
+**Usage :** `+warn <@user> <raison>`
 
 **Permissions:** `ModerateMembers`
 
@@ -129,7 +129,7 @@ Si configuré avec `+punish`, les warns accumulés déclenchent des sanctions au
 
 Affiche les avertissements d'un membre.
 
-**Usage:** `+warnlist [@user]`
+**Usage :** `+warnlist [@user]`
 
 **Permissions:** `ModerateMembers`
 
@@ -148,7 +148,7 @@ Affiche la liste de tous les membres avec des warns sur le serveur.
 
 Supprime un ou tous les avertissements.
 
-**Usage:** `+clearwarn <@user> [id|all]`
+**Usage :** `+clearwarn <@user> [id|all]`
 
 **Permissions:** `ModerateMembers`
 
@@ -164,7 +164,7 @@ Supprime un ou tous les avertissements.
 
 Supprime des messages en masse.
 
-**Usage:** `+clear <nombre> [@user]`
+**Usage :** `+clear <nombre> [@user]`
 
 **Alias:** `purge`, `clean`
 
@@ -188,7 +188,7 @@ Supprime des messages en masse.
 
 Verrouille un salon (empêche d'écrire).
 
-**Usage:** `+lock [#salon] [durée]`
+**Usage :** `+lock [#salon] [durée]`
 
 **Permissions:** `ManageChannels`
 **Bot Permissions:** `ManageChannels`
@@ -206,7 +206,7 @@ Verrouille un salon (empêche d'écrire).
 
 Déverrouille un salon.
 
-**Usage:** `+unlock [#salon]`
+**Usage :** `+unlock [#salon]`
 
 **Permissions:** `ManageChannels`
 
@@ -222,7 +222,7 @@ Déverrouille un salon.
 
 Active le mode lent sur un salon.
 
-**Usage:** `+slowmode <durée|off> [#salon]`
+**Usage :** `+slowmode <durée|off> [#salon]`
 
 **Alias:** `sm`
 
@@ -248,7 +248,7 @@ Active le mode lent sur un salon.
 
 Change le pseudonyme d'un membre.
 
-**Usage:** `+nick <@user> [nouveau_nom]`
+**Usage :** `+nick <@user> [nouveau_nom]`
 
 **Permissions:** `ManageNicknames`
 **Bot Permissions:** `ManageNicknames`

@@ -39,7 +39,7 @@ const PANEL_IDLE_MS = 120_000;
 const PANEL_TIME_MS = 300_000;
 
 const DEFAULT_VC_CONFIG = {
-  title      : '{guild} - Statistiques',
+  title      : '{guild}',
   description:
     'Membre : **{members}**\n' +
     'En ligne : **{online}**\n' +
@@ -162,7 +162,7 @@ async function _openConfigPanel(client, message, guildConfig, prefix, deleteRepl
         _buildModal(modalId, 'Titre', [
           _input('title', 'Titre de l\'embed', TextInputStyle.Short, {
             value: state.title || '', required: false,
-            maxLength: 256, placeholder: '{guild} - Statistiques',
+            maxLength: 256, placeholder: '{guild}',
           }),
         ])
       ).then(() => true).catch(() => false);

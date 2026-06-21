@@ -52,9 +52,9 @@ module.exports = {
       if (useTimeout) {
         modeLabel = '**Timeout natif Discord**\n*Les mutes appliqués via le bot sont limités à 28 jours.*';
       } else if (!muteRoleId) {
-        modeLabel = '**Rôle mute**\n⚠️ Aucun rôle configuré. Les commandes `mute` / `tempmute` échoueront.\nUtilisez `+muteconfig setup` ou `+muteconfig role <@role>`.';
+        modeLabel = '**Rôle mute**\n⚑ Aucun rôle configuré. Les commandes `mute` / `tempmute` échoueront.\nUtilisez `+muteconfig setup` ou `+muteconfig role <@role>`.';
       } else if (!muteRole) {
-        modeLabel = `**Rôle mute**\n⚠️ Le rôle configuré (\`${muteRoleId}\`) est introuvable.`;
+        modeLabel = `**Rôle mute**\n⚑ Le rôle configuré (\`${muteRoleId}\`) est introuvable.`;
       } else {
         modeLabel = `**Rôle mute** : <@&${muteRole.id}>\n*Vérifiez les permissions du rôle sur tous les salons avec \`+muteconfig setup\` si besoin.*`;
       }

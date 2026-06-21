@@ -110,7 +110,7 @@ module.exports = {
   name: 'nomCommande',
   aliases: ['alias1', 'alias2'],
   description: 'Description de ce que fait la commande',
-  usage: '<argument_obligatoire> [optionnel]',
+  Usage : '<argument_obligatoire> [optionnel]',
   category: 'Categorie',
   cooldown: 5, // secondes
   
@@ -126,7 +126,7 @@ module.exports = {
       // 1. Validation des arguments
       if (!args.length) {
         return message.reply({
-          embeds: [createErrorEmbed('Usage: ' + this.usage)]
+          embeds: [createErrorEmbed('Usage : ' + this.usage)]
         });
       }
       

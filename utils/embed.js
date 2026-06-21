@@ -1,8 +1,11 @@
 'use strict';
 
 
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, ContainerBuilder, TextDisplayBuilder, MessageFlags } = require('discord.js');
 const db = require('../core/database');
+
+const _V2_AVAILABLE = typeof ContainerBuilder === 'function' && typeof TextDisplayBuilder === 'function';
+const _V2_FLAG = MessageFlags?.IsComponentsV2 ?? (1 << 15);
 
 
 const COLOR_ERROR   = '#ED4245';
@@ -11,6 +14,17 @@ const COLOR_DEFAULT = '#2B2D31';
 
 const PRIVATE_INTERACTION_DEFAULT_DURATION = 15 * 60 * 1000;
 const privateInteractions = new Map();
+
+function fmtCoins(n) {
+  if (n == null) return '0';
+  const abs = Math.abs(n);
+  if (abs >= 1_000_000_000_000_000) return (n / 1_000_000_000_000_000).toFixed(2) + 'Qd';
+  if (abs >= 1_000_000_000_000) return (n / 1_000_000_000_000).toFixed(2) + 'Td';
+  if (abs >= 1_000_000_000) return (n / 1_000_000_000).toFixed(2) + 'Bd';
+  if (abs >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+  if (abs >= 1_000) return (n / 1_000).toFixed(1) + 'k';
+  return String(n);
+}
 
 function _getMessageId(messageLike) {
   if (!messageLike) return null;
@@ -369,6 +383,20 @@ function log(guildId, title, fields = [], extra = {}) {
 async function reply(message, description, options = {}) {
   const { allowedMentions: customAllowed, ...buildOpts } = options;
 
+  if (_V2_AVAILABLE) {
+    const container = new ContainerBuilder();
+    const parts = [];
+    if (buildOpts.title) parts.push(`### ${buildOpts.title}`);
+    if (description) parts.push(String(description));
+    if (!parts.length) parts.push('');
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(parts.join('\n\n')));
+    return message.reply({
+      components      : [container],
+      flags           : _V2_FLAG,
+      allowedMentions : customAllowed ?? { parse: [], repliedUser: false },
+    }).catch(() => null);
+  }
+
   return message.reply({
     embeds: [
       build(
@@ -386,6 +414,20 @@ async function reply(message, description, options = {}) {
 
 async function replyError(message, description, options = {}) {
   const { allowedMentions: customAllowed, ...buildOpts } = options;
+
+  if (_V2_AVAILABLE) {
+    const container = new ContainerBuilder().setAccentColor(0xED4245);
+    const parts = [];
+    if (buildOpts.title) parts.push(`### ${buildOpts.title}`);
+    if (description) parts.push(String(description));
+    if (!parts.length) parts.push('');
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(parts.join('\n\n')));
+    return message.reply({
+      components      : [container],
+      flags           : _V2_FLAG,
+      allowedMentions : customAllowed ?? { parse: [], repliedUser: false },
+    }).catch(() => null);
+  }
 
   return message.reply({
     embeds: [
@@ -497,4 +539,6 @@ module.exports = {
 
   COLOR_ERROR,
   COLOR_DEFAULT,
+
+  fmtCoins,
 };

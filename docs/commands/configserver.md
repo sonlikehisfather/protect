@@ -17,7 +17,7 @@ Configuration complète du serveur et de ses fonctionnalités.
 
 Configure les rôles attribués automatiquement aux nouveaux membres.
 
-**Usage:** `+autorole <add|remove|list|clear> [@role]`
+**Usage :** `+autorole <add|remove|list|clear> [@role]`
 
 **Permissions:** `Administrator`
 
@@ -44,7 +44,7 @@ Configure les rôles attribués automatiquement aux nouveaux membres.
 
 Configure les messages de bienvenue.
 
-**Usage:** `+joinsettings <option> [valeur]`
+**Usage :** `+joinsettings <option> [valeur]`
 
 **Permissions:** `Administrator`
 
@@ -81,7 +81,7 @@ Configure les messages de bienvenue.
 
 Configure les messages de départ.
 
-**Usage:** `+leavesettings <option> [valeur]`
+**Usage :** `+leavesettings <option> [valeur]`
 
 **Permissions:** `Administrator`
 
@@ -109,7 +109,7 @@ Mêmes variables que `joinsettings`.
 
 Configure le système de modmail.
 
-**Usage:** `+modmail <option> [valeur]`
+**Usage :** `+modmail <option> [valeur]`
 
 **Permissions:** `Administrator`
 
@@ -142,7 +142,7 @@ Quand un membre envoie un MP au bot :
 
 Configure les vocaux temporaires.
 
-**Usage:** `+tempvoc <option> [valeur]`
+**Usage :** `+tempvoc <option> [valeur]`
 
 **Permissions:** `Administrator`
 
@@ -173,7 +173,7 @@ Configure les vocaux temporaires.
 
 Crée un menu de rôles par réactions.
 
-**Usage:** `+rolemenu <create|add|remove|delete|list>`
+**Usage :** `+rolemenu <create|add|remove|delete|list>`
 
 **Permissions:** `ManageRoles`
 **Bot Permissions:** `ManageRoles`, `AddReactions`
@@ -211,7 +211,7 @@ Crée un menu de rôles par réactions.
 
 Affiche la liste des variables disponibles pour les messages.
 
-**Usage:** `+variables`
+**Usage :** `+variables`
 
 ### Variables Utilisateur
 - `{user.mention}` - Mention
@@ -239,7 +239,7 @@ Affiche la liste des variables disponibles pour les messages.
 
 Affiche un résumé de la configuration actuelle.
 
-**Usage:** `+checkconfig`
+**Usage :** `+checkconfig`
 
 **Alias:** `configserver`
 

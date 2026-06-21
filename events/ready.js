@@ -136,6 +136,9 @@ module.exports = {
     await _recoverPendingVerifications(client);
     _processDuePurges(client);
 
+    const refundedBets = db.refundAllPendingBets();
+    if (refundedBets > 0) console.log(`[ready] Remboursement de ${refundedBets} pari(s) casino interrompu(s).`);
+
     _safeInterval(() => _processSanctions(client), TICK_MS);
     _safeInterval(() => _processTempRoles(client), TICK_MS);
     _safeInterval(() => _processReminders(client), TICK_MS);

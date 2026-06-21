@@ -203,7 +203,7 @@ Message envoyé
 ### Message AutoMod (DM)
 
 ```
-⚠️ Votre message sur {server.name} a été supprimé.
+⚑ Votre message sur {server.name} a été supprimé.
 
 Raison: {reason}
 Contenu: {content_preview}

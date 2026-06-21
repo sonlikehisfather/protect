@@ -27,7 +27,7 @@ exports.run = async (client, message, args) => {
   if (sub === 'server') {
     await embed.reply(
       message,
-      '⚠️ **Action irréversible.** Cela supprimera TOUS les paramètres du bot sur ce serveur ' +
+      '⚑ **Action irréversible.** Cela supprimera TOUS les paramètres du bot sur ce serveur ' +
       '(config, permissions, antiraid, logs, etc.).\nRépondez `confirmer` dans 15 secondes pour continuer.'
     );
 
@@ -50,7 +50,7 @@ exports.run = async (client, message, args) => {
 
     await embed.reply(
       message,
-      '⚠️ **Action irréversible.** Cela supprimera les paramètres du bot sur **TOUS** les serveurs.\n' +
+      '⚑ **Action irréversible.** Cela supprimera les paramètres du bot sur **TOUS** les serveurs.\n' +
       'Répondez `confirmer tout` dans 15 secondes pour continuer.'
     );
 

@@ -20,7 +20,7 @@ Commandes utiles pour tous les membres du serveur.
 
 Affiche l'aide des commandes.
 
-**Usage:** `+help [commande|catégorie]`
+**Usage :** `+help [commande|catégorie]`
 
 **Alias:** `h`, `aide`
 
@@ -37,7 +37,7 @@ Affiche l'aide des commandes.
 
 Vérifie la latence du bot.
 
-**Usage:** `+ping`
+**Usage :** `+ping`
 
 **Alias:** `latency`, `ms`
 
@@ -52,7 +52,7 @@ Vérifie la latence du bot.
 
 Affiche les informations sur le bot.
 
-**Usage:** `+botinfo`
+**Usage :** `+botinfo`
 
 **Alias:** `bi`, `bot`, `info`
 
@@ -70,7 +70,7 @@ Affiche les informations sur le bot.
 
 Affiche les informations sur un membre.
 
-**Usage:** `+userinfo [@user|id]`
+**Usage :** `+userinfo [@user|id]`
 
 **Alias:** `ui`, `user`, `whois`
 
@@ -99,7 +99,7 @@ Affiche vos propres informations.
 
 Affiche les informations sur le serveur.
 
-**Usage:** `+serverinfo`
+**Usage :** `+serverinfo`
 
 **Alias:** `si`, `server`, `guildinfo`
 
@@ -118,7 +118,7 @@ Affiche les informations sur le serveur.
 
 Affiche les statistiques du serveur.
 
-**Usage:** `+stats`
+**Usage :** `+stats`
 
 **Alias:** `statistics`
 
@@ -135,7 +135,7 @@ Affiche les statistiques du serveur.
 
 Calculateur avec expressions mathématiques.
 
-**Usage:** `+calc <expression>`
+**Usage :** `+calc <expression>`
 
 **Alias:** `calculate`, `math`
 
@@ -158,7 +158,7 @@ Calculateur avec expressions mathématiques.
 
 Crée un sondage avec réactions.
 
-**Usage:** `+poll "question" "option1" "option2" [...]`
+**Usage :** `+poll "question" "option1" "option2" [...]`
 
 **Permissions:** `ManageMessages`
 
@@ -179,7 +179,7 @@ Crée un sondage avec réactions.
 
 Affiche l'avatar d'un membre.
 
-**Usage:** `+avatar [@user]`
+**Usage :** `+avatar [@user]`
 
 **Alias:** `pp`, `pdp`, `av`
 
@@ -197,7 +197,7 @@ Affiche l'avatar en haute résolution avec lien direct.
 
 Affiche la bannière d'un membre.
 
-**Usage:** `+banner [@user]`
+**Usage :** `+banner [@user]`
 
 ### Exemples
 ```
@@ -213,7 +213,7 @@ Affiche la bannière d'un membre.
 
 Liste tous les bots du serveur.
 
-**Usage:** `+allbots`
+**Usage :** `+allbots`
 
 Affiche :
 - Nombre total de bots
@@ -226,7 +226,7 @@ Affiche :
 
 Liste tous les administrateurs.
 
-**Usage:** `+alladmins`
+**Usage :** `+alladmins`
 
 **Alias:** `admins`
 
@@ -238,7 +238,7 @@ Affiche les membres avec la permission `Administrator`.
 
 Liste les boosters du serveur.
 
-**Usage:** `+boosters`
+**Usage :** `+boosters`
 
 Affiche :
 - Nombre de boosts total

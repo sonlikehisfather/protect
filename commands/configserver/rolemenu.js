@@ -2511,7 +2511,7 @@ async function _handleDeleteDrafts(message, guildId, deleteReply, deleteDelay) {
     embeds: [
       embed.build(
         guildId,
-        `**${drafts.length}** brouillon(s) avec options :\n${ids}${extra}\n\nLeurs options seront perdues. Supprimer ?`,
+        `**${drafts.length}** brouillon(s) avec options :\n${ids}${extra}\n\nLeurs options seront Perdues. Supprimer ?`,
         { timestamp: false }
       ),
     ],

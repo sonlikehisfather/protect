@@ -43,7 +43,7 @@ module.exports = {
         await tempvoc.handleVoiceStateUpdate(client, oldState, newState);
       }
 
-      _handleVoiceTracking(oldState, newState, member, guildId);
+      _handleVoiceTracking(client, oldState, newState, member, guildId);
     } catch (err) {
       errorHandler.handle(err, {
         source : 'voiceStateUpdate',
@@ -407,7 +407,9 @@ async function _handleVoiceLog(client, oldState, newState, member, guildId) {
 }
 
 
-function _handleVoiceTracking(oldState, newState, member, guildId) {
+const casinoVoiceSessions = new Map();
+
+function _handleVoiceTracking(client, oldState, newState, member, guildId) {
   const oldCh = oldState.channelId;
   const newCh = newState.channelId;
 
@@ -415,15 +417,113 @@ function _handleVoiceTracking(oldState, newState, member, guildId) {
 
   if (!oldCh && newCh) {
     db.voiceJoin(guildId, member.id, newCh);
+    _startCasinoVoiceSession(guildId, member.id);
     return;
   }
 
   if (oldCh && !newCh) {
     db.voiceLeave(guildId, member.id);
+    _endCasinoVoiceSession(guildId, member.id, client);
     return;
   }
 
   if (oldCh && newCh) {
     db.voiceMove(guildId, member.id, newCh);
   }
+}
+
+function _startCasinoVoiceSession(guildId, userId) {
+  const key = `${guildId}_${userId}`;
+  casinoVoiceSessions.set(key, Date.now());
+}
+
+async function _endCasinoVoiceSession(guildId, userId, client) {
+  const key = `${guildId}_${userId}`;
+  const start = casinoVoiceSessions.get(key);
+  if (!start) return;
+
+  const cfg = db.getCasinoConfig(guildId);
+  if (!cfg.enabled) {
+    casinoVoiceSessions.delete(key);
+    return;
+  }
+
+  // Check blacklist
+  if (db.isCasinoBlacklisted(guildId, userId)) {
+    casinoVoiceSessions.delete(key);
+    return;
+  }
+
+  const minutes = Math.floor((Date.now() - start) / 60000);
+  if (minutes < 1) {
+    casinoVoiceSessions.delete(key);
+    return;
+  }
+
+  // Get member for role/status checks
+  try {
+    const guild = await client.guilds.fetch(guildId);
+    const member = await guild.members.fetch(userId);
+
+    let multiplier = 1;
+
+    // Check role multiplier
+    if (cfg.roleMultiplierId && member.roles.cache.has(cfg.roleMultiplierId)) {
+      multiplier *= cfg.publicVocMultiplier || 2;
+    }
+
+    // Check status multiplier
+    if (cfg.statusMultiplier && cfg.statusText) {
+      const activity = member.presence?.activities.find(a => a.type === 4); // Custom status
+      const state = activity?.state?.toLowerCase() || '';
+      const keywords = cfg.statusText.split('|').map(t => t.trim().toLowerCase()).filter(Boolean);
+      if (keywords.some(kw => state.includes(kw))) {
+        multiplier *= (cfg.statusVocMultiplier ?? 2.0);
+      }
+    }
+
+    // Calculate rewards ・ auto-attributed on voice leave
+    const coinsPerMin = cfg.coinsPerVocMin ?? 0;
+    const drawsPerMin = (cfg.drawsPerVocHour ?? 0) / 60;
+    const baseCoins = Math.floor(minutes * coinsPerMin);
+    const baseDraws = Math.floor(minutes * drawsPerMin);
+
+    const coins = Math.floor(baseCoins * multiplier);
+    const draws = Math.floor(baseDraws * multiplier);
+
+    // Apply rewards
+    if (coins > 0) {
+      db.addCasinoCoins(guildId, userId, coins, 'win');
+    }
+    if (draws > 0) {
+      db.addCasinoDraws(guildId, userId, draws);
+    }
+
+    db.addVocMinutes(guildId, userId, minutes);
+
+    // Log to gains channel (V2)
+    if (coins > 0 || draws > 0) {
+      const { sendCasinoLog } = require('../commands/casino/casino');
+      sendCasinoLog(guild, cfg, 'logChannelGains', {
+        icon  : '✸',
+        title : 'Vocal',
+        color : 0x57F287,
+        user  : userId,
+        lines : [
+          `※ **+${embed.fmtCoins(coins)}** coins`,
+          `◆ **+${draws}** tirage${draws !== 1 ? 's' : ''}`,
+          `> ${minutes}m x${multiplier}`,
+        ],
+      });
+    }
+  } catch {}
+
+  casinoVoiceSessions.delete(key);
+}
+
+function _getCasinoVoiceMinutes(guildId, userId) {
+  const key = `${guildId}_${userId}`;
+  const start = casinoVoiceSessions.get(key);
+  if (!start) return 0;
+  return Math.floor((Date.now() - start) / 60000);
 }

@@ -16,7 +16,7 @@ Configuration des outils de modération.
 
 Configure le rôle et la méthode de mute.
 
-**Usage:** `+muteconfig [@role|create]`
+**Usage :** `+muteconfig [@role|create]`
 
 **Permissions:** `Administrator`
 
@@ -45,7 +45,7 @@ Lors de `create` :
 
 Configure les punitions automatiques selon le nombre de warns.
 
-**Usage:** `+punish <add|remove|list> [warns] [action] [durée]`
+**Usage :** `+punish <add|remove|list> [warns] [action] [durée]`
 
 **Permissions:** `Administrator`
 
@@ -76,7 +76,7 @@ Configure les punitions automatiques selon le nombre de warns.
 
 Configure le slowmode par défaut.
 
-**Usage:** `+config slowmode <durée>`
+**Usage :** `+config slowmode <durée>`
 
 **Permissions:** `ManageChannels`
 
@@ -99,7 +99,7 @@ Alias de `punish`. Voir [punish](#punish).
 
 Configure un salon pour n'accepter que les images.
 
-**Usage:** `+piconly <#salon|on|off>`
+**Usage :** `+piconly <#salon|on|off>`
 
 **Permissions:** `ManageChannels`
 
@@ -121,7 +121,7 @@ Configure un salon pour n'accepter que les images.
 
 Exclut des salons/membres du système de niveaux.
 
-**Usage:** `+noderank <channel|user> <add|remove|list>`
+**Usage :** `+noderank <channel|user> <add|remove|list>`
 
 **Permissions:** `Administrator`
 

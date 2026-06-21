@@ -144,7 +144,7 @@ function buildConfigPayload(guildId, page = 0, status = null, disabled = false) 
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      `## Configuration — Confessions anonymes\n` +
+      `## Configuration ・ Confessions anonymes\n` +
       `-# Page ${page + 1} /2`,
     ),
   );
@@ -153,9 +153,9 @@ function buildConfigPayload(guildId, page = 0, status = null, disabled = false) 
   if (page === 0) {
     container.addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
-        `**Système** — ${cfg.enabled ? 'Actif' : 'Inactif'}\n` +
-        `**Salon confessions** — ${ch(cfg.channelId)}\n` +
-        `**Salon de review** — ${ch(cfg.reviewChannelId)}`,
+        `**Système** ・ ${cfg.enabled ? 'Actif' : 'Inactif'}\n` +
+        `**Salon confessions** ・ ${ch(cfg.channelId)}\n` +
+        `**Salon de review** ・ ${ch(cfg.reviewChannelId)}`,
       ),
     );
     container.addSeparatorComponents(new SeparatorBuilder());
@@ -187,12 +187,12 @@ function buildConfigPayload(guildId, page = 0, status = null, disabled = false) 
   } else {
     container.addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
-        `**Modération review** — ${on(cfg.reviewEnabled)}\n` +
-        `**Réactions** — ${on(cfg.reactionsEnabled)}\n` +
-        `**Réponse anonyme** — ${on(cfg.replyEnabled)}\n` +
-        `**Révélation auteur** — ${on(cfg.revealAllowed)}\n` +
-        `**Cooldown** — ${fmt(cfg.cooldownSeconds)}\n` +
-        `**Blacklist** — ${cfg.blacklist ? `\`${cfg.blacklist.split(',').length} mot(s)\`` : '`Aucune`'}`,
+        `**Modération review** ・ ${on(cfg.reviewEnabled)}\n` +
+        `**Réactions** ・ ${on(cfg.reactionsEnabled)}\n` +
+        `**Réponse anonyme** ・ ${on(cfg.replyEnabled)}\n` +
+        `**Révélation auteur** ・ ${on(cfg.revealAllowed)}\n` +
+        `**Cooldown** ・ ${fmt(cfg.cooldownSeconds)}\n` +
+        `**Blacklist** ・ ${cfg.blacklist ? `\`${cfg.blacklist.split(',').length} mot(s)\`` : '`Aucune`'}`,
       ),
     );
     container.addSeparatorComponents(new SeparatorBuilder());
