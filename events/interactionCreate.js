@@ -245,6 +245,14 @@ async function _handleButton(client, interaction) {
     return;
   }
 
+  if (id.startsWith('cs_inv_')) {
+    console.log(`[BUTTON] Casino inventory action: ${id}, user=${interaction.user.id}`);
+    let casino = null;
+    try { casino = require('../commands/casino/casino'); } catch (e) { console.error('[INV] Failed to load casino module:', e); }
+    if (casino?.handleInventoryAction) return casino.handleInventoryAction(interaction, id);
+    return interaction.reply({ content: 'Action inventaire indisponible.', flags: 64 }).catch(() => {});
+  }
+
   if (id.startsWith('csconf_')) {
     console.log(`[CASINO] Handling config button: ${id} from user ${interaction.user.id}`);
     return _handleCasinoConfigButton(client, interaction, id);
@@ -623,6 +631,149 @@ async function _handleSelectMenu(client, interaction) {
     return interaction.deferUpdate().catch(() => {});
   }
 
+  if (id === 'cs_inv_category') {
+    let casino = null;
+    try { casino = require('../commands/casino/casino'); } catch {}
+    if (casino?.handleInventoryCategory) return casino.handleInventoryCategory(interaction);
+    return interaction.deferUpdate().catch(() => {});
+  }
+
+  if (id.startsWith('cs_inv_select:')) {
+    let casino = null;
+    try { casino = require('../commands/casino/casino'); } catch {}
+    if (casino?.handleInventorySelect) return casino.handleInventorySelect(interaction);
+    return interaction.deferUpdate().catch(() => {});
+  }
+
+  if (id.startsWith('cs_inv_use_xp:')) {
+    console.log(`[BUTTON] cs_inv_use_xp triggered: id=${id}`);
+    try {
+      const itemId = parseInt(id.split(':')[1], 10);
+      const guildId = interaction.guild?.id;
+      const userId = interaction.user.id;
+      console.log(`[INV] Use XP: itemId=${itemId}, guildId=${guildId}, userId=${userId}`);
+      
+      const inv = db.getInventory(guildId, userId);
+      const item = inv.find(i => i.itemId === itemId);
+      if (!item) {
+        console.log(`[INV] Item not found: ${itemId}`);
+        return interaction.reply({ content: 'Item non trouvé.', flags: 64 }).catch(() => {});
+      }
+      
+      const xpAmount = parseInt(item.value || 0, 10) || 100;
+      console.log(`[INV] Adding XP: ${xpAmount}`);
+      db.addUserXP(guildId, userId, xpAmount);
+      db.removeInventoryItem(guildId, userId, itemId, 1);
+      
+      const user = db.getCasinoUser(guildId, userId);
+      console.log(`[INV] XP used successfully. New XP: ${user.xp}`);
+      return interaction.reply({ content: `✓ **+${xpAmount}** XP utilisé ! (Total: ${user.xp} XP)`, flags: 64 }).catch(() => {});
+    } catch (e) {
+      console.error(`[INV] Error using XP:`, e);
+      return interaction.reply({ content: `Erreur: ${e.message}`, flags: 64 }).catch(() => {});
+    }
+  }
+
+  if (id.startsWith('cs_inv_toggle_role:')) {
+    console.log(`[BUTTON] cs_inv_toggle_role triggered: id=${id}`);
+    try {
+      const itemId = parseInt(id.split(':')[1], 10);
+      const guildId = interaction.guild?.id;
+      const userId = interaction.user.id;
+      console.log(`[INV] Toggle role: itemId=${itemId}, guildId=${guildId}, userId=${userId}`);
+      
+      const inv = db.getInventory(guildId, userId);
+      const item = inv.find(i => i.itemId === itemId);
+      if (!item || !item.roleId) {
+        console.log(`[INV] Item or roleId not found: item=${item}, roleId=${item?.roleId}`);
+        return interaction.reply({ content: 'Item ou rôle non trouvé.', flags: 64 }).catch(() => {});
+      }
+      
+      const member = await interaction.guild?.members.fetch(userId).catch((e) => {
+        console.error(`[INV] Failed to fetch member:`, e);
+        return null;
+      });
+      if (!member) {
+        console.log(`[INV] Member not found`);
+        return interaction.reply({ content: 'Membre non trouvé.', flags: 64 }).catch(() => {});
+      }
+      
+      const hasRole = member.roles.cache.has(item.roleId);
+      console.log(`[INV] Has role: ${hasRole}, roleId: ${item.roleId}`);
+      
+      if (hasRole) {
+        await member.roles.remove(item.roleId).catch((e) => console.error(`[INV] Failed to remove role:`, e));
+        console.log(`[INV] Role removed successfully`);
+        return interaction.reply({ content: `✓ Rôle **${item.name}** retiré !`, flags: 64 }).catch(() => {});
+      } else {
+        await member.roles.add(item.roleId).catch((e) => console.error(`[INV] Failed to add role:`, e));
+        console.log(`[INV] Role added successfully`);
+        return interaction.reply({ content: `✓ Rôle **${item.name}** ajouté !`, flags: 64 }).catch(() => {});
+      }
+    } catch (e) {
+      console.error(`[INV] Error toggling role:`, e);
+      return interaction.reply({ content: `Erreur: ${e.message}`, flags: 64 }).catch(() => {});
+    }
+  }
+
+  if (id.startsWith('cs_inv_toggle_title:')) {
+    console.log(`[BUTTON] cs_inv_toggle_title triggered: id=${id}`);
+    try {
+      const itemId = parseInt(id.split(':')[1], 10);
+      const guildId = interaction.guild?.id;
+      const userId = interaction.user.id;
+      console.log(`[INV] Toggle title: itemId=${itemId}, guildId=${guildId}, userId=${userId}`);
+      
+      const user = db.getCasinoUser(guildId, userId);
+      const inv = db.getInventory(guildId, userId);
+      const item = inv.find(i => i.itemId === itemId);
+      if (!item) {
+        console.log(`[INV] Item not found: ${itemId}`);
+        return interaction.reply({ content: 'Item non trouvé.', flags: 64 }).catch(() => {});
+      }
+      
+      const isActive = user?.activeTitle === itemId;
+      console.log(`[INV] Is active: ${isActive}, activeTitle: ${user?.activeTitle}`);
+      
+      if (isActive) {
+        db.setActiveTitle(guildId, userId, null);
+        console.log(`[INV] Title removed successfully`);
+        return interaction.reply({ content: `✓ Titre **${item.name}** retiré !`, flags: 64 }).catch(() => {});
+      } else {
+        db.setActiveTitle(guildId, userId, itemId);
+        console.log(`[INV] Title set successfully`);
+        return interaction.reply({ content: `✓ Titre **${item.name}** affiché !`, flags: 64 }).catch(() => {});
+      }
+    } catch (e) {
+      console.error(`[INV] Error toggling title:`, e);
+      return interaction.reply({ content: `Erreur: ${e.message}`, flags: 64 }).catch(() => {});
+    }
+  }
+
+  if (id.startsWith('cs_inv_remove:')) {
+    console.log(`[BUTTON] cs_inv_remove triggered: id=${id}`);
+    try {
+      const itemId = parseInt(id.split(':')[1], 10);
+      const guildId = interaction.guild?.id;
+      const userId = interaction.user.id;
+      console.log(`[INV] Remove item: itemId=${itemId}, guildId=${guildId}, userId=${userId}`);
+      
+      const inv = db.getInventory(guildId, userId);
+      const item = inv.find(i => i.itemId === itemId);
+      if (!item) {
+        console.log(`[INV] Item not found: ${itemId}`);
+        return interaction.reply({ content: 'Item non trouvé.', flags: 64 }).catch(() => {});
+      }
+      
+      db.removeInventoryItem(guildId, userId, itemId, item.quantity);
+      console.log(`[INV] Item removed successfully`);
+      return interaction.reply({ content: `✓ **${item.name}** x${item.quantity} supprimé(s) !`, flags: 64 }).catch(() => {});
+    } catch (e) {
+      console.error(`[INV] Error removing item:`, e);
+      return interaction.reply({ content: `Erreur: ${e.message}`, flags: 64 }).catch(() => {});
+    }
+  }
+
   if (id === 'cs_shop_shield_select') {
     let casino = null;
     try { casino = require('../commands/casino/casino'); } catch {}
@@ -831,11 +982,34 @@ async function _handleModal(client, interaction) {
       return Math.max(0, Math.round(parseFloat(m[1]) * mult));
     };
     const secs = parseDur(interaction.fields.getTextInputValue('duration'));
-    const cdMap = { bj: 'cooldownBj', cf: 'cooldownCf', rl: 'cooldownRl', collect: 'cooldownCollect', vol: 'cooldownVol', gift: 'cooldownGift', russian: 'cooldownRussian', mine: 'cooldownMine', plinko: 'cooldownPlinko', tower: 'cooldownTower' };
-    const labelMap = { bj: 'Blackjack', cf: 'Coinflip', rl: 'Roulette', collect: 'Collect', vol: 'Vol', gift: 'Gift', russian: 'Russian', mine: 'Mine', plinko: 'Plinko', tower: 'Tower' };
+    const cdMap = { bj: 'cooldownBj', cf: 'cooldownCf', rl: 'cooldownRl', collect: 'cooldownCollect', vol: 'cooldownVol', gift: 'cooldownGift', russian: 'cooldownRussian', mine: 'cooldownMine', plinko: 'cooldownPlinko', tower: 'cooldownTower', withdraw: 'cooldownWithdraw' };
+    const labelMap = { bj: 'Blackjack', cf: 'Coinflip', rl: 'Roulette', collect: 'Collect', vol: 'Vol', gift: 'Gift', russian: 'Russian', mine: 'Mine', plinko: 'Plinko', tower: 'Tower', withdraw: 'Withdraw' };
     if (cdMap[cmd]) db.setCasinoConfig(guildId, { [cdMap[cmd]]: secs });
     const fmtCd = s => s > 0 ? (s % 86400 === 0 ? `${s/86400}j` : s % 3600 === 0 ? `${s/3600}h` : s % 60 === 0 ? `${s/60}m` : `${s}s`) : 'aucun';
     await interaction.reply({ content: `✓ Cooldown ${labelMap[cmd]} : ${fmtCd(secs)}`, flags: MessageFlags.Ephemeral }).catch(() => {});
+    await _refreshCasinoConfigPanel(interaction);
+    return;
+  }
+
+  if (id === 'csconf_investments_modal') {
+    const parseInt_ = v => { const n = parseInt(v); return isNaN(n) || n < 0 ? 0 : n; };
+    const parseRate = v => { const n = parseFloat(v); return isNaN(n) || n < 0 ? 0.05 : n / 100; };
+    const parseDur = v => {
+      if (!v || !v.trim()) return 86400;
+      const m = v.trim().match(/^(\d+(?:\.\d+)?)\s*([smhj]?)$/i);
+      if (!m) return parseInt(v) || 86400;
+      const mult = { s: 1, m: 60, h: 3600, j: 86400 }[(m[2] || 's').toLowerCase()] ?? 1;
+      return Math.max(1, Math.round(parseFloat(m[1]) * mult));
+    };
+    const min = parseInt_(interaction.fields.getTextInputValue('min')) || 10000;
+    const max = parseInt_(interaction.fields.getTextInputValue('max')) || 1000000;
+    const rate = parseRate(interaction.fields.getTextInputValue('rate')) || 0.05;
+    const cooldown = parseDur(interaction.fields.getTextInputValue('cooldown'));
+    const penaltyRaw = parseFloat(interaction.fields.getTextInputValue('penalty') || '10');
+    const penalty = isNaN(penaltyRaw) ? 0.1 : Math.min(100, Math.max(0, penaltyRaw)) / 100;
+    db.setCasinoConfig(guildId, { investmentMin: min, investmentMax: max, investmentRate: rate, investmentClaimCooldown: cooldown, withdrawalPenalty: penalty });
+    const fmtCd = s => s % 86400 === 0 ? `${s/86400}j` : s % 3600 === 0 ? `${s/3600}h` : s % 60 === 0 ? `${s/60}m` : `${s}s`;
+    await interaction.reply({ content: `✓ Investissements ・ Min: ${min} | Max: ${max} | Taux: ${(rate*100).toFixed(1)}% | Cooldown: ${fmtCd(cooldown)} | Pénalité: ${(penalty*100).toFixed(0)}%`, flags: MessageFlags.Ephemeral }).catch(() => {});
     await _refreshCasinoConfigPanel(interaction);
     return;
   }
@@ -870,6 +1044,10 @@ async function _handleModal(client, interaction) {
       const fmtCd  = s => s > 0 ? (s % 86400 === 0 ? `${s/86400}j` : s % 3600 === 0 ? `${s/3600}h` : s % 60 === 0 ? `${s/60}m` : `${s}s`) : 'off';
       db.setCasinoConfig(guildId, { limitDrawsMax: val, limitDrawsPeriod: period });
       await interaction.reply({ content: `✓ Tirages max : ${val > 0 ? val : 'illimité'} / ${fmtCd(period)}`, flags: MessageFlags.Ephemeral }).catch(() => {});
+    } else if (type === 'invest_max') {
+      const val = parseInt_(interaction.fields.getTextInputValue('value'));
+      db.setCasinoConfig(guildId, { investmentCapMax: val });
+      await interaction.reply({ content: `✓ Investissement max : ${val > 0 ? val.toLocaleString() + ' coins' : 'illimité'}`, flags: MessageFlags.Ephemeral }).catch(() => {});
     }
     await _refreshCasinoConfigPanel(interaction);
     return;
@@ -2720,8 +2898,8 @@ async function _handleCasinoConfigButton(client, interaction, id) {
           { label: 'Couleur', value: 'color', description: 'Couleur de pseudo' },
           { label: 'Badge', value: 'badge', description: 'Badge de profil' },
           { label: 'Décor', value: 'decor', description: 'Décor de profil' },
+          { label: 'Titre', value: 'title', description: 'Titre de profil' },
           { label: 'XP', value: 'xp', description: 'Points d\'expérience' },
-          { label: 'Nitro', value: 'nitro', description: 'Récompense Nitro' },
           { label: 'Autre', value: 'item', description: 'Item générique' },
         );
       return interaction.reply({ content: 'Choisis le type d\'item à ajouter.', components: [new ActionRowBuilder().addComponents(select)], flags: MessageFlags.Ephemeral }).catch(() => {});
@@ -2740,6 +2918,7 @@ async function _handleCasinoConfigButton(client, interaction, id) {
         })));
       return interaction.reply({ content: 'Sélectionne l\'item à supprimer.', components: [new ActionRowBuilder().addComponents(select)], flags: MessageFlags.Ephemeral }).catch(() => {});
     }
+
 
     if (id === 'csconf_gacha_coins') {
       const { ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
@@ -3100,10 +3279,29 @@ async function _handleCasinoConfigSelect(interaction, id) {
                 { label: 'Plinko',    value: 'plinko',  description: 'Cooldown du .plinko' },
                 { label: 'Tower',     value: 'tower',   description: 'Cooldown du .tower' },
                 { label: 'Dice',      value: 'dice',    description: 'Cooldown du .dice' },
+                { label: 'Invest',    value: 'invest',   description: 'Cooldown du .invest' },
+                { label: 'Claims',    value: 'claims',   description: 'Cooldown du .claims (gains investissement)' },
+                { label: 'Withdraw',  value: 'withdraw', description: 'Cooldown du .withdraw (retrait investissement)' },
               )
             )],
             flags: MessageFlags.Ephemeral,
           }).catch(() => {});
+        }
+
+        if (sub === 'investments') {
+          const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+          const cfg = db.getCasinoConfig(guildId);
+          const modal = new ModalBuilder()
+            .setCustomId('csconf_investments_modal')
+            .setTitle('Investissements');
+          modal.addComponents(
+            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('min').setLabel('Montant minimum (défaut: 10000)').setStyle(TextInputStyle.Short).setValue(String(cfg.investmentMin ?? 10000)).setRequired(false)),
+            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('max').setLabel('Montant maximum (défaut: 1000000)').setStyle(TextInputStyle.Short).setValue(String(cfg.investmentMax ?? 1000000)).setRequired(false)),
+            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('rate').setLabel('Taux % par claim (ex: 5 = 5%)').setStyle(TextInputStyle.Short).setValue(String((cfg.investmentRate ?? 0.05) * 100)).setRequired(false)),
+            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('cooldown').setLabel('Cooldown claim (ex: 30s, 5m, 1h, 1j)').setStyle(TextInputStyle.Short).setValue(String(cfg.investmentClaimCooldown ?? 86400)).setRequired(false)),
+            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('penalty').setLabel('Pénalité retrait % (ex: 10 = 10%)').setStyle(TextInputStyle.Short).setValue(String((cfg.withdrawalPenalty ?? 0.1) * 100)).setRequired(false)),
+          );
+          return interaction.showModal(modal).catch(() => {});
         }
 
         if (sub === 'plafonds') {
@@ -3115,6 +3313,7 @@ async function _handleCasinoConfigSelect(interaction, id) {
                 { label: 'Tirages max détenus', value: 'max_draws', description: 'Plafond de tirages qu\'un joueur peut avoir' },
                 { label: 'Gains max par période', value: 'gains', description: 'Limite de coins gagnés sur une période' },
                 { label: 'Tirages max par période', value: 'draws', description: 'Limite de tirages gagnés sur une période' },
+                { label: 'Investissement max', value: 'invest_max', description: 'Plafond total d\'investissement par joueur' },
               )
             )],
             flags: MessageFlags.Ephemeral,
@@ -3150,8 +3349,8 @@ async function _handleCasinoConfigSelect(interaction, id) {
         const cmd = interaction.values[0];
         const cfg = db.getCasinoConfig(guildId);
         const fmtCd = s => s > 0 ? (s % 86400 === 0 ? `${s/86400}j` : s % 3600 === 0 ? `${s/3600}h` : s % 60 === 0 ? `${s/60}m` : `${s}s`) : '0';
-        const cdMap = { bj: 'cooldownBj', cf: 'cooldownCf', rl: 'cooldownRl', collect: 'cooldownCollect', vol: 'cooldownVol', gift: 'cooldownGift', russian: 'cooldownRussian', mine: 'cooldownMine', plinko: 'cooldownPlinko', tower: 'cooldownTower' };
-        const labelMap = { bj: 'Blackjack', cf: 'Coinflip', rl: 'Roulette', collect: 'Collect', vol: 'Vol', gift: 'Gift', russian: 'Russian', mine: 'Mine', plinko: 'Plinko', tower: 'Tower' };
+        const cdMap = { bj: 'cooldownBj', cf: 'cooldownCf', rl: 'cooldownRl', collect: 'cooldownCollect', vol: 'cooldownVol', gift: 'cooldownGift', russian: 'cooldownRussian', mine: 'cooldownMine', plinko: 'cooldownPlinko', tower: 'cooldownTower', dice: 'cooldownDice', invest: 'cooldownInvest', claims: 'cooldownClaims' };
+        const labelMap = { bj: 'Blackjack', cf: 'Coinflip', rl: 'Roulette', collect: 'Collect', vol: 'Vol', gift: 'Gift', russian: 'Russian', mine: 'Mine', plinko: 'Plinko', tower: 'Tower', dice: 'Dice', invest: 'Invest', claims: 'Claims' };
         const modal = new ModalBuilder()
           .setCustomId(`csconf_limits_cd_modal:${cmd}`)
           .setTitle(`Cooldown ・ ${labelMap[cmd]}`);
@@ -3185,6 +3384,9 @@ async function _handleCasinoConfigSelect(interaction, id) {
             new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('value').setLabel('Tirages max (0 = illimité)').setStyle(TextInputStyle.Short).setValue(String(cfg.limitDrawsMax ?? 0)).setRequired(false)),
             new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('period').setLabel('Période (ex: 1h, 30m, 1j ・ 0 = off)').setStyle(TextInputStyle.Short).setValue(fmtCd(cfg.limitDrawsPeriod ?? 0)).setRequired(false)),
           );
+        } else if (type === 'invest_max') {
+          modal.setTitle('Plafond ・ Investissement max');
+          modal.addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('value').setLabel('Montant max investissable (0 = illimité)').setStyle(TextInputStyle.Short).setValue(String(cfg.investmentCapMax ?? 0)).setRequired(false)));
         }
         return interaction.showModal(modal).catch(() => {});
       }
@@ -3202,6 +3404,29 @@ async function _handleCasinoConfigSelect(interaction, id) {
         await interaction.update({ content: roleId ? `✓ Rôle bonus: <@&${roleId}>` : '✓ Rôle bonus supprimé', components: [] }).catch(() => {});
         await _refreshCasinoConfigPanel(interaction);
         return;
+      }
+      if (id === 'csconf_shop_category') {
+        const category = interaction.values[0];
+        const shopItems = db.getShopItems(guildId);
+        const categoryItems = shopItems.filter(item => item.type === category);
+        const itemsText = categoryItems.length
+          ? categoryItems.map(item => `• **${item.name}** ・ ${embed.fmtCoins(item.price)} coins`).join('\n')
+          : '*Aucun item dans cette categorie*';
+        const categoryLabel = { title: 'Titres', color: 'Couleurs', role: 'Roles', badge: 'Badges', decor: 'Decorations', item: 'Items', draws: 'Tirages', xp: 'XP' }[category] || category;
+        const key = `${guildId}:${interaction.user.id}`;
+        _casinoConfigViews.set(key, `shop_category_${category}`);
+        const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+        const content = `## ${categoryLabel}\n\n${itemsText}\n\n-# Ajoute ou supprime des items de cette categorie.`;
+        return interaction.update({
+          content,
+          components: [
+            new ActionRowBuilder().addComponents(
+              new ButtonBuilder().setCustomId(`csconf_shop_add_cat:${category}`).setLabel('Ajouter').setStyle(ButtonStyle.Success),
+              new ButtonBuilder().setCustomId(`csconf_shop_remove_cat:${category}`).setLabel('Supprimer').setStyle(ButtonStyle.Danger).setDisabled(!categoryItems.length),
+              new ButtonBuilder().setCustomId('csconf_shop_back').setLabel('Retour').setStyle(ButtonStyle.Secondary),
+            ),
+          ],
+        }).catch(() => {});
       }
       if (id === 'csconf_shop_type_sel') {
         const type = interaction.values[0];
@@ -3359,11 +3584,15 @@ async function _handleCasinoModuleModal(interaction, id) {
       if (!name || price < 1) {
         return interaction.reply({ content: 'Nom ou prix invalide.', flags: 64 }).catch(() => {});
       }
-      const roleId = type === 'role' ? value.replace(/[<@&>]/g, '') : null;
-      const colorHex = type === 'color' ? value : null;
-      const stock = (type === 'draws' || type === 'xp') ? (parseInt(value, 10) || 1) : -1;
-      console.log(`[CASINO-MODAL] Adding shop item: name=${name}, type=${type}, price=${price}, roleId=${roleId}`);
-      db.addShopItem(guildId, name, description, price, type, roleId, colorHex, stock);
+      const roleLikeTypes = ['role', 'color', 'badge', 'decor'];
+      const cleanValue = value.replace(/[<@&>]/g, '');
+      const roleId = roleLikeTypes.includes(type) && cleanValue ? cleanValue : null;
+      const colorHex = type === 'color' && value.startsWith('#') ? value : null;
+      const titleColorHex = type === 'title' && value.startsWith('#') ? value : null;
+      const stock = -1;
+      const quantity = (type === 'draws' || type === 'xp') ? (parseInt(value, 10) || 1) : 1;
+      console.log(`[CASINO-MODAL] Adding shop item: name=${name}, type=${type}, price=${price}, roleId=${roleId}, quantity=${quantity}, titleColorHex=${titleColorHex}`);
+      db.addShopItem(guildId, name, description, price, type, roleId, colorHex, stock, 0, quantity, titleColorHex);
       console.log(`[CASINO-MODAL] Shop item added successfully`);
       _casinoConfigViews.set(key, 'shop_admin');
       await _refreshCasinoConfigPanel(interaction);

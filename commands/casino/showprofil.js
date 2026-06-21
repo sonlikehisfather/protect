@@ -49,7 +49,7 @@ exports.run = async (client, message, args) => {
 
   try {
     const { generateProfileCard } = require('../../utils/profileCard');
-    const buffer = await generateProfileCard(member, user, realLevel, levelData, rank, equipped);
+    const buffer = await generateProfileCard(member, user, realLevel, levelData, rank, equipped, guildId, target.id);
     const attachment = new AttachmentBuilder(buffer, { name: 'profile.png' });
     return message.reply({ files: [attachment], allowedMentions: { parse: [] } });
   } catch (err) {

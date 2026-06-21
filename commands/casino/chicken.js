@@ -63,6 +63,8 @@ exports.run = async (client, message, args) => {
 
   setCooldown(guildId, userId, 'chicken');
 
+  const startTime = Date.now();
+
   let diffKey = (args[1] || 'medium').toLowerCase();
   if (!DIFFS[diffKey]) diffKey = 'medium';
   let diff = DIFFS[diffKey];
@@ -184,6 +186,11 @@ exports.run = async (client, message, args) => {
 
     const netGain = winAmount - amount;
     if (winAmount > 0) db.addCasinoCoins(guildId, userId, winAmount, 'win');
+
+    // Track game stats
+    const gameDuration = Math.floor((Date.now() - startTime) / 1000);
+    db.recordGameStat(guildId, userId, 'chicken', winAmount > amount ? 1 : 0, amount, winAmount > amount ? winAmount - amount : 0);
+    db.addPlaytime(guildId, userId, gameDuration);
     db.clearPendingBet(guildId, userId, 'chicken');
     const finalCoins = db.getCasinoUser(guildId, userId).coins;
 

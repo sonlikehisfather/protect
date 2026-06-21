@@ -137,7 +137,30 @@ module.exports = {
     _processDuePurges(client);
 
     const refundedBets = db.refundAllPendingBets();
-    if (refundedBets > 0) console.log(`[ready] Remboursement de ${refundedBets} pari(s) casino interrompu(s).`);
+    if (refundedBets.count > 0) {
+      console.log(`[ready] Remboursement de ${refundedBets.count} pari(s) casino interrompu(s).`);
+      try {
+        const { sendCasinoLog } = require('../commands/casino/casino');
+        const byGuild = {};
+        for (const row of refundedBets.rows) {
+          if (!byGuild[row.guildId]) byGuild[row.guildId] = [];
+          byGuild[row.guildId].push(row);
+        }
+        for (const [guildId, rows] of Object.entries(byGuild)) {
+          const guild = client.guilds.cache.get(guildId);
+          if (!guild) continue;
+          const cfg = db.getCasinoConfig(guildId);
+          if (!cfg?.logChannelGames) continue;
+          const lines = rows.map(r => `> <@${r.userId}> ・ **${r.game}** ・ remboursé **${r.amount}** coins`);
+          sendCasinoLog(guild, cfg, 'logChannelGames', {
+            icon: '↺',
+            title: `Remboursements au redémarrage (${rows.length})`,
+            color: 0xFEE75C,
+            lines,
+          });
+        }
+      } catch {}
+    }
 
     _safeInterval(() => _processSanctions(client), TICK_MS);
     _safeInterval(() => _processTempRoles(client), TICK_MS);

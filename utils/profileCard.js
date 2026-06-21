@@ -2,6 +2,7 @@
 
 const { Canvas, loadImage } = require('skia-canvas');
 const { xpForLevel }              = require('../modules/levels');
+const db                          = require('../core/database');
 
 const W = 900;
 const H = 340;
@@ -129,7 +130,7 @@ function drawStatCard(ctx, x, y, w, h, icon, label, value, color) {
   ctx.restore();
 }
 
-async function generateProfileCard(member, casinoUser, realLevel, levelData, rank, equipped = {}) {
+async function generateProfileCard(member, casinoUser, realLevel, levelData, rank, equipped = {}, guildId = null, userId = null) {
   const MAX_LEVEL = 1000;
   const prestige = Math.floor(realLevel / MAX_LEVEL);
   const displayLevel = prestige >= 4 ? MAX_LEVEL : realLevel % MAX_LEVEL;
@@ -295,6 +296,18 @@ async function generateProfileCard(member, casinoUser, realLevel, levelData, ran
   ctx.textBaseline = 'middle';
   ctx.fillText(lvlText, lvlX + lvlW / 2, lvlY + 14);
 
+  // Afficher le titre actif si présent (sous le niveau, à droite)
+  if (casinoUser.activeTitle) {
+    const titleItem = equipped.title;
+    if (titleItem) {
+      ctx.font = 'bold 12px sans-serif';
+      ctx.fillStyle = titleItem.titleColorHex ?? '#FFD700';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'top';
+      ctx.fillText(`✦ ${titleItem.name}`, W - 135, 80);
+    }
+  }
+
   ctx.font = '17px sans-serif';
   ctx.fillStyle = color;
   ctx.textAlign = 'left';
@@ -357,15 +370,28 @@ async function generateProfileCard(member, casinoUser, realLevel, levelData, ran
   ctx.fillStyle = divGrad;
   ctx.fillRect(CX, DIV_Y, CW, 1);
 
-  const vocH  = Math.floor(casinoUser.vocMinutes / 60);
-  const vocM  = casinoUser.vocMinutes % 60;
+  // Calculer winrate et meilleur jeu
+  const totalGames = (casinoUser.totalGamesWon ?? 0) + (casinoUser.totalGamesLost ?? 0);
+  const winrate = totalGames > 0 ? ((casinoUser.totalGamesWon ?? 0) / totalGames * 100).toFixed(1) : '0.0';
+  const allGameStats = db.getAllGameStats(guildId, userId);
+  let bestGameStr = '-';
+  if (allGameStats && allGameStats.length > 0) {
+    const best = allGameStats
+      .filter(g => (g.wins + g.losses) > 0)
+      .sort((a, b) => (b.wins / (b.wins + b.losses)) - (a.wins / (a.wins + a.losses)))[0];
+    if (best) {
+      const wr = ((best.wins / (best.wins + best.losses)) * 100).toFixed(0);
+      const gameLabels = { blackjack: 'BJ', coinflip: 'Flip', roulette: 'Rou.', tower: 'Tower', mine: 'Mine', dice: 'Dice', chicken: 'Chkn', plinko: 'Plinko', russian: 'Russ.', vol: 'Vol' };
+      const gameName = gameLabels[best.game] ?? (best.game.charAt(0).toUpperCase() + best.game.slice(1));
+      bestGameStr = `${gameName} ${wr}%`;
+    }
+  }
+
   const stats = [
     { icon: '\u25C6', label: 'COINS',    value: fmtNum(casinoUser.coins) },
     { icon: '\u2663', label: 'TIRAGES',  value: String(casinoUser.draws) },
-    { icon: '\u2193', label: 'PARIE',    value: fmtNum(casinoUser.totalSpent ?? 0) },
-    { icon: '\u2191', label: 'GAGNE',    value: fmtNum(casinoUser.totalWon ?? 0) },
-    { icon: '\u266A', label: 'VOCAL',    value: `${vocH}h ${vocM}m` },
-    { icon: '\u270E', label: 'MESSAGES', value: String(casinoUser.msgCount) },
+    { icon: '\u2191', label: 'WINRATE',  value: `${winrate}%` },
+    { icon: '\u2605', label: 'BEST',     value: bestGameStr },
   ];
 
   const cardGap = 10;

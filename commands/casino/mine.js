@@ -71,6 +71,8 @@ exports.run = async (client, message, args) => {
 
   setCooldown(guildId, userId, 'mine');
 
+  const startTime = Date.now();
+
   let bombCount = parseInt(args[1]);
   if (!bombCount || bombCount < 1) bombCount = cfg.limitMineBombs ?? 3;
   if (bombCount > 24) bombCount = 24;
@@ -322,6 +324,10 @@ exports.run = async (client, message, args) => {
       }
       return;
     }
+
+    const gameDuration = Math.floor((Date.now() - startTime) / 1000);
+    db.recordGameStat(guildId, userId, 'mine', winAmount > 0 ? 1 : 0, amount, winAmount > amount ? winAmount - amount : 0);
+    db.addPlaytime(guildId, userId, gameDuration);
 
     const finalCoins = db.getCasinoUser(guildId, userId).coins;
     const netGain = winAmount - amount;

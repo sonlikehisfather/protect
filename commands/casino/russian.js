@@ -67,6 +67,8 @@ exports.run = async (client, message, args) => {
 
   setCooldown(guildId, userId, 'russian');
 
+  const startTime = Date.now();
+
   let betDeducted = false;
   const deductBet = () => {
     if (betDeducted) return;
@@ -213,6 +215,9 @@ exports.run = async (client, message, args) => {
         alive = false;
         finished = true;
         await sent.edit(await buildPanel('dead')).catch(() => {});
+        const deadDuration = Math.floor((Date.now() - startTime) / 1000);
+        db.recordGameStat(guildId, userId, 'russian', 0, amount, 0);
+        db.addPlaytime(guildId, userId, deadDuration);
         collector.stop('dead');
         return;
       }
@@ -241,6 +246,9 @@ exports.run = async (client, message, args) => {
       winAmount = Math.floor(amount * (MULTIPLIERS[pulled - 1] ?? 1));
       db.addCasinoCoins(guildId, userId, winAmount, 'win');
       db.clearPendingBet(guildId, userId, 'russian');
+      const gameDuration = Math.floor((Date.now() - startTime) / 1000);
+      db.recordGameStat(guildId, userId, 'russian', 1, amount, winAmount);
+      db.addPlaytime(guildId, userId, gameDuration);
     } else if (reason === 'timeout') {
       refundBet();
       const finalCoins = db.getCasinoUser(guildId, userId).coins;

@@ -48,6 +48,7 @@ exports.run = async (client, message, args) => {
 
   db.resetCasinoUser(guildId, target.id);
   db.resetXp(guildId, target.id);
+  db.removeInvestment(guildId, target.id);
 
   const { sendCasinoLog } = require('./casino');
   sendCasinoLog(message.guild, cfg, 'logChannelGains', {

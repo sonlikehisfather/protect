@@ -3554,7 +3554,7 @@ up(db) {
           name         TEXT    NOT NULL,
           description  TEXT,
           price        INTEGER NOT NULL,
-          type         TEXT    NOT NULL CHECK(type IN ('role','color','badge','decor','item','draws','pillages','xp','sabotage','nitro')),
+          type         TEXT    NOT NULL CHECK(type IN ('role','color','badge','decor','item','draws','pillages','xp','sabotage','nitro','title')),
           itemType     TEXT    DEFAULT NULL,
           roleId       TEXT,
           colorHex     TEXT,
@@ -3584,7 +3584,7 @@ up(db) {
           id          INTEGER PRIMARY KEY AUTOINCREMENT,
           guildId     TEXT    NOT NULL,
           name        TEXT    NOT NULL,
-          type        TEXT    NOT NULL CHECK(type IN ('coins','role','color','badge','decor','draws','pillages','xp','sabotage','item','nitro')),
+          type        TEXT    NOT NULL CHECK(type IN ('coins','role','color','badge','decor','draws','pillages','xp','sabotage','item','nitro','title')),
           tier        TEXT    DEFAULT 'common' CHECK(tier IN ('common','rare','epic','legendary','secret')),
           value       INTEGER,
           roleId      TEXT,
@@ -3832,6 +3832,15 @@ function repairCasinoSchema(db) {
     { name: 'cooldownDice',       type: 'INTEGER', dflt: '0' },
     { name: 'limitDiceMin',       type: 'INTEGER', dflt: '0' },
     { name: 'limitDiceMax',       type: 'INTEGER', dflt: '0' },
+    { name: 'investmentRate',     type: 'REAL', dflt: '0.05' },
+    { name: 'investmentMin',      type: 'INTEGER', dflt: '10000' },
+    { name: 'investmentMax',      type: 'INTEGER', dflt: '1000000' },
+    { name: 'investmentClaimCooldown', type: 'INTEGER', dflt: '86400' },
+    { name: 'investmentCapMax',      type: 'INTEGER', dflt: '0' },
+    { name: 'cooldownInvest',        type: 'INTEGER', dflt: '0' },
+    { name: 'cooldownClaims',        type: 'INTEGER', dflt: '0' },
+    { name: 'withdrawalPenalty',     type: 'REAL',    dflt: '0.1' },
+    { name: 'cooldownWithdraw',      type: 'INTEGER', dflt: '0' },
   ];
 
   for (const col of casinoConfigColumns) {
@@ -3842,6 +3851,95 @@ function repairCasinoSchema(db) {
 
   if (!hasColumn('casino_users', 'shields')) {
     db.exec(`ALTER TABLE casino_users ADD COLUMN shields INTEGER NOT NULL DEFAULT 0`);
+  }
+
+  if (!hasColumn('casino_users', 'totalPlaytime')) {
+    db.exec(`ALTER TABLE casino_users ADD COLUMN totalPlaytime INTEGER NOT NULL DEFAULT 0`);
+  }
+
+  if (!hasColumn('casino_users', 'activeTitle')) {
+    db.exec(`ALTER TABLE casino_users ADD COLUMN activeTitle INTEGER`);
+  }
+
+  if (!hasColumn('casino_users', 'lastInvestmentClaim')) {
+    db.exec(`ALTER TABLE casino_users ADD COLUMN lastInvestmentClaim INTEGER DEFAULT 0`);
+  }
+
+  if (!hasColumn('casino_shop', 'titleColorHex')) {
+    db.exec(`ALTER TABLE casino_shop ADD COLUMN titleColorHex TEXT`);
+  }
+
+  // Fix casino_shop CHECK constraint to include 'title'
+  try {
+    const shopTableInfo = db.prepare("PRAGMA table_info(casino_shop)").all();
+    if (shopTableInfo.length > 0) {
+      // Try to insert a title item to check if constraint allows it
+      try {
+        db.prepare("INSERT INTO casino_shop (guildId, name, price, type) VALUES (?, ?, ?, ?)").run('test', 'test', 0, 'title');
+        db.prepare("DELETE FROM casino_shop WHERE guildId = ? AND name = ?").run('test', 'test');
+      } catch (e) {
+        if (e.message.includes('CHECK constraint failed')) {
+          // Recreate table with correct constraint
+          db.exec(`
+            CREATE TABLE casino_shop_new (
+              id           INTEGER PRIMARY KEY AUTOINCREMENT,
+              guildId      TEXT    NOT NULL,
+              name         TEXT    NOT NULL,
+              description  TEXT,
+              price        INTEGER NOT NULL,
+              type         TEXT    NOT NULL CHECK(type IN ('role','color','badge','decor','item','draws','pillages','xp','sabotage','nitro','title')),
+              itemType     TEXT    DEFAULT NULL,
+              roleId       TEXT,
+              colorHex     TEXT,
+              stock        INTEGER DEFAULT -1,
+              quantity     INTEGER DEFAULT 1,
+              limited      INTEGER NOT NULL DEFAULT 0,
+              active       INTEGER NOT NULL DEFAULT 1,
+              createdAt    INTEGER NOT NULL DEFAULT (unixepoch()),
+              UNIQUE(guildId, name)
+            );
+          `);
+          db.exec(`INSERT INTO casino_shop_new SELECT * FROM casino_shop;`);
+          db.exec(`DROP TABLE casino_shop;`);
+          db.exec(`ALTER TABLE casino_shop_new RENAME TO casino_shop;`);
+        }
+      }
+    }
+  } catch (e) {
+    console.log('[DB] Casino shop migration skipped:', e.message);
+  }
+
+  // Fix casino_gacha_pool CHECK constraint to include 'title'
+  try {
+    const gachaTableInfo = db.prepare("PRAGMA table_info(casino_gacha_pool)").all();
+    if (gachaTableInfo.length > 0) {
+      try {
+        db.prepare("INSERT INTO casino_gacha_pool (guildId, name, type, weight) VALUES (?, ?, ?, ?)").run('test', 'test', 'title', 1);
+        db.prepare("DELETE FROM casino_gacha_pool WHERE guildId = ? AND name = ?").run('test', 'test');
+      } catch (e) {
+        if (e.message.includes('CHECK constraint failed')) {
+          db.exec(`
+            CREATE TABLE casino_gacha_pool_new (
+              id          INTEGER PRIMARY KEY AUTOINCREMENT,
+              guildId     TEXT    NOT NULL,
+              name        TEXT    NOT NULL,
+              type        TEXT    NOT NULL CHECK(type IN ('coins','role','color','badge','decor','draws','pillages','xp','sabotage','item','nitro','title')),
+              tier        TEXT    DEFAULT 'common' CHECK(tier IN ('common','rare','epic','legendary','secret')),
+              value       INTEGER,
+              roleId      TEXT,
+              weight      INTEGER NOT NULL DEFAULT 1,
+              limited     INTEGER NOT NULL DEFAULT 0,
+              active      INTEGER NOT NULL DEFAULT 1
+            );
+          `);
+          db.exec(`INSERT INTO casino_gacha_pool_new SELECT * FROM casino_gacha_pool;`);
+          db.exec(`DROP TABLE casino_gacha_pool;`);
+          db.exec(`ALTER TABLE casino_gacha_pool_new RENAME TO casino_gacha_pool;`);
+        }
+      }
+    }
+  } catch (e) {
+    console.log('[DB] Casino gacha pool migration skipped:', e.message);
   }
 
   if (!hasColumn('giveaway_coins', 'durationMs')) {
@@ -3874,6 +3972,35 @@ function repairCasinoSchema(db) {
       amount      INTEGER NOT NULL,
       game        TEXT    NOT NULL,
       createdAt   INTEGER NOT NULL DEFAULT (unixepoch())
+    );
+  `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS casino_investments (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      guildId       TEXT    NOT NULL,
+      userId        TEXT    NOT NULL,
+      amount        INTEGER NOT NULL,
+      rate          REAL    NOT NULL,
+      createdAt     INTEGER NOT NULL,
+      lastClaim     INTEGER NOT NULL,
+      UNIQUE(guildId, userId)
+    );
+  `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS casino_game_stats (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      guildId       TEXT    NOT NULL,
+      userId        TEXT    NOT NULL,
+      game          TEXT    NOT NULL,
+      wins          INTEGER DEFAULT 0,
+      losses        INTEGER DEFAULT 0,
+      totalBet      INTEGER DEFAULT 0,
+      totalWon      INTEGER DEFAULT 0,
+      createdAt     INTEGER DEFAULT (unixepoch()),
+      updatedAt     INTEGER DEFAULT (unixepoch()),
+      UNIQUE(guildId, userId, game)
     );
   `);
 }
@@ -8069,7 +8196,7 @@ const db = {
 
   getEquippedItemDetails(guildId, userId) {
     const d = getDb();
-    const user = d.prepare('SELECT equippedColorId, equippedBadgeId, equippedDecorId, equippedSuccessId FROM casino_users WHERE guildId = ? AND userId = ?').get(guildId, userId);
+    const user = d.prepare('SELECT equippedColorId, equippedBadgeId, equippedDecorId, equippedSuccessId, activeTitle FROM casino_users WHERE guildId = ? AND userId = ?').get(guildId, userId);
     if (!user) return {};
 
     const result = {};
@@ -8078,6 +8205,7 @@ const db = {
       { key: 'badge', id: user.equippedBadgeId },
       { key: 'decor', id: user.equippedDecorId },
       { key: 'success', id: user.equippedSuccessId },
+      { key: 'title', id: user.activeTitle },
     ];
 
     for (const slot of slots) {
@@ -8090,13 +8218,13 @@ const db = {
   },
 
 
-  addShopItem(guildId, name, description, price, type, roleId = null, colorHex = null, stock = -1, limited = 0) {
+  addShopItem(guildId, name, description, price, type, roleId = null, colorHex = null, stock = -1, limited = 0, quantity = 1, titleColorHex = null) {
     const d = getDb();
     d.prepare('DELETE FROM casino_shop WHERE guildId = ? AND name = ? AND active = 0').run(guildId, name);
     return d.prepare(
-      `INSERT INTO casino_shop (guildId, name, description, price, type, roleId, colorHex, stock, limited)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(guildId, name, description, price, type, roleId, colorHex, stock, limited);
+      `INSERT INTO casino_shop (guildId, name, description, price, type, roleId, colorHex, stock, limited, quantity, titleColorHex)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(guildId, name, description, price, type, roleId, colorHex, stock, limited, quantity, titleColorHex);
   },
 
   getShopItems(guildId) {
@@ -8116,7 +8244,7 @@ const db = {
     const item = d.prepare('SELECT * FROM casino_shop WHERE guildId = ? AND id = ?').get(guildId, itemId);
     if (!item) return { ok: false, reason: 'notfound' };
 
-    const UNIQUE_TYPES = ['color', 'role', 'badge', 'decor', 'nitro'];
+    const UNIQUE_TYPES = ['color', 'role', 'badge', 'decor', 'nitro', 'title'];
     if (UNIQUE_TYPES.includes(item.type)) {
       const existing = d.prepare('SELECT 1 FROM casino_inventory WHERE guildId = ? AND userId = ? AND itemId = ?').get(guildId, userId, itemId);
       if (existing) return { ok: false, reason: 'alreadyowned' };
@@ -8145,7 +8273,8 @@ const db = {
 
   getInventory(guildId, userId) {
     return getDb().prepare(
-      `SELECT i.*, s.name, s.type, s.roleId, s.colorHex FROM casino_inventory i
+      `SELECT i.*, s.name, s.type, s.roleId, s.colorHex, s.quantity AS rewardQuantity, s.stock
+       FROM casino_inventory i
        JOIN casino_shop s ON i.itemId = s.id
        WHERE i.guildId = ? AND i.userId = ?`
     ).all(guildId, userId);
@@ -8163,6 +8292,30 @@ const db = {
     d.prepare('DELETE FROM casino_inventory WHERE guildId = ? AND userId = ?').run(guildId, userId);
     d.prepare('DELETE FROM casino_gacha_owned WHERE guildId = ? AND userId = ?').run(guildId, userId);
     d.prepare('UPDATE casino_users SET equippedColorId = NULL, equippedBadgeId = NULL, equippedDecorId = NULL, equippedSuccessId = NULL, updatedAt = unixepoch() WHERE guildId = ? AND userId = ?').run(guildId, userId);
+  },
+
+  removeInventoryItem(guildId, userId, itemId, quantity = 1) {
+    const d = getDb();
+    const item = d.prepare('SELECT quantity FROM casino_inventory WHERE guildId = ? AND userId = ? AND itemId = ?').get(guildId, userId, itemId);
+    if (!item) return false;
+    
+    const newQty = item.quantity - quantity;
+    if (newQty <= 0) {
+      d.prepare('DELETE FROM casino_inventory WHERE guildId = ? AND userId = ? AND itemId = ?').run(guildId, userId, itemId);
+    } else {
+      d.prepare('UPDATE casino_inventory SET quantity = ? WHERE guildId = ? AND userId = ? AND itemId = ?').run(newQty, guildId, userId, itemId);
+    }
+    return true;
+  },
+
+  addUserXP(guildId, userId, xpAmount) {
+    const d = getDb();
+    d.prepare('UPDATE casino_users SET xp = xp + ?, updatedAt = unixepoch() WHERE guildId = ? AND userId = ?').run(xpAmount, guildId, userId);
+  },
+
+  addCasinoXP(guildId, userId, xpAmount) {
+    const d = getDb();
+    d.prepare('UPDATE casino_users SET xp = xp + ?, updatedAt = unixepoch() WHERE guildId = ? AND userId = ?').run(xpAmount, guildId, userId);
   },
 
 
@@ -8381,7 +8534,7 @@ const db = {
       ).run(row.amount, row.amount, row.guildId, row.userId);
     }
     d.prepare('DELETE FROM casino_pending_bets').run();
-    return rows.length;
+    return { count: rows.length, rows };
   },
 
   // ─── Giveaway Coins ──────────────────────────────────────────────────────
@@ -8431,6 +8584,93 @@ const db = {
 
   rerollGiveawayCoins(id, newWinners) {
     getDb().prepare('UPDATE giveaway_coins SET winners = ? WHERE id = ?').run(JSON.stringify(newWinners), id);
+  },
+
+  // ─── Investissements ─────────────────────────────────────────────────────
+  addInvestment(guildId, userId, amount, rate) {
+    const now = Math.floor(Date.now() / 1000);
+    getDb().prepare(
+      `INSERT INTO casino_investments (guildId, userId, amount, rate, createdAt, lastClaim)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(guildId, userId) DO UPDATE SET amount = amount + ?`
+    ).run(guildId, userId, amount, rate, now, now, amount);
+  },
+
+  getInvestment(guildId, userId) {
+    return getDb().prepare('SELECT * FROM casino_investments WHERE guildId = ? AND userId = ?').get(guildId, userId);
+  },
+
+  claimInvestment(guildId, userId, gainAmount) {
+    const now = Math.floor(Date.now() / 1000);
+    getDb().prepare(
+      `UPDATE casino_investments SET lastClaim = ? WHERE guildId = ? AND userId = ?`
+    ).run(now, guildId, userId);
+    this.addCasinoCoins(guildId, userId, gainAmount, 'investment');
+  },
+
+  updateInvestmentAmount(guildId, userId, newAmount) {
+    getDb().prepare(
+      `UPDATE casino_investments SET amount = ? WHERE guildId = ? AND userId = ?`
+    ).run(newAmount, guildId, userId);
+  },
+
+  removeInvestment(guildId, userId) {
+    getDb().prepare('DELETE FROM casino_investments WHERE guildId = ? AND userId = ?').run(guildId, userId);
+  },
+
+  // ─── Playtime ───────────────────────────────────────────────────────────
+  addPlaytime(guildId, userId, seconds) {
+    getDb().prepare(
+      `UPDATE casino_users SET totalPlaytime = totalPlaytime + ?, updatedAt = unixepoch()
+       WHERE guildId = ? AND userId = ?`
+    ).run(seconds, guildId, userId);
+  },
+
+  getPlaytime(guildId, userId) {
+    const row = getDb().prepare('SELECT totalPlaytime FROM casino_users WHERE guildId = ? AND userId = ?').get(guildId, userId);
+    return row?.totalPlaytime ?? 0;
+  },
+
+  // ─── Titres ─────────────────────────────────────────────────────────────
+  setActiveTitle(guildId, userId, titleId) {
+    getDb().prepare(
+      `UPDATE casino_users SET activeTitle = ?, updatedAt = unixepoch()
+       WHERE guildId = ? AND userId = ?`
+    ).run(titleId, guildId, userId);
+  },
+
+  getActiveTitle(guildId, userId) {
+    const row = getDb().prepare('SELECT activeTitle FROM casino_users WHERE guildId = ? AND userId = ?').get(guildId, userId);
+    return row?.activeTitle ?? null;
+  },
+
+  // ─── Game Stats ──────────────────────────────────────────────────────────
+  recordGameStat(guildId, userId, game, won, betAmount, gainAmount) {
+    const now = Math.floor(Date.now() / 1000);
+    getDb().prepare(
+      `INSERT INTO casino_game_stats (guildId, userId, game, wins, losses, totalBet, totalWon, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(guildId, userId, game) DO UPDATE SET
+       wins = wins + ?, losses = losses + ?, totalBet = totalBet + ?, totalWon = totalWon + ?, updatedAt = ?`
+    ).run(
+      guildId, userId, game,
+      won ? 1 : 0, won ? 0 : 1, betAmount, gainAmount > 0 ? gainAmount : 0, now, now,
+      won ? 1 : 0, won ? 0 : 1, betAmount, gainAmount > 0 ? gainAmount : 0, now
+    );
+    // Aussi mettre à jour totalGamesWon/Lost
+    if (won) {
+      getDb().prepare('UPDATE casino_users SET totalGamesWon = totalGamesWon + 1 WHERE guildId = ? AND userId = ?').run(guildId, userId);
+    } else {
+      getDb().prepare('UPDATE casino_users SET totalGamesLost = totalGamesLost + 1 WHERE guildId = ? AND userId = ?').run(guildId, userId);
+    }
+  },
+
+  getGameStats(guildId, userId, game) {
+    return getDb().prepare('SELECT * FROM casino_game_stats WHERE guildId = ? AND userId = ? AND game = ?').get(guildId, userId, game);
+  },
+
+  getAllGameStats(guildId, userId) {
+    return getDb().prepare('SELECT * FROM casino_game_stats WHERE guildId = ? AND userId = ? ORDER BY game ASC').all(guildId, userId);
   },
 
 };

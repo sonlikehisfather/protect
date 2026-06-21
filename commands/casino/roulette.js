@@ -190,6 +190,8 @@ exports.run = async (client, message, args) => {
   }
 
   setCooldown(guildId, userId, 'roulette');
+
+  const startTime = Date.now();
   db.removeCasinoCoins(guildId, userId, amount, 'spend');
   let betDeducted = true;
   const refundBet = () => {
@@ -217,9 +219,12 @@ exports.run = async (client, message, args) => {
   const winAmount = win ? Math.floor(amount * choice.cote) : 0;
   const netGain  = win ? winAmount - amount : -amount;
 
+  const gameDuration = Math.floor((Date.now() - startTime) / 1000);
   if (win) {
     db.addCasinoCoins(guildId, userId, winAmount, 'win');
   }
+  db.recordGameStat(guildId, userId, 'roulette', win ? 1 : 0, amount, win ? winAmount : 0);
+  db.addPlaytime(guildId, userId, gameDuration);
 
   const baseXp  = win ? (cfg.xpRlWin ?? 40) : (cfg.xpRlLoss ?? 15);
   const xpGain  = win ? Math.max(baseXp, Math.floor(netGain / 500) + baseXp) : baseXp;

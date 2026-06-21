@@ -672,7 +672,7 @@ function checkCasinoLimits(message, commandName, amount = null) {
   const cfg = db.getCasinoConfig(guildId);
 
   // Cooldown check
-  const cdKey = { blackjack: 'cooldownBj', coinflip: 'cooldownCf', daily: 'cooldownDaily', collect: 'cooldownCollect', roulette: 'cooldownRl', vol: 'cooldownVol', gift: 'cooldownGift', russian: 'cooldownRussian', mine: 'cooldownMine', plinko: 'cooldownPlinko', tower: 'cooldownTower', dice: 'cooldownDice', chicken: 'cooldownChicken' }[commandName];
+  const cdKey = { blackjack: 'cooldownBj', coinflip: 'cooldownCf', daily: 'cooldownDaily', collect: 'cooldownCollect', roulette: 'cooldownRl', vol: 'cooldownVol', gift: 'cooldownGift', russian: 'cooldownRussian', mine: 'cooldownMine', plinko: 'cooldownPlinko', tower: 'cooldownTower', dice: 'cooldownDice', chicken: 'cooldownChicken', withdraw: 'cooldownWithdraw' }[commandName];
   if (cdKey && cfg[cdKey] > 0) {
     const storeKey = `${guildId}:${userId}:${commandName}`;
     const last = _cooldownStore.get(storeKey) || 0;
@@ -825,7 +825,7 @@ function buildCasinoPage(guildId, userId, page) {
   return embed.build(guildId, `Tu as **${user.draws}** tirage(s).\n\nClique sur **Lancer un tirage** pour tenter ta chance.`, { title: '◈ Tirage', color: '#57F287' });
 }
 
-const _UNIQUE_TYPES = new Set(['color', 'role', 'badge', 'decor', 'nitro']);
+const _UNIQUE_TYPES = new Set(['color', 'role', 'badge', 'decor', 'nitro', 'title']);
 
 function _getAvailableShopItems(guildId, userId) {
   const items = db.getShopItems(guildId);
@@ -837,19 +837,26 @@ function _getAvailableShopItems(guildId, userId) {
 
 function buildShopCategoryRow(guildId, userId) {
   const items = _getAvailableShopItems(guildId, userId);
+  const categoryMap = { title: 'Titres', color: 'Couleurs', role: 'Roles', badge: 'Badges', decor: 'Decorations', item: 'Items', draws: 'Tirages', xp: 'XP' };
   const options = [];
-  if (items.length) {
-    options.push({
-      label: 'Items',
-      value: 'items',
-      description: `${items.length} item(s) disponible(s)`,
-    });
+  
+  for (const [type, label] of Object.entries(categoryMap)) {
+    const count = items.filter(i => i.type === type).length;
+    if (count > 0) {
+      options.push({
+        label,
+        value: type,
+        description: `${count} item(s) disponible(s)`,
+      });
+    }
   }
+  
   options.push({
     label: 'Boucliers anti-vol',
     value: 'shields',
     description: 'Proteger contre les vols',
   });
+  
   if (!options.length) return null;
   return new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
@@ -859,8 +866,10 @@ function buildShopCategoryRow(guildId, userId) {
   );
 }
 
-function buildShopItemsRow(guildId, userId) {
-  const items = _getAvailableShopItems(guildId, userId).slice(0, 25);
+function buildShopItemsRow(guildId, userId, category = null) {
+  let items = _getAvailableShopItems(guildId, userId);
+  if (category) items = items.filter(i => i.type === category);
+  items = items.slice(0, 25);
   if (!items.length) return null;
   return new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
@@ -869,7 +878,7 @@ function buildShopItemsRow(guildId, userId) {
       .addOptions(items.map(item => ({
         label: item.name.slice(0, 100),
         value: String(item.id),
-        description: `${embed.fmtCoins(item.price)} coins • ${item.type}`.slice(0, 100),
+        description: `${embed.fmtCoins(item.price)} coins`.slice(0, 100),
       }))),
   );
 }
@@ -1008,7 +1017,7 @@ async function handleInteraction(interaction, id) {
       const equipped    = db.getEquippedItemDetails(guildId, userId);
       try {
         const { generateProfileCard } = require('../../utils/profileCard');
-        const buffer = await generateProfileCard(interaction.member, user, realLevel, levelData, rank, equipped);
+        const buffer = await generateProfileCard(interaction.member, user, realLevel, levelData, rank, equipped, guildId, userId);
         const attachment = new AttachmentBuilder(buffer, { name: 'profile.png' });
         return interaction.reply({ files: [attachment], flags: MessageFlags.Ephemeral }).catch(() => {});
       } catch (cardErr) {
@@ -1073,20 +1082,7 @@ async function handleShopCategory(interaction) {
   const guildId = interaction.guild.id;
   const userId = interaction.user.id;
   const category = interaction.values?.[0];
-
-  if (category === 'items') {
-    const items = _getAvailableShopItems(guildId, userId);
-    if (!items.length) {
-      return interaction.reply({ embeds: [embed.build(guildId, 'Aucun item disponible.', { title: '◈ Shop', color: '#ED4245' })], flags: MessageFlags.Ephemeral }).catch(() => {});
-    }
-    const lines = items.slice(0, 15).map(item => `**#${item.id}** ${item.name} ・ ${embed.fmtCoins(item.price)} coins (${item.type})`);
-    const itemsRow = buildShopItemsRow(guildId, userId);
-    return interaction.reply({
-      embeds: [embed.build(guildId, `${lines.join('\n')}\n\nChoisis un item à acheter :`, { title: '❃ Items', color: '#5865F2' })],
-      components: itemsRow ? [itemsRow] : [],
-      flags: MessageFlags.Ephemeral,
-    }).catch(() => {});
-  }
+  const categoryLabels = { title: 'Titres', color: 'Couleurs', role: 'Roles', badge: 'Badges', decor: 'Decorations', item: 'Items', draws: 'Tirages', xp: 'XP' };
 
   if (category === 'shields') {
     const cfg = db.getCasinoConfig(guildId);
@@ -1109,7 +1105,19 @@ async function handleShopCategory(interaction) {
     }).catch(() => {});
   }
 
-  return interaction.deferUpdate().catch(() => {});
+  // Handle category items
+  const items = _getAvailableShopItems(guildId, userId).filter(i => i.type === category);
+  if (!items.length) {
+    return interaction.reply({ embeds: [embed.build(guildId, 'Aucun item disponible dans cette catégorie.', { title: `◈ ${categoryLabels[category] || category}`, color: '#ED4245' })], flags: MessageFlags.Ephemeral }).catch(() => {});
+  }
+
+  const lines = items.slice(0, 15).map(item => `**${item.name}** ・ ${embed.fmtCoins(item.price)} coins`);
+  const itemsRow = buildShopItemsRow(guildId, userId, category);
+  return interaction.reply({
+    embeds: [embed.build(guildId, `${lines.join('\n')}\n\nChoisis un item à acheter :`, { title: `◈ ${categoryLabels[category] || category}`, color: '#5865F2' })],
+    components: itemsRow ? [itemsRow] : [],
+    flags: MessageFlags.Ephemeral,
+  }).catch(() => {});
 }
 
 async function handleShopShieldSelect(interaction) {
@@ -1164,7 +1172,7 @@ function buildConfigPanel(guild, view = 'overview') {
   const shopItems = db.getShopItems(guildId);
   const gachaPool = db.getGachaPool(guildId);
   const levelRoles = db.getCasinoLevelRoles(guildId);
-  const shopPreview = shopItems.length ? shopItems.slice(0, 6).map(item => `• **#${item.id}** ${item.name} ・ ${item.price} coins (${item.type})`).join('\n') : '*Aucun item configuré*';
+  const shopPreview = shopItems.length ? shopItems.slice(0, 6).map(item => `• **${item.name}** ・ ${embed.fmtCoins(item.price)} coins (${item.type})`).join('\n') : '*Aucun item configuré*';
   const gachaPreview = gachaPool.length ? gachaPool.slice(0, 6).map(item => `• **#${item.id}** ${item.name} ・ ${item.type} / poids ${item.weight}`).join('\n') : '*Aucune récompense configurée*';
   const levelPreview = levelRoles.length ? levelRoles.slice(0, 6).map(item => `• Niveau **${item.level}** ・ <@&${item.roleId}>`).join('\n') : '*Aucun rôle de niveau configuré*';
   const container = new ContainerBuilder().setAccentColor(config.enabled ? 0x57F287 : 0xED4245);
@@ -1232,7 +1240,7 @@ function buildConfigPanel(guild, view = 'overview') {
       `> Commandes bloquees hors salons autorises :\n${restrictedText}\n\n` +
       `-# Selectionne les commandes a restreindre ci-dessous.`
     ));
-    const cmdOptions = ['blackjack', 'coinflip', 'roulette', 'daily', 'collect', 'don', 'top', 'timer', 'vol', 'jackpot', 'russian', 'mine', 'plinko', 'tower', 'chicken', 'dice'].map(cmd => ({
+    const cmdOptions = ['blackjack', 'coinflip', 'roulette', 'daily', 'collect', 'don', 'top', 'timer', 'vol', 'jackpot', 'russian', 'mine', 'plinko', 'tower', 'chicken', 'dice', 'invest', 'claims', 'withdraw', 'analytics', 'compare'].map(cmd => ({
       label: cmd.charAt(0).toUpperCase() + cmd.slice(1),
       value: cmd,
       description: `Restreindre +${cmd} au salon casino`,
@@ -1346,6 +1354,10 @@ function buildConfigPanel(guild, view = 'overview') {
       `> Collect \`${fmtSec(config.cooldownCollect)}\` • Daily \`24h\` • Vol \`${fmtSec(config.cooldownVol)}\` • Gift \`${fmtSec(config.cooldownGift)}\`\n` +
       `> Russian \`${fmtSec(config.cooldownRussian)}\` • Mine \`${fmtSec(config.cooldownMine)}\` • Plinko \`${fmtSec(config.cooldownPlinko)}\` • Tower \`${fmtSec(config.cooldownTower)}\`\n` +
       `> Dice \`${fmtSec(config.cooldownDice)}\`\n\n` +
+      `### Investissements\n` +
+      `> Min ${fmtVal(config.investmentMin || 10000)} • Max ${fmtVal(config.investmentMax || 1000000)}\n` +
+      `> Taux ${((config.investmentRate || 0.05) * 100).toFixed(1)}% • Cooldown claim \`${fmtSec(config.investmentClaimCooldown || 86400)}\`\n` +
+      `> Pénalité retrait \`${((config.withdrawalPenalty ?? 0.1) * 100).toFixed(0)}%\`\n\n` +
       `### Plafonds\n` +
       `> Coins max ${fmtVal(config.limitMaxCoins)} • Tirages max ${fmtVal(config.limitMaxDraws)}\n` +
       `> Gains max ${gainsLabel} • Tirages/periode ${drawsLabel}`
@@ -1357,6 +1369,7 @@ function buildConfigPanel(guild, view = 'overview') {
         .addOptions(
           { label: 'Mises min/max', value: 'mises', description: 'Mise minimale et maximale par jeu' },
           { label: 'Cooldowns', value: 'cooldowns', description: 'Intervalle entre chaque commande' },
+          { label: 'Investissements', value: 'investments', description: 'Min, max, taux, cooldown claim' },
           { label: 'Plafonds', value: 'plafonds', description: 'Max coins, max gains/tirages par periode' },
         ),
     ));
@@ -1509,9 +1522,215 @@ exports.handlePanelInteractions = handlePanelInteractions;
 exports.handlePanelNav = handlePanelNav;
 exports.handlePanelDraw = handlePanelDraw;
 exports.handleInteraction = handleInteraction;
+async function handleInventoryCategory(interaction) {
+  const error = checkCasinoAccess(interaction);
+  if (error) return interaction.reply({ embeds: [embed.build(interaction.guild?.id, error, { color: '#ED4245' })], flags: MessageFlags.Ephemeral }).catch(() => {});
+
+  const guildId = interaction.guild.id;
+  const userId = interaction.user.id;
+  const category = interaction.values?.[0];
+  const categoryLabels = { title: 'Titres', color: 'Couleurs', role: 'Roles', badge: 'Badges', decor: 'Decorations', item: 'Items', draws: 'Tirages', xp: 'XP' };
+
+  if (category === 'shields') {
+    const userShields = db.getShields(guildId, userId);
+    return interaction.reply({
+      embeds: [embed.build(guildId, `Tu as **${userShields}** bouclier(s).\n\n1 bouclier = 1 vol bloqué.`, { title: '◊ Boucliers anti-vol', color: '#5865F2' })],
+      flags: MessageFlags.Ephemeral,
+    }).catch(() => {});
+  }
+
+  // Handle category items
+  const inv = db.getInventory(guildId, userId);
+  const items = inv.filter(i => i.type === category);
+  if (!items.length) {
+    return interaction.reply({ embeds: [embed.build(guildId, 'Aucun item dans cette catégorie.', { title: `◈ ${categoryLabels[category] || category}`, color: '#ED4245' })], flags: MessageFlags.Ephemeral }).catch(() => {});
+  }
+
+  const lines = items.map(item => `**${item.name}** x${item.quantity}`);
+  const select = new StringSelectMenuBuilder()
+    .setCustomId(`cs_inv_select:${category}`)
+    .setPlaceholder('Choisir un item')
+    .addOptions(items.map(item => ({
+      label: item.name.slice(0, 100),
+      value: String(item.itemId),
+      description: `x${item.quantity}`,
+    })));
+
+  return interaction.reply({
+    embeds: [embed.build(guildId, `${lines.join('\n')}\n\nChoisis un item :`, { title: `◈ ${categoryLabels[category] || category}`, color: '#5865F2' })],
+    components: [new ActionRowBuilder().addComponents(select)],
+    flags: MessageFlags.Ephemeral,
+  }).catch(() => {});
+}
+
+async function handleInventorySelect(interaction) {
+  console.log(`[1] handleInventorySelect called`);
+  const error = checkCasinoAccess(interaction);
+  if (error) return interaction.reply({ embeds: [embed.build(interaction.guild?.id, error, { color: '#ED4245' })], flags: MessageFlags.Ephemeral }).catch(() => {});
+
+  const guildId = interaction.guild.id;
+  const userId = interaction.user.id;
+  const itemId = parseInt(interaction.values?.[0], 10);
+  const category = interaction.customId.split(':')[1];
+
+  console.log(`[2] handleInventorySelect: guildId=${guildId}, userId=${userId}, itemId=${itemId}, category=${category}`);
+
+  const inv = db.getInventory(guildId, userId);
+  console.log(`[3] Inventory fetched: ${inv.length} items`);
+  
+  const item = inv.find(i => i.itemId === itemId);
+  console.log(`[4] Item found: ${item ? item.name : 'NOT FOUND'}`);
+  
+  if (!item) {
+    console.log(`[ERROR] Item not found: ${itemId}`);
+    return interaction.reply({ embeds: [embed.build(guildId, 'Item non trouvé.', { color: '#ED4245' })], flags: MessageFlags.Ephemeral }).catch(() => {});
+  }
+
+  if (category === 'xp') {
+    const buttons = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`cs_inv_use_xp:${itemId}`).setLabel('Utiliser').setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId(`cs_inv_remove:${itemId}`).setLabel('Clear').setStyle(ButtonStyle.Danger),
+    );
+    return interaction.reply({
+      embeds: [embed.build(guildId, `**${item.name}** x${item.quantity}\n\nChoisis une action :`, { title: 'XP', color: '#5865F2' })],
+      components: [buttons],
+      flags: MessageFlags.Ephemeral,
+    }).catch(() => {});
+  }
+
+  if (['role', 'color', 'badge', 'decor'].includes(category)) {
+    const user = await interaction.guild?.members.fetch(userId).catch(() => null);
+    const hasRole = user?.roles.cache.has(item.roleId);
+    const buttons = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`cs_inv_toggle_role:${itemId}`).setLabel(hasRole ? 'Retirer du profil' : 'Ajouter au profil').setStyle(hasRole ? ButtonStyle.Danger : ButtonStyle.Success),
+      new ButtonBuilder().setCustomId(`cs_inv_remove:${itemId}`).setLabel('Clear').setStyle(ButtonStyle.Danger),
+    );
+    return interaction.reply({
+      embeds: [embed.build(guildId, `**${item.name}** x${item.quantity}\n\n${hasRole ? '✓ Actuellement équipé' : 'Non équipé'}\n\nChoisis une action :`, { title: category === 'color' ? 'Couleur' : category === 'badge' ? 'Badge' : category === 'decor' ? 'Décoration' : 'Rôle', color: '#5865F2' })],
+      components: [buttons],
+      flags: MessageFlags.Ephemeral,
+    }).catch(() => {});
+  }
+
+  if (category === 'title') {
+    const user = db.getCasinoUser(guildId, userId);
+    const isActive = Number(user?.activeTitle) === Number(itemId);
+    const buttons = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`cs_inv_toggle_title:${itemId}`).setLabel(isActive ? 'Retirer du profil' : 'Afficher sur profil').setStyle(isActive ? ButtonStyle.Danger : ButtonStyle.Success),
+      new ButtonBuilder().setCustomId(`cs_inv_remove:${itemId}`).setLabel('Clear').setStyle(ButtonStyle.Danger),
+    );
+    return interaction.reply({
+      embeds: [embed.build(guildId, `**${item.name}** x${item.quantity}\n\n${isActive ? '✓ Actuellement affiché' : 'Non affiché'}\n\nChoisis une action :`, { title: 'Titre', color: '#5865F2' })],
+      components: [buttons],
+      flags: MessageFlags.Ephemeral,
+    }).catch(() => {});
+  }
+
+  const buttons = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`cs_inv_remove:${itemId}`).setLabel('Clear').setStyle(ButtonStyle.Danger),
+  );
+  return interaction.reply({
+    embeds: [embed.build(guildId, `**${item.name}** x${item.quantity}`, { title: 'Item', color: '#5865F2' })],
+    components: [buttons],
+    flags: MessageFlags.Ephemeral,
+  }).catch(() => {});
+}
+
+async function handleInventoryAction(interaction, id) {
+  const error = checkCasinoAccess(interaction);
+  if (error) return interaction.reply({ embeds: [embed.build(interaction.guild?.id, error, { color: '#ED4245' })], flags: MessageFlags.Ephemeral }).catch(() => {});
+
+  const guildId = interaction.guild.id;
+  const userId = interaction.user.id;
+  const itemId = parseInt(id.split(':')[1], 10);
+  console.log(`[INV-ACTION] start id=${id} guild=${guildId} user=${userId} item=${itemId}`);
+
+  const inv = db.getInventory(guildId, userId);
+  const item = inv.find(i => Number(i.itemId) === Number(itemId));
+  if (!item) {
+    console.log(`[INV-ACTION] item not found item=${itemId} inv=${inv.map(i => i.itemId).join(',')}`);
+    return interaction.reply({ content: 'Item non trouvé dans ton inventaire.', flags: 64 }).catch(() => {});
+  }
+
+  if (id.startsWith('cs_inv_use_xp:')) {
+    const xpAmount = parseInt(item.rewardQuantity || item.stock || item.quantity || 1, 10) || 1;
+    db.addCasinoXP(guildId, userId, xpAmount);
+    db.removeInventoryItem(guildId, userId, itemId, 1);
+    const user = db.getCasinoUser(guildId, userId);
+    console.log(`[INV-ACTION] xp used amount=${xpAmount} total=${user?.xp}`);
+    return interaction.reply({ content: `✓ **${xpAmount} XP** utilisé. Total : **${user?.xp ?? 0} XP**`, flags: 64 }).catch(() => {});
+  }
+
+  if (id.startsWith('cs_inv_toggle_role:')) {
+    const roleId = item.roleId || (/^\d{17,20}$/.test(String(item.colorHex || '')) ? item.colorHex : null);
+    if (!roleId) {
+      console.log(`[INV-ACTION] missing roleId for item=${itemId} type=${item.type}`);
+      return interaction.reply({ content: 'Cet item n’a aucun rôle configuré.', flags: 64 }).catch(() => {});
+    }
+    const member = await interaction.guild.members.fetch(userId).catch(e => {
+      console.error('[INV-ACTION] member fetch failed:', e);
+      return null;
+    });
+    if (!member) return interaction.reply({ content: 'Membre introuvable.', flags: 64 }).catch(() => {});
+
+    const hasRole = member.roles.cache.has(roleId);
+    try {
+      if (hasRole) {
+        await member.roles.remove(roleId, 'Casino inventory toggle');
+        console.log(`[INV-ACTION] role removed role=${roleId}`);
+      } else {
+        await member.roles.add(roleId, 'Casino inventory toggle');
+        console.log(`[INV-ACTION] role added role=${roleId}`);
+      }
+      
+      const newHasRole = !hasRole;
+      const buttons = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`cs_inv_toggle_role:${itemId}`).setLabel(newHasRole ? 'Retirer du profil' : 'Ajouter au profil').setStyle(newHasRole ? ButtonStyle.Danger : ButtonStyle.Success),
+        new ButtonBuilder().setCustomId(`cs_inv_remove:${itemId}`).setLabel('Clear').setStyle(ButtonStyle.Danger),
+      );
+      return interaction.update({
+        embeds: [embed.build(guildId, `**${item.name}** x${item.quantity}\n\n${newHasRole ? '✓ Actuellement équipé' : 'Non équipé'}\n\nChoisis une action :`, { title: item.type === 'color' ? 'Couleur' : item.type === 'badge' ? 'Badge' : item.type === 'decor' ? 'Décoration' : 'Rôle', color: '#5865F2' })],
+        components: [buttons],
+      }).catch(() => {});
+    } catch (e) {
+      console.error('[INV-ACTION] role toggle failed:', e);
+      return interaction.reply({ content: `Impossible de modifier le rôle : ${e.message}`, flags: 64 }).catch(() => {});
+    }
+  }
+
+  if (id.startsWith('cs_inv_toggle_title:')) {
+    const user = db.getCasinoUser(guildId, userId);
+    const activeTitle = user?.activeTitle == null ? null : Number(user.activeTitle);
+    const nextTitle = activeTitle === Number(itemId) ? null : itemId;
+    db.setActiveTitle(guildId, userId, nextTitle);
+    console.log(`[INV-ACTION] title set old=${activeTitle} new=${nextTitle}`);
+    
+    const isActive = nextTitle === Number(itemId);
+    const buttons = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`cs_inv_toggle_title:${itemId}`).setLabel(isActive ? 'Retirer du profil' : 'Afficher sur profil').setStyle(isActive ? ButtonStyle.Danger : ButtonStyle.Success),
+      new ButtonBuilder().setCustomId(`cs_inv_remove:${itemId}`).setLabel('Clear').setStyle(ButtonStyle.Danger),
+    );
+    return interaction.update({
+      embeds: [embed.build(guildId, `**${item.name}** x${item.quantity}\n\n${isActive ? '✓ Actuellement affiché' : 'Non affiché'}\n\nChoisis une action :`, { title: 'Titre', color: '#5865F2' })],
+      components: [buttons],
+    }).catch(() => {});
+  }
+
+  if (id.startsWith('cs_inv_remove:')) {
+    db.removeInventoryItem(guildId, userId, itemId, item.quantity);
+    console.log(`[INV-ACTION] item removed item=${itemId} qty=${item.quantity}`);
+    return interaction.reply({ content: `✓ **${item.name}** supprimé de ton inventaire.`, flags: 64 }).catch(() => {});
+  }
+
+  return interaction.reply({ content: 'Action inconnue.', flags: 64 }).catch(() => {});
+}
+
 exports.handleShopSelect = handleShopSelect;
 exports.handleShopCategory = handleShopCategory;
 exports.handleShopShieldSelect = handleShopShieldSelect;
+exports.handleInventoryCategory = handleInventoryCategory;
+exports.handleInventorySelect = handleInventorySelect;
+exports.handleInventoryAction = handleInventoryAction;
 exports.handleAchievementInteraction = handleAchievementInteraction;
 exports.checkCasinoChannel = checkCasinoChannel;
 exports.getRankFromLevel = getRankFromLevel;
@@ -1841,44 +2060,99 @@ function _buildGamesPage(guildId, userId) {
 
 function _buildShopPage(guildId, userId) {
   const items = _getAvailableShopItems(guildId, userId);
-  const userShields = db.getShields(guildId, userId);
+  const categoryMap = { title: 'Titres', color: 'Couleurs', role: 'Roles', badge: 'Badges', decor: 'Decorations', item: 'Items', draws: 'Tirages', xp: 'XP' };
+  const options = [];
+  
+  for (const [type, label] of Object.entries(categoryMap)) {
+    const count = items.filter(i => i.type === type).length;
+    if (count > 0) {
+      options.push({
+        label,
+        value: type,
+        description: `${count} item(s) disponible(s)`,
+      });
+    }
+  }
+  
+  options.push({
+    label: 'Boucliers anti-vol',
+    value: 'shields',
+    description: 'Proteger contre les vols',
+  });
+  
+  const totalItems = items.length;
   const container = new ContainerBuilder().setAccentColor(0xEB459E);
-  container.addTextDisplayComponents(new TextDisplayBuilder().setContent('## ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡\n##             BOUTIQUE\n## ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡'));
-  container.addSeparatorComponents(new SeparatorBuilder());
+  
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
-    `◊ **Boucliers possédés :** ${userShields}\n` +
-    (items.length ? `❃ **${items.length}** item(s) disponible(s)` : '*Aucun item disponible*') + `\n\n` +
-    `Sélectionne une catégorie pour voir les propositions et prix.`
+    `## Boutique\n\n> **Items disponibles :** ${totalItems}\n\n-# Selectionne une categorie pour voir les items.`
   ));
-  const catOptions = [];
-  if (items.length) catOptions.push({ label: 'Items', value: 'items', description: `${items.length} item(s) disponible(s)` });
-  catOptions.push({ label: 'Boucliers anti-vol', value: 'shields', description: 'Proteger contre les vols' });
-  container.addActionRowComponents(new ActionRowBuilder().addComponents(
-    new StringSelectMenuBuilder().setCustomId('cs_shop_category').setPlaceholder('Choisir une catégorie').addOptions(catOptions),
-  ));
+  
+  if (options.length > 1) {
+    container.addActionRowComponents(new ActionRowBuilder().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId('cs_shop_category')
+        .setPlaceholder('Choisir une categorie')
+        .addOptions(options.slice(0, 25)),
+    ));
+  } else {
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent('*Aucun item disponible*'));
+  }
+  
   container.addActionRowComponents(_buildNavMenu('shop'));
   return container;
+}
+
+function buildInventoryCategoryRow(guildId, userId) {
+  const inv = db.getInventory(guildId, userId);
+  const categoryMap = { title: 'Titres', color: 'Couleurs', role: 'Roles', badge: 'Badges', decor: 'Decorations', item: 'Items', draws: 'Tirages', xp: 'XP' };
+  const options = [];
+  
+  for (const [type, label] of Object.entries(categoryMap)) {
+    const count = inv.filter(i => i.type === type).length;
+    if (count > 0) {
+      options.push({
+        label,
+        value: type,
+        description: `${count} item(s)`,
+      });
+    }
+  }
+  
+  const userShields = db.getShields(guildId, userId);
+  if (userShields > 0) {
+    options.push({
+      label: 'Boucliers anti-vol',
+      value: 'shields',
+      description: `${userShields} bouclier(s)`,
+    });
+  }
+  
+  if (!options.length) return null;
+  return new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId('cs_inv_category')
+      .setPlaceholder('Choisir une categorie')
+      .addOptions(options.slice(0, 25)),
+  );
 }
 
 function _buildInventoryPage(guildId, userId) {
   const inv = db.getInventory(guildId, userId);
   const userShields = db.getShields(guildId, userId);
+  const totalItems = inv.length + (userShields > 0 ? 1 : 0);
   const container = new ContainerBuilder().setAccentColor(0xFEE75C);
-  container.addTextDisplayComponents(new TextDisplayBuilder().setContent('## Inventaire'));
-  container.addSeparatorComponents(new SeparatorBuilder());
-
-  const lines = [];
-  lines.push(`◊ **Boucliers :** ${userShields}`);
-
-  if (!inv.length) {
-    lines.push('*Aucun item*');
+  
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
+    `## Inventaire\n\n> **Objets :** ${totalItems}\n\n-# Selectionne une categorie pour voir tes items.`
+  ));
+  
+  const categoryRow = buildInventoryCategoryRow(guildId, userId);
+  if (categoryRow) {
+    container.addActionRowComponents(categoryRow);
   } else {
-    for (const item of inv) {
-      lines.push(`◇ **${item.name}** x${item.quantity} (${item.type})`);
-    }
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent('*Aucun item dans l\'inventaire*'));
   }
-
-  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join('\n')));
+  
   return container;
 }
 
@@ -1983,7 +2257,7 @@ async function handlePanelNav(interaction) {
     try {
       await interaction.deferUpdate().catch(() => {});
       const { generateProfileCard } = require('../../utils/profileCard');
-      const buffer = await generateProfileCard(interaction.member, user, realLevel, levelData, rank, equipped);
+      const buffer = await generateProfileCard(interaction.member, user, realLevel, levelData, rank, equipped, guildId, userId);
       const attachment = new AttachmentBuilder(buffer, { name: 'profile.png' });
       await interaction.followUp({ files: [attachment], flags: MessageFlags.Ephemeral }).catch(() => {});
     } catch (cardErr) {

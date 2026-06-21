@@ -84,6 +84,7 @@ exports.run = async (client, message, args) => {
 
   setCooldown(guildId, userId, 'blackjack');
 
+  const startTime = Date.now();
   let betDeducted = false;
   const deductBet = () => {
     if (betDeducted) return;
@@ -273,6 +274,11 @@ exports.run = async (client, message, args) => {
     const baseXp = win ? (csCfg.xpBjWin ?? 50) : push ? (csCfg.xpBjPush ?? 5) : (csCfg.xpBjLoss ?? 15);
     const xpGain = win ? Math.max(baseXp, Math.floor(gain / 500) + baseXp) : baseXp;
     db.addXp(guildId, userId, xpGain);
+
+    // Track game stats
+    const gameDuration = Math.floor((Date.now() - startTime) / 1000);
+    db.recordGameStat(guildId, userId, 'blackjack', (win || push) ? 1 : 0, amount, win ? gain : 0);
+    db.addPlaytime(guildId, userId, gameDuration);
 
     finalCoins = db.getCasinoUser(guildId, userId).coins;
 

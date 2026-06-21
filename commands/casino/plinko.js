@@ -121,6 +121,8 @@ exports.run = async (client, message, args) => {
 
   setCooldown(guildId, userId, 'plinko');
 
+  const startTime = Date.now();
+
   let risk = (args[1] || 'medium').toLowerCase();
   if (!MULTIPLIERS[risk]) risk = 'medium';
 
@@ -192,21 +194,18 @@ exports.run = async (client, message, args) => {
     return { content: `◉ Plinko\nMise : ${embed.fmtCoins(amount)} coins ・ Risque : ${RISK_LABELS[risk]}\n\n${grid}`, components: [] };
   };
 
-  const buildResult = (path, finalSlot, mults) => {
+  const buildResult = async (path, finalSlot, mults) => {
     const finalMult = mults[finalSlot];
     const winAmount = Math.floor(amount * finalMult);
     const netGain = winAmount - amount;
 
     if (winAmount > 0) db.addCasinoCoins(guildId, userId, winAmount, 'win');
+
+    // Track game stats
+    const gameDuration = Math.floor((Date.now() - startTime) / 1000);
+    db.recordGameStat(guildId, userId, 'plinko', netGain > 0 ? 1 : 0, amount, netGain > 0 ? netGain : 0);
+    db.addPlaytime(guildId, userId, gameDuration);
     const finalCoins = db.getCasinoUser(guildId, userId).coins;
-
-    const grid = buildGrid(path, ROWS, finalSlot, mults);
-    const slotDisplay = mults.map((m, i) => i === finalSlot ? `**[×${m}]**` : `×${m}`).join(' ');
-
-    let resultLine;
-    if (netGain > 0) resultLine = `> ✸ **Gagne !** ×${finalMult} → **+${embed.fmtCoins(netGain)}** coins`;
-    else if (netGain === 0) resultLine = `> = **Egalite.** ×${finalMult} → **${embed.fmtCoins(winAmount)}** coins`;
-    else resultLine = `> ‼ **Perdu.** ×${finalMult} → **-${embed.fmtCoins(Math.abs(netGain))}** coins`;
 
     const xpGain = netGain > 0 ? Math.max(15, Math.floor(netGain / 500) + 15) : 10;
     db.addXp(guildId, userId, xpGain);
@@ -224,22 +223,34 @@ exports.run = async (client, message, args) => {
       ],
     });
 
-    const header = `## ◉ Plinko\n\n> Mise : **${embed.fmtCoins(amount)}** coins ・ Risque : **${RISK_LABELS[risk]}**\n`;
-
-    if (V2_AVAILABLE) {
-      const container = new ContainerBuilder().setAccentColor(
-        netGain > 0 ? 0x57F287 : netGain === 0 ? 0xFEE75C : 0xED4245
-      );
-      container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
-        header + '\n' + grid + '\n\n### Resultat\n' + slotDisplay + '\n\n' + resultLine + '\n> Solde : **' + embed.fmtCoins(finalCoins) + '** coins'
-      ));
-      return { components: [container], flags: COMPONENTS_V2_FLAG, allowedMentions: { parse: [] } };
+    try {
+      const { generatePlinkoImage } = require('../../utils/plinkoImage');
+      const { AttachmentBuilder } = require('discord.js');
+      const buffer = await generatePlinkoImage({
+        path, finalSlot, mults, risk,
+        amount, winAmount, netGain, finalCoins,
+        riskLabel: RISK_LABELS[risk],
+      });
+      const attachment = new AttachmentBuilder(buffer, { name: 'plinko.png' });
+      return { files: [attachment], components: [], allowedMentions: { parse: [] } };
+    } catch (imgErr) {
+      console.error('[Plinko] Image error:', imgErr?.message);
+      const grid = buildGrid(path, ROWS, finalSlot, mults);
+      const slotDisplay = mults.map((m, i) => i === finalSlot ? `**[×${m}]**` : `×${m}`).join(' ');
+      let resultLine;
+      if (netGain > 0) resultLine = `> ✸ **Gagne !** ×${finalMult} → **+${embed.fmtCoins(netGain)}** coins`;
+      else if (netGain === 0) resultLine = `> = **Egalite.** ×${finalMult} → **${embed.fmtCoins(winAmount)}** coins`;
+      else resultLine = `> ‼ **Perdu.** ×${finalMult} → **-${embed.fmtCoins(Math.abs(netGain))}** coins`;
+      const header = `## ◉ Plinko\n\n> Mise : **${embed.fmtCoins(amount)}** coins ・ Risque : **${RISK_LABELS[risk]}**\n`;
+      if (V2_AVAILABLE) {
+        const container = new ContainerBuilder().setAccentColor(netGain > 0 ? 0x57F287 : netGain === 0 ? 0xFEE75C : 0xED4245);
+        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
+          header + '\n' + grid + '\n\n### Resultat\n' + slotDisplay + '\n\n' + resultLine + '\n> Solde : **' + embed.fmtCoins(finalCoins) + '** coins'
+        ));
+        return { components: [container], flags: COMPONENTS_V2_FLAG, allowedMentions: { parse: [] } };
+      }
+      return { content: `◉ Plinko\n${netGain >= 0 ? 'Gagne' : 'Perdu'} ×${finalMult} | Solde : ${embed.fmtCoins(finalCoins)} coins`, components: [] };
     }
-
-    return {
-      content: `◉ Plinko\nMise : ${embed.fmtCoins(amount)} coins ・ Risque : ${RISK_LABELS[risk]}\n\n${grid}\n\nSlot : ${finalSlot + 1}/${SLOTS} → ×${finalMult}\n${netGain > 0 ? 'Gagne' : netGain === 0 ? 'Egalite' : 'Perdu'} ${embed.fmtCoins(Math.abs(netGain))} coins\nSolde : ${embed.fmtCoins(finalCoins)} coins`,
-      components: [],
-    };
   };
 
   let currentRisk = risk;
@@ -292,7 +303,7 @@ exports.run = async (client, message, args) => {
       }
 
       await sleep(ANIM_DELAY);
-      await sent.edit(buildResult(path, finalSlot, mults)).catch(() => {});
+      await sent.edit(await buildResult(path, finalSlot, mults)).catch(() => {});
     }
   });
 

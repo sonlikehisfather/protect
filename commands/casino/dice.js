@@ -76,6 +76,8 @@ exports.run = async (client, message, args) => {
 
   setCooldown(guildId, userId, 'dice');
 
+  const startTime = Date.now();
+
   let betDeducted = false;
   const deductBet = () => {
     if (betDeducted) return;
@@ -226,6 +228,11 @@ exports.run = async (client, message, args) => {
       if (win) winAmount = Math.floor(amount * mult);
 
       if (winAmount > 0) db.addCasinoCoins(guildId, userId, winAmount, 'win');
+
+    // Track game stats
+    const gameDuration = Math.floor((Date.now() - startTime) / 1000);
+    db.recordGameStat(guildId, userId, 'dice', win ? 1 : 0, amount, win ? winAmount - amount : 0);
+    db.addPlaytime(guildId, userId, gameDuration);
       db.clearPendingBet(guildId, userId, 'dice');
 
       const gain = win ? winAmount - amount : -amount;

@@ -63,6 +63,8 @@ exports.run = async (client, message, args) => {
 
   setCooldown(guildId, userId, 'coinflip');
 
+  const startTime = Date.now();
+
   let betDeducted = false;
   const deductBet = () => {
     if (betDeducted) return;
@@ -140,14 +142,17 @@ exports.run = async (client, message, args) => {
 
     // Handle bet result
     let finalCoins, gain;
+    let winAmount = 0;
     if (win) {
-      // Win - return bet * cote
-      const winAmount = Math.floor(amount * cote);
+      winAmount = Math.floor(amount * cote);
       db.addCasinoCoins(guildId, userId, winAmount, 'win');
-      gain = winAmount - amount; // Net gain (excluding original bet)
+      gain = winAmount - amount;
     } else {
       gain = -amount;
     }
+    const gameDuration = Math.floor((Date.now() - startTime) / 1000);
+    db.recordGameStat(guildId, userId, 'coinflip', win ? 1 : 0, amount, win ? winAmount - amount : 0);
+    db.addPlaytime(guildId, userId, gameDuration);
     db.clearPendingBet(guildId, userId, 'coinflip');
 
     const baseXp  = win ? (cfg.xpCfWin ?? 30) : (cfg.xpCfLoss ?? 10);

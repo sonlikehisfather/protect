@@ -66,6 +66,8 @@ exports.run = async (client, message, args) => {
   if (targetShields > 0) {
     db.consumeShield(guildId, target.id);
     setCooldown(guildId, userId, 'vol');
+
+  const startTime = Date.now();
     sendCasinoLog(message.guild, cfg, 'logChannelGames', {
       icon  : '◊',
       title : 'Vol Bloque',
@@ -161,6 +163,11 @@ exports.run = async (client, message, args) => {
   // Steal coins
   db.removeCasinoCoins(guildId, target.id, stolenCoins);
   db.addCasinoCoins(guildId, userId, stolenCoins, 'win');
+
+    // Track game stats
+    const gameDuration = Math.floor((Date.now() - startTime) / 1000);
+    db.recordGameStat(guildId, userId, 'vol', success > 0 ? 1 : 0, amount, success > 0 ? success : 0);
+    db.addPlaytime(guildId, userId, gameDuration);
 
   // Steal XP if enabled
   let stolenXp = 0;
