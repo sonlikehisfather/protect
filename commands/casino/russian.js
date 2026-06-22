@@ -121,7 +121,7 @@ exports.run = async (client, message, args) => {
     const accentColor = state === 'dead' ? 0xED4245 : (state === 'cashout' || state === 'maxsurvived') ? 0x57F287 : 0xFEE75C;
 
     if (img && V2_AVAILABLE) {
-      const container = new ContainerBuilder().setAccentColor(accentColor);
+      const container = new ContainerBuilder();
       container.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL('attachment://russian_game.png')));
 
       if (state === 'playing') {
@@ -152,7 +152,7 @@ exports.run = async (client, message, args) => {
       return {
         embeds: [embed.build(guildId, null, {
           title: '◉ Roulette Russe', image: 'attachment://russian_game.png',
-          description: desc, color: '#' + accentColor.toString(16).padStart(6, '0'), timestamp: false,
+          description: desc, timestamp: false,
         })],
         files: [new AttachmentBuilder(img, { name: 'russian_game.png' })],
         components: rows,
@@ -255,7 +255,7 @@ exports.run = async (client, message, args) => {
       sendCasinoLog(message.guild, cfg, 'logChannelGames', {
         icon  : '↺',
         title : 'Roulette Russe',
-        color : 0xFEE75C,
+
         user  : userId,
         lines : [
           `Mise : **${embed.fmtCoins(amount)}** coins`,
@@ -264,7 +264,7 @@ exports.run = async (client, message, args) => {
         ],
       });
       if (V2_AVAILABLE) {
-        const c = new ContainerBuilder().setAccentColor(0xFEE75C);
+        const c = new ContainerBuilder();
         c.addTextDisplayComponents(new TextDisplayBuilder().setContent(
           `## ◉ Roulette Russe\n\n> Mise : **${embed.fmtCoins(amount)}** coins ・ **Expiré**\n> Remboursement : **${embed.fmtCoins(amount)}** coins\n> Solde : **${embed.fmtCoins(finalCoins)}** coins`
         ));
@@ -286,7 +286,7 @@ exports.run = async (client, message, args) => {
     sendCasinoLog(message.guild, cfg, 'logChannelGames', {
       icon  : netGain > 0 ? '✸' : '↺',
       title : 'Roulette Russe',
-      color : netGain > 0 ? 0x57F287 : 0xED4245,
+
       user  : userId,
       lines : [
         `Mise : **${embed.fmtCoins(amount)}** coins`,

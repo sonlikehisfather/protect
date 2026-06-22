@@ -58,6 +58,6 @@ exports.run = async (client, message, args) => {
 
   return embed.reply(message,
     `Capital: ${embed.fmtCoins(invest.amount)} | Pénalité (${pctLabel}): -${embed.fmtCoins(penaltyAmount)}\nReçu: +${embed.fmtCoins(returned)} | solde : ${embed.fmtCoins(user?.coins ?? 0)}`,
-    { title: 'Retrait investissement', color: '#ED4245' }
+    { title: 'Retrait investissement' }
   );
 };

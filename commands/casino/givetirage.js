@@ -82,7 +82,7 @@ exports.run = async (client, message, args) => {
   sendCasinoLog(message.guild, cfg, 'logChannelGains', {
     icon  : '✸',
     title : 'Give Tirages',
-    color : 0x57F287,
+
     lines : [
       `◆ **+${amount}** tirage${amount !== 1 ? 's' : ''} → <@${target.id}>`,
       `> par <@${authorId}>`,
@@ -99,6 +99,6 @@ exports.run = async (client, message, args) => {
 
   return embed.reply(message,
     `+${amount} tirage(s) ajoutés à <@${target.id}>.`,
-    { title: '✸ Give Tirages', color: '#57F287' }
+    { title: '✸ Give Tirages' }
   );
 };

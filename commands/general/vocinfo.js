@@ -170,13 +170,13 @@ module.exports = {
       new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId('vocinfo:prev')
-          .setLabel('\u25C0')
+          .setLabel('\u2190')
           .setStyle(ButtonStyle.Secondary)
           .setDisabled(disabled || page === 0),
 
         new ButtonBuilder()
           .setCustomId('vocinfo:next')
-          .setLabel('\u25B6')
+          .setLabel('\u2192')
           .setStyle(ButtonStyle.Secondary)
           .setDisabled(disabled || page >= pages.length - 1),
 

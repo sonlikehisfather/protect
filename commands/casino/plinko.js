@@ -5,6 +5,8 @@ const {
   ButtonBuilder,
   ButtonStyle,
   ContainerBuilder,
+  MediaGalleryBuilder,
+  MediaGalleryItemBuilder,
   MessageFlags,
   SeparatorBuilder,
   TextDisplayBuilder,
@@ -148,7 +150,7 @@ exports.run = async (client, message, args) => {
     }
 
     if (V2_AVAILABLE) {
-      const container = new ContainerBuilder().setAccentColor(0x5865F2);
+      const container = new ContainerBuilder();
       container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
         `## ◉ Plinko\n\n> Mise : **${embed.fmtCoins(amount)}** coins ・ Risque : **${RISK_LABELS[currentRisk]}**\n\nChoisis ton niveau de risque puis lance la balle !`
       ));
@@ -186,7 +188,7 @@ exports.run = async (client, message, args) => {
     const header = `## ◉ Plinko\n\n> Mise : **${embed.fmtCoins(amount)}** coins ・ Risque : **${RISK_LABELS[risk]}**\n`;
 
     if (V2_AVAILABLE) {
-      const container = new ContainerBuilder().setAccentColor(0x5865F2);
+      const container = new ContainerBuilder();
       container.addTextDisplayComponents(new TextDisplayBuilder().setContent(header + '\n' + grid));
       return { components: [container], flags: COMPONENTS_V2_FLAG, allowedMentions: { parse: [] } };
     }
@@ -213,7 +215,6 @@ exports.run = async (client, message, args) => {
     sendCasinoLog(message.guild, cfg, 'logChannelGames', {
       icon  : netGain > 0 ? '✸' : '↺',
       title : 'Plinko',
-      color : netGain > 0 ? 0x57F287 : 0xED4245,
       user  : userId,
       lines : [
         `Mise : **${embed.fmtCoins(amount)}** coins ・ Risque : **${RISK_LABELS[risk]}**`,
@@ -232,6 +233,11 @@ exports.run = async (client, message, args) => {
         riskLabel: RISK_LABELS[risk],
       });
       const attachment = new AttachmentBuilder(buffer, { name: 'plinko.png' });
+      if (V2_AVAILABLE) {
+        const container = new ContainerBuilder();
+        container.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL('attachment://plinko.png')));
+        return { components: [container], flags: COMPONENTS_V2_FLAG, files: [attachment], allowedMentions: { parse: [] } };
+      }
       return { files: [attachment], components: [], allowedMentions: { parse: [] } };
     } catch (imgErr) {
       console.error('[Plinko] Image error:', imgErr?.message);
@@ -243,7 +249,7 @@ exports.run = async (client, message, args) => {
       else resultLine = `> ‼ **Perdu.** ×${finalMult} → **-${embed.fmtCoins(Math.abs(netGain))}** coins`;
       const header = `## ◉ Plinko\n\n> Mise : **${embed.fmtCoins(amount)}** coins ・ Risque : **${RISK_LABELS[risk]}**\n`;
       if (V2_AVAILABLE) {
-        const container = new ContainerBuilder().setAccentColor(netGain > 0 ? 0x57F287 : netGain === 0 ? 0xFEE75C : 0xED4245);
+        const container = new ContainerBuilder();
         container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
           header + '\n' + grid + '\n\n### Resultat\n' + slotDisplay + '\n\n' + resultLine + '\n> Solde : **' + embed.fmtCoins(finalCoins) + '** coins'
         ));
@@ -314,7 +320,7 @@ exports.run = async (client, message, args) => {
       sendCasinoLog(message.guild, cfg, 'logChannelGames', {
         icon  : '↺',
         title : 'Plinko',
-        color : 0xFEE75C,
+
         user  : userId,
         lines : [
           `Mise : **${embed.fmtCoins(amount)}** coins`,
@@ -323,7 +329,7 @@ exports.run = async (client, message, args) => {
         ],
       });
       if (V2_AVAILABLE) {
-        const c = new ContainerBuilder().setAccentColor(0xFEE75C);
+        const c = new ContainerBuilder();
         c.addTextDisplayComponents(new TextDisplayBuilder().setContent(
           `## ◉ Plinko\n\n> Mise : **${embed.fmtCoins(amount)}** coins ・ **Expiré**\n> Remboursement : **${embed.fmtCoins(amount)}** coins\n> Solde : **${embed.fmtCoins(finalCoins)}** coins`
         ));

@@ -104,7 +104,7 @@ exports.run = async (client, message, args) => {
   );
 
   const buildPickV2 = () => {
-    const container = new ContainerBuilder().setAccentColor(0x3498DB);
+    const container = new ContainerBuilder();
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
       `## 🎯 Dice\n\n` +
       `Mise : **${embed.fmtCoins(amount)}** coins\n\n` +
@@ -128,7 +128,7 @@ exports.run = async (client, message, args) => {
     embeds: [embed.build(guildId, null, {
       title: '🎯 Dice',
       description: `Mise : **${embed.fmtCoins(amount)}** coins\n\nChoisis une plage entre **0** et **${ROLL_MAX - 1}**.\nLe bot tire un chiffre. S'il est dans ta plage, tu gagnes !\n\nPlus ta plage est petite, plus la cote est élevée.\n\nExemples :\n• 0-99 (100 num) → x${calcMultiplier(100).toFixed(2)} (~100%)\n• 0-49 (50 num) → x${calcMultiplier(50).toFixed(2)} (~50%)\n• 30-39 (10 num) → x${calcMultiplier(10).toFixed(2)} (~10%)\n• 45-47 (3 num) → x${calcMultiplier(3).toFixed(2)} (~3%)`,
-      color: '#3498DB', timestamp: false,
+      timestamp: false,
     })],
     components: [btnRow],
     allowedMentions: { parse: [] },
@@ -245,7 +245,7 @@ exports.run = async (client, message, args) => {
       sendCasinoLog(message.guild, cfg, 'logChannelGames', {
         icon  : win ? '✸' : '↺',
         title : 'Dice',
-        color : win ? 0x57F287 : 0xED4245,
+
         user  : userId,
         lines : [
           `Mise : **${embed.fmtCoins(amount)}** coins`,
@@ -281,7 +281,7 @@ exports.run = async (client, message, args) => {
       let editPayload;
 
       if (imageBuffer && V2_AVAILABLE) {
-        const c = new ContainerBuilder().setAccentColor(win ? 0x57F287 : 0xED4245);
+        const c = new ContainerBuilder();
         c.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL('attachment://dice_result.png')));
         editPayload = {
           components: [c],
@@ -293,13 +293,13 @@ exports.run = async (client, message, args) => {
           embeds: [embed.build(guildId, null, {
             title: '🎯 Dice',
             image: 'attachment://dice_result.png',
-            color: win ? '#57F287' : '#ED4245', timestamp: false,
+            timestamp: false,
           })],
           components: [],
           files: [new AttachmentBuilder(imageBuffer, { name: 'dice_result.png' })],
         };
       } else if (V2_AVAILABLE) {
-        const c = new ContainerBuilder().setAccentColor(win ? 0x57F287 : 0xED4245);
+        const c = new ContainerBuilder();
         c.addTextDisplayComponents(new TextDisplayBuilder().setContent(
           `## 🎯 Dice\n\n` +
           `Plage : **${rangeMin} - ${rangeMax}** (${rangeSize} num) ・ x${mult.toFixed(2)} ・ ${winChance}%\n` +
@@ -321,7 +321,7 @@ exports.run = async (client, message, args) => {
               { name: 'Resultat', value: win ? `✔ Gagne +${embed.fmtCoins((winAmount - amount))} coins` : `× Perdu -${embed.fmtCoins(amount)} coins`, inline: false },
               { name: 'Solde', value: `${embed.fmtCoins(finalCoins)} coins`, inline: false },
             ],
-            color: win ? '#57F287' : '#ED4245', timestamp: false,
+            timestamp: false,
           })],
           components: [],
         };
@@ -343,7 +343,7 @@ exports.run = async (client, message, args) => {
     sendCasinoLog(message.guild, cfg, 'logChannelGames', {
       icon  : '↺',
       title : 'Dice',
-      color : 0xFEE75C,
+
       user  : userId,
       lines : [
         `Mise : **${embed.fmtCoins(amount)}** coins`,
@@ -352,7 +352,7 @@ exports.run = async (client, message, args) => {
       ],
     });
     if (V2_AVAILABLE) {
-      const c = new ContainerBuilder().setAccentColor(0xFEE75C);
+      const c = new ContainerBuilder();
       c.addTextDisplayComponents(new TextDisplayBuilder().setContent(
         `## 🎯 Dice\n\n> Mise : **${embed.fmtCoins(amount)}** coins ・ **Expiré**\n> Remboursement : **${embed.fmtCoins(amount)}** coins\n> Solde : **${embed.fmtCoins(finalCoins)}** coins`
       ));

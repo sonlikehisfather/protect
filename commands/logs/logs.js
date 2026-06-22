@@ -522,8 +522,8 @@ function _buildV2Panel(state, client) {
 
     container.addSeparatorComponents(new SeparatorBuilder());
     const navRow = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('logs:page:prev').setLabel('\u25C0').setStyle(ButtonStyle.Secondary).setDisabled(currentPage === 0),
-      new ButtonBuilder().setCustomId('logs:page:next').setLabel('\u25B6').setStyle(ButtonStyle.Secondary).setDisabled(currentPage >= totalPages - 1),
+      new ButtonBuilder().setCustomId('logs:page:prev').setLabel('\u2190').setStyle(ButtonStyle.Secondary).setDisabled(currentPage === 0),
+      new ButtonBuilder().setCustomId('logs:page:next').setLabel('\u2192').setStyle(ButtonStyle.Secondary).setDisabled(currentPage >= totalPages - 1),
       new ButtonBuilder().setCustomId('logs:close').setLabel('\u2716').setStyle(ButtonStyle.Danger)
     );
     container.addActionRowComponents(navRow);

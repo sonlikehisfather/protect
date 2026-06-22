@@ -63,7 +63,7 @@ exports.run = async (client, message, args) => {
 
   let msg;
   if (V2_AVAILABLE) {
-    const container = new ContainerBuilder().setAccentColor(0x57F287);
+    const container = new ContainerBuilder();
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(giftText));
     container.addActionRowComponents(makeRow());
     msg = await message.reply({ components: [container], flags: COMPONENTS_V2_FLAG }).catch(() => null);
@@ -94,7 +94,7 @@ exports.run = async (client, message, args) => {
       sendCasinoLog(message.guild, cfg, 'logChannelGames', {
         icon  : '✸',
         title : 'Gift',
-        color : 0x57F287,
+
         user  : i.user.id,
         lines : [
           `Cadeau trouve par <@${i.user.id}>`,
@@ -102,7 +102,7 @@ exports.run = async (client, message, args) => {
         ],
       });
       if (V2_AVAILABLE) {
-        const winContainer = new ContainerBuilder().setAccentColor(0x57F287);
+        const winContainer = new ContainerBuilder();
         winContainer.addTextDisplayComponents(new TextDisplayBuilder().setContent(
           `## Cadeau trouve !\n\n> **<@${i.user.id}>** a trouve le cadeau ・ **+${embed.fmtCoins(prize)} coins** !`
         ));
@@ -115,7 +115,7 @@ exports.run = async (client, message, args) => {
       collector.stop('won');
     } else {
       if (V2_AVAILABLE) {
-        const loseContainer = new ContainerBuilder().setAccentColor(0xED4245);
+        const loseContainer = new ContainerBuilder();
         loseContainer.addTextDisplayComponents(new TextDisplayBuilder().setContent(
           `> **<@${i.user.id}>** a rate ・ ce bouton etait vide.`
         ));
@@ -135,7 +135,7 @@ exports.run = async (client, message, args) => {
       const endText = expired
         ? `Le cadeau a expire ・ personne n'a trouve ! *(+${embed.fmtCoins(prize)} coins perdus)*`
         : giftText;
-      const container = new ContainerBuilder().setAccentColor(expired ? 0xED4245 : 0x57F287);
+      const container = new ContainerBuilder();
       container.addTextDisplayComponents(new TextDisplayBuilder().setContent(endText));
       container.addActionRowComponents(makeRow(true, true));
       await msg.edit({ components: [container], flags: COMPONENTS_V2_FLAG }).catch(() => {});

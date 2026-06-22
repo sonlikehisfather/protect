@@ -103,13 +103,13 @@ module.exports = {
       new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId('local:sanctions:prev')
-          .setLabel('\u25C0')
+          .setLabel('\u2190')
           .setStyle(ButtonStyle.Secondary)
           .setDisabled(disabled || current === 0),
 
         new ButtonBuilder()
           .setCustomId('local:sanctions:next')
-          .setLabel('\u25B6')
+          .setLabel('\u2192')
           .setStyle(ButtonStyle.Secondary)
           .setDisabled(disabled || current >= pages.length - 1),
 

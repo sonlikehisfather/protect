@@ -351,12 +351,12 @@ async function _sendPaginated(message, guildId, opts) {
   const buildRow = (idx) => new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('local:perms:prev')
-      .setLabel('\u25C0')
+      .setLabel('\u2190')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(idx === 0),
     new ButtonBuilder()
       .setCustomId('local:perms:next')
-      .setLabel('\u25B6')
+      .setLabel('\u2192')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(idx === total - 1),
     new ButtonBuilder()

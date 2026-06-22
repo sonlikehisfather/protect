@@ -300,12 +300,12 @@ function _buildV2Doc(state, guildId) {
     const navRow = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('logsdoc:page:prev')
-        .setLabel('\u25C0')
+        .setLabel('\u2190')
         .setStyle(ButtonStyle.Secondary)
         .setDisabled(currentPage === 0),
       new ButtonBuilder()
         .setCustomId('logsdoc:page:next')
-        .setLabel('\u25B6')
+        .setLabel('\u2192')
         .setStyle(ButtonStyle.Secondary)
         .setDisabled(currentPage >= totalPages - 1),
       new ButtonBuilder()
@@ -387,12 +387,12 @@ function _buildClassicDoc(state, guildId) {
       new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId('logsdoc:page:prev')
-          .setLabel('\u25C0')
+          .setLabel('\u2190')
           .setStyle(ButtonStyle.Secondary)
           .setDisabled(currentPage === 0),
         new ButtonBuilder()
           .setCustomId('logsdoc:page:next')
-          .setLabel('\u25B6')
+          .setLabel('\u2192')
           .setStyle(ButtonStyle.Secondary)
           .setDisabled(currentPage >= totalPages - 1),
         new ButtonBuilder()

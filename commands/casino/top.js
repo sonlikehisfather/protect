@@ -52,5 +52,5 @@ exports.run = async (client, message, args) => {
     return message.reply({ components: [container], flags: COMPONENTS_V2_FLAG, allowedMentions: { parse: [] } });
   }
 
-  return message.reply({ embeds: [embed.build(guildId, description, { title: '★ Top Coins', color: '#FFD700' })] });
+  return message.reply({ embeds: [embed.build(guildId, description, { title: '★ Top Coins' })] });
 };

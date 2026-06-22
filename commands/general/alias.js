@@ -109,12 +109,12 @@ module.exports = {
           new ActionRowBuilder().addComponents(
             new ButtonBuilder()
               .setCustomId('al:prev')
-              .setLabel('\u25C0')
+              .setLabel('\u2190')
               .setStyle(ButtonStyle.Secondary)
               .setDisabled(disabled || currentPage === 0),
             new ButtonBuilder()
               .setCustomId('al:next')
-              .setLabel('\u25B6')
+              .setLabel('\u2192')
               .setStyle(ButtonStyle.Secondary)
               .setDisabled(disabled || currentPage >= maxPage),
             new ButtonBuilder()

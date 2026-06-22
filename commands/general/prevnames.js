@@ -180,12 +180,12 @@ function _buildNavRow(pageIdx, totalPages, disabled = false) {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('pn:prev')
-      .setLabel('\u25C0')
+      .setLabel('\u2190')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(disabled || pageIdx === 0),
     new ButtonBuilder()
       .setCustomId('pn:next')
-      .setLabel('\u25B6')
+      .setLabel('\u2192')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(disabled || pageIdx >= totalPages - 1),
     new ButtonBuilder()

@@ -74,6 +74,6 @@ exports.run = async (client, message, args) => {
 
   return embed.reply(message,
     `Gains reclames: +${embed.fmtCoins(gainAmount)} coins\n\nsolde : ${embed.fmtCoins(updatedUser.coins)}`,
-    { title: 'Gains Investissement', color: '#57F287' }
+    { title: 'Gains Investissement' }
   );
 };

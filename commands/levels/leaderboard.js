@@ -132,13 +132,13 @@ function _buildLeaderboardPayload(guildId, page) {
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`${CUSTOM_ID}:${guildId}:${safePage - 1}`)
-      .setLabel('\u25C0')
+      .setLabel('\u2190')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(safePage <= 1),
 
     new ButtonBuilder()
       .setCustomId(`${CUSTOM_ID}:${guildId}:${safePage + 1}`)
-      .setLabel('\u25B6')
+      .setLabel('\u2192')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(safePage >= totalPages),
 

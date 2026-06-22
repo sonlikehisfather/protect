@@ -69,7 +69,7 @@ exports.run = async (client, message, args) => {
   const _v2Panel = (text, disabled = false) => {
     if (V2_AVAILABLE) {
       try {
-        const container = new ContainerBuilder().setAccentColor(0xED4245);
+        const container = new ContainerBuilder();
         container.addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
         container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
         container.addActionRowComponents(_buildConfirmRow(disabled));
@@ -137,7 +137,7 @@ exports.run = async (client, message, args) => {
 
   if (V2_AVAILABLE) {
     try {
-      const container = new ContainerBuilder().setAccentColor(0xED4245);
+      const container = new ContainerBuilder();
       container.addTextDisplayComponents(new TextDisplayBuilder().setContent(doneText));
       await panel.edit({ embeds: [], components: [container], flags: COMPONENTS_V2_FLAG, allowedMentions: { parse: [] } }).catch(() => {});
       return;

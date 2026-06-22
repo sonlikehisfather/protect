@@ -65,7 +65,7 @@ exports.run = async (client, message, args) => {
   sendCasinoLog(message.guild, cfg, 'logChannelGains', {
     icon  : '↺',
     title : 'Remove Tirages',
-    color : 0xED4245,
+
     lines : [
       `◆ **-${effective}** tirage${effective !== 1 ? 's' : ''} ← <@${target.id}>`,
       `> par <@${authorId}>${effective < amount ? ` (plafonne ・ solde etait ${current})` : ''}`,
@@ -84,6 +84,6 @@ exports.run = async (client, message, args) => {
   const note = effective < amount ? `\n*(demande : ${embed.fmtCoins(amount)} ・ plafonne au solde)*` : '';
   return embed.reply(message,
     `**${effective}** tirage(s) retire(s) a <@${target.id}>.${note}`,
-    { title: '↺ Remove Tirages', color: '#ED4245' }
+    { title: '↺ Remove Tirages' }
   );
 };

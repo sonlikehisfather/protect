@@ -129,7 +129,7 @@ exports.run = async (client, message, args) => {
     ));
 
     if (img && V2_AVAILABLE) {
-      const c = new ContainerBuilder().setAccentColor(diff.color);
+      const c = new ContainerBuilder();
       c.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL('attachment://chicken_game.png')));
       c.addSeparatorComponents(new SeparatorBuilder());
       for (const row of rows) c.addActionRowComponents(row);
@@ -141,7 +141,7 @@ exports.run = async (client, message, args) => {
       return {
         embeds: [embed.build(guildId, null, {
           title: '~ Chicken Crossing', image: 'attachment://chicken_game.png',
-          description: text, color: '#' + diff.accent.replace('#', ''), timestamp: false,
+          description: text + diff.accent.replace('#', ''), timestamp: false,
         })],
         files: [new AttachmentBuilder(img, { name: 'chicken_game.png' })],
         components: rows,
@@ -165,14 +165,14 @@ exports.run = async (client, message, args) => {
     }
 
     if (img && V2_AVAILABLE) {
-      const c = new ContainerBuilder().setAccentColor(0xED4245);
+      const c = new ContainerBuilder();
       c.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL('attachment://chicken_crash.png')));
       return { components: [c], flags: COMPONENTS_V2_FLAG, files: [new AttachmentBuilder(img, { name: 'chicken_crash.png' })], allowedMentions: { parse: [] } };
     }
     return {
       embeds: [embed.build(guildId, null, {
         title: '~ Chicken Crossing - CRASH', image: 'attachment://chicken_crash.png',
-        description: `Route ${crashedLane + 1} ・ -${embed.fmtCoins(amount)} coins`, color: '#ED4245', timestamp: false,
+        description: `Route ${crashedLane + 1} ・ -${embed.fmtCoins(amount)} coins`, timestamp: false,
       })],
       files: [new AttachmentBuilder(img, { name: 'chicken_crash.png' })],
       components: [],
@@ -200,7 +200,7 @@ exports.run = async (client, message, args) => {
     sendCasinoLog(message.guild, cfg, 'logChannelGames', {
       icon  : netGain > 0 ? '~' : 'X',
       title : 'Chicken Crossing',
-      color : netGain > 0 ? 0x57F287 : 0xED4245,
+
       user  : userId,
       lines : [
         `Mise : **${embed.fmtCoins(amount)}** coins ・ **${diff.label}**`,
@@ -223,7 +223,7 @@ exports.run = async (client, message, args) => {
     }
 
     if (img && V2_AVAILABLE) {
-      const c = new ContainerBuilder().setAccentColor(netGain > 0 ? 0x57F287 : 0xED4245);
+      const c = new ContainerBuilder();
       c.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL('attachment://chicken_result.png')));
       return { components: [c], flags: COMPONENTS_V2_FLAG, files: [new AttachmentBuilder(img, { name: 'chicken_result.png' })], allowedMentions: { parse: [] } };
     }
@@ -231,7 +231,7 @@ exports.run = async (client, message, args) => {
       embeds: [embed.build(guildId, null, {
         title: '~ Chicken Crossing', image: 'attachment://chicken_result.png',
         description: `${diff.label} ・ ${netGain > 0 ? 'Gagne' : 'Perdu'} ・ Solde : ${embed.fmtCoins(finalCoins)} coins`,
-        color: netGain > 0 ? '#57F287' : '#ED4245', timestamp: false,
+        timestamp: false,
       })],
       files: [new AttachmentBuilder(img, { name: 'chicken_result.png' })],
       components: [],
@@ -241,7 +241,7 @@ exports.run = async (client, message, args) => {
   const buildSelect = (dk) => {
     const d = DIFFS[dk];
     if (V2_AVAILABLE) {
-      const c = new ContainerBuilder().setAccentColor(d.color);
+      const c = new ContainerBuilder();
       c.addTextDisplayComponents(new TextDisplayBuilder().setContent(
         `## ~ Chicken Crossing\n\n` +
         `> Mise : **${embed.fmtCoins(amount)}** coins\n` +
@@ -329,7 +329,7 @@ exports.run = async (client, message, args) => {
         sendCasinoLog(message.guild, cfg, 'logChannelGames', {
           icon  : '↺',
           title : 'Chicken Crossing',
-          color : 0xFEE75C,
+
           user  : userId,
           lines : [
             `Mise : **${embed.fmtCoins(amount)}** coins`,
@@ -338,7 +338,7 @@ exports.run = async (client, message, args) => {
           ],
         });
         if (V2_AVAILABLE) {
-          const c = new ContainerBuilder().setAccentColor(0xED4245);
+          const c = new ContainerBuilder();
           c.addTextDisplayComponents(new TextDisplayBuilder().setContent(
             `## ~ Chicken Crossing\n\n> Mise : **${embed.fmtCoins(amount)}** coins ・ Annule\n> Solde : **${embed.fmtCoins(finalCoins)}** coins`
           ));
@@ -403,7 +403,7 @@ exports.run = async (client, message, args) => {
         sendCasinoLog(message.guild, cfg, 'logChannelGames', {
           icon  : '↺',
           title : 'Chicken Crossing',
-          color : 0xFEE75C,
+
           user  : userId,
           lines : [
             `Mise : **${embed.fmtCoins(amount)}** coins`,
@@ -412,7 +412,7 @@ exports.run = async (client, message, args) => {
           ],
         });
         if (V2_AVAILABLE) {
-          const c = new ContainerBuilder().setAccentColor(0xFEE75C);
+          const c = new ContainerBuilder();
           c.addTextDisplayComponents(new TextDisplayBuilder().setContent(
             `## ~ Chicken Crossing\n\n> Mise : **${embed.fmtCoins(amount)}** coins ・ **Expiré**\n> Remboursement : **${embed.fmtCoins(amount)}** coins\n> Solde : **${embed.fmtCoins(finalCoins)}** coins`
           ));

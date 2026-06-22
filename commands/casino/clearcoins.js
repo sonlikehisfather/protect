@@ -50,7 +50,7 @@ exports.run = async (client, message, args) => {
   sendCasinoLog(message.guild, cfg, 'logChannelGains', {
     icon  : '×',
     title : 'Clear Coins',
-    color : 0xED4245,
+
     user  : target.id,
     lines : [
       `× **-${embed.fmtCoins(current)}** coins (solde remis a zero)`,
@@ -68,6 +68,6 @@ exports.run = async (client, message, args) => {
 
   return embed.reply(message,
     `**${embed.fmtCoins(current)}** coins retires a <@${target.id}>. Solde : 0.`,
-    { title: '× Clear Coins', color: '#ED4245' }
+    { title: '× Clear Coins' }
   );
 };

@@ -110,6 +110,6 @@ exports.run = async (client, message, args) => {
 
   return embed.reply(message,
     `investi : ${embed.fmtCoins(amount)} coins\nTotal: ${embed.fmtCoins(totalInvested)} coins\n\nGains/${claimLabel}: +${embed.fmtCoins(gainPerClaim)}\nGains/jour: +${embed.fmtCoins(dailyGain)} | Gains/semaine: +${embed.fmtCoins(weeklyGain)} | Gains/mois: +${embed.fmtCoins(monthlyGain)}\n\nsolde : ${embed.fmtCoins(newBalance)}\n\nUtilise +claims pour reclamer tes gains`,
-    { title: 'Investissement', color: '#57F287' }
+    { title: 'Investissement' }
   );
 };

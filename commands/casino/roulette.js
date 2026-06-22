@@ -237,7 +237,7 @@ exports.run = async (client, message, args) => {
     sendCasinoLog(message.guild, cfg, 'logChannelGames', {
       icon  : win ? '✸' : '↺',
       title : 'Roulette',
-      color : win ? 0x57F287 : 0xED4245,
+
       user  : userId,
       lines : [
         `Mise : **${embed.fmtCoins(amount)}** coins sur **${choice.label}** (x${choice.cote})`,
@@ -264,7 +264,7 @@ exports.run = async (client, message, args) => {
 
   if (imageBuffer) {
     if (V2_AVAILABLE) {
-      const container = new ContainerBuilder().setAccentColor(win ? 0x57F287 : 0xED4245);
+      const container = new ContainerBuilder();
       container.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL('attachment://roulette_result.png')));
       return message.reply({
         components: [container],
@@ -279,7 +279,7 @@ exports.run = async (client, message, args) => {
         sendCasinoLog(message.guild, cfg, 'logChannelGames', {
           icon  : '↺',
           title : 'Roulette',
-          color : 0xFEE75C,
+
           user  : userId,
           lines : [
             `Mise : **${embed.fmtCoins(amount)}** coins`,
@@ -296,7 +296,7 @@ exports.run = async (client, message, args) => {
           `Résultat : ${result} ${colorTag}\n` +
           `${verdict}\nSolde : ${embed.fmtCoins(finalUser.coins)}`,
         image: 'attachment://roulette_result.png',
-        color: win ? '#57F287' : '#ED4245', timestamp: false,
+        timestamp: false,
       })],
       files: [new AttachmentBuilder(imageBuffer, { name: 'roulette_result.png' })],
       allowedMentions: { parse: [], repliedUser: false },
@@ -308,7 +308,7 @@ exports.run = async (client, message, args) => {
       sendCasinoLog(message.guild, cfg, 'logChannelGames', {
         icon  : '↺',
         title : 'Roulette',
-        color : 0xFEE75C,
+
         user  : userId,
         lines : [
           `Mise : **${embed.fmtCoins(amount)}** coins`,
@@ -320,7 +320,7 @@ exports.run = async (client, message, args) => {
   }
 
   if (V2_AVAILABLE) {
-    const container = new ContainerBuilder().setAccentColor(win ? 0x57F287 : 0xED4245);
+    const container = new ContainerBuilder();
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
       `## ◉ Roulette\n\n` +
       `**Ta mise** : ${embed.fmtCoins(amount)} coins sur **${choice.label}**\n` +
@@ -341,7 +341,7 @@ exports.run = async (client, message, args) => {
       sendCasinoLog(message.guild, cfg, 'logChannelGames', {
         icon  : '↺',
         title : 'Roulette',
-        color : 0xFEE75C,
+
         user  : userId,
         lines : [
           `Mise : **${embed.fmtCoins(amount)}** coins`,
@@ -356,7 +356,7 @@ exports.run = async (client, message, args) => {
     `Mise : ${embed.fmtCoins(amount)} sur ${choice.label} (x${choice.cote})\n` +
     `Résultat : ${result} ${colorTag}\n` +
     `${verdict}\nSolde : ${embed.fmtCoins(finalUser.coins)}`,
-    { title: '◉ Roulette', color: win ? '#57F287' : '#ED4245' }
+    { title: '◉ Roulette' }
   ).then(sent => {
     if (deleteReply) embed.scheduleDelete(sent, deleteDelay);
   }).catch(() => {
@@ -365,7 +365,7 @@ exports.run = async (client, message, args) => {
     sendCasinoLog(message.guild, cfg, 'logChannelGames', {
       icon  : '↺',
       title : 'Roulette',
-      color : 0xFEE75C,
+
       user  : userId,
       lines : [
         `Mise : **${embed.fmtCoins(amount)}** coins`,

@@ -2002,12 +2002,12 @@ async function _handleList(client, message, guildId, deleteReply, deleteDelay) {
       buttons.push(
         new ButtonBuilder()
           .setCustomId('local:rmlist:prev')
-          .setLabel('\u25C0')
+          .setLabel('\u2190')
           .setStyle(ButtonStyle.Secondary)
           .setDisabled(disabled || page === 0),
         new ButtonBuilder()
           .setCustomId('local:rmlist:next')
-          .setLabel('\u25B6')
+          .setLabel('\u2192')
           .setStyle(ButtonStyle.Secondary)
           .setDisabled(disabled || page >= pages.length - 1),
       );

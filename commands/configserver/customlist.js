@@ -100,13 +100,13 @@ module.exports = {
       new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId('local:cclist:prev')
-          .setLabel('\u25C0')
+          .setLabel('\u2190')
           .setStyle(ButtonStyle.Secondary)
           .setDisabled(disabled || page <= 0),
 
         new ButtonBuilder()
           .setCustomId('local:cclist:next')
-          .setLabel('\u25B6')
+          .setLabel('\u2192')
           .setStyle(ButtonStyle.Secondary)
           .setDisabled(disabled || page >= totalPages - 1),
 

@@ -58,6 +58,6 @@ exports.run = async (client, message, args) => {
     `**${displayName}**\n` +
     `※ **${embed.fmtCoins(user.coins)}** coins\n` +
     `◆ **${user.draws}** tirage${user.draws !== 1 ? 's' : ''}`,
-    { color: '#FFD700' }
+    { }
   );
 };

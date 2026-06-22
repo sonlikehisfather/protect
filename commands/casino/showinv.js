@@ -43,7 +43,7 @@ exports.run = async (client, message, args) => {
   const shields = db.getShields(guildId, target.id);
 
   if (V2_AVAILABLE) {
-    const container = new ContainerBuilder().setAccentColor(0xFEE75C);
+    const container = new ContainerBuilder();
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
       `## Inventaire de <@${target.id}>\n` +
       `> Solde : **${embed.fmtCoins((user.coins || 0))}** coins  •  Tirages : **${user?.draws || 0}**`
@@ -101,5 +101,5 @@ exports.run = async (client, message, args) => {
       text += '\n';
     }
   }
-  return embed.reply(message, text, { title: 'Show Inventory', color: '#FEE75C' });
+  return embed.reply(message, text, { title: 'Show Inventory' });
 };

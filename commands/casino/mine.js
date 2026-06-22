@@ -145,9 +145,7 @@ exports.run = async (client, message, args) => {
     const safeClicked = revealed.size - (dead ? 1 : 0);
     const mult = multiplier(safeClicked);
     const potentialWin = Math.floor(amount * mult);
-    const container = new ContainerBuilder().setAccentColor(
-      state === 'dead' ? 0xED4245 : state === 'cashout' ? 0x57F287 : 0xFEE75C
-    );
+    const container = new ContainerBuilder();
 
     let body = `## ■ Mines\n\n`;
     body += `> Mise : **${embed.fmtCoins(amount)}** coins ・ Bombes : **${bombCount}**\n`;
@@ -305,7 +303,7 @@ exports.run = async (client, message, args) => {
       sendCasinoLog(message.guild, cfg, 'logChannelGames', {
         icon  : '↺',
         title : 'Mines',
-        color : 0xFEE75C,
+
         user  : userId,
         lines : [
           `Mise : **${embed.fmtCoins(amount)}** coins`,
@@ -314,7 +312,7 @@ exports.run = async (client, message, args) => {
         ],
       });
       if (V2_AVAILABLE) {
-        const c = new ContainerBuilder().setAccentColor(0xFEE75C);
+        const c = new ContainerBuilder();
         c.addTextDisplayComponents(new TextDisplayBuilder().setContent(
           `## ■ Mines\n\n> Mise : **${embed.fmtCoins(amount)}** coins ・ **Expiré**\n> Remboursement : **${embed.fmtCoins(amount)}** coins\n> Solde : **${embed.fmtCoins(finalCoins)}** coins`
         ));
@@ -340,7 +338,7 @@ exports.run = async (client, message, args) => {
     sendCasinoLog(message.guild, cfg, 'logChannelGames', {
       icon  : netGain > 0 ? '✸' : '↺',
       title : 'Mines',
-      color : netGain > 0 ? 0x57F287 : 0xED4245,
+
       user  : userId,
       lines : [
         `Mise : **${embed.fmtCoins(amount)}** coins ・ Bombes : **${bombCount}**`,
@@ -365,9 +363,7 @@ exports.run = async (client, message, args) => {
 
     if (mineImage) {
       if (V2_AVAILABLE) {
-        const container = new ContainerBuilder().setAccentColor(
-          state === 'dead' ? 0xED4245 : 0x57F287
-        );
+        const container = new ContainerBuilder();
         container.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL('attachment://mine_result.png')));
         await sent.edit({
           components: [container],

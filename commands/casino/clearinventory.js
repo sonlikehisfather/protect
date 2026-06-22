@@ -56,7 +56,7 @@ exports.run = async (client, message, args) => {
   sendCasinoLog(message.guild, cfg, 'logChannelGains', {
     icon  : 'x',
     title : 'Clear Inventory',
-    color : 0xED4245,
+
     lines : [
       `> Inventaire vidé pour <@${target.id}> (${itemCount} item(s) et ${shields} bouclier(s) supprime(s))`,
       `> par <@${authorId}>`,
@@ -75,6 +75,6 @@ exports.run = async (client, message, args) => {
 
   return embed.reply(message,
     `Inventaire de <@${target.id}> vidé (${itemCount} item(s) et ${shields} bouclier(s) supprime(s)).`,
-    { title: 'Clear Inventory', color: '#ED4245' }
+    { title: 'Clear Inventory' }
   );
 };

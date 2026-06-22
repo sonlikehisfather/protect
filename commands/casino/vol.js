@@ -71,7 +71,6 @@ exports.run = async (client, message, args) => {
     sendCasinoLog(message.guild, cfg, 'logChannelGames', {
       icon  : '◊',
       title : 'Vol Bloque',
-      color : 0x5865F2,
       user  : userId,
       lines : [
         `Cible : <@${target.id}>`,
@@ -90,15 +89,15 @@ exports.run = async (client, message, args) => {
 
     if (volImage) {
       if (V2_AVAILABLE) {
-        const container = new ContainerBuilder().setAccentColor(0x5865F2);
+        const container = new ContainerBuilder();
         container.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL('attachment://vol_result.png')));
         return message.reply({ components: [container], flags: COMPONENTS_V2_FLAG, files: [new AttachmentBuilder(volImage, { name: 'vol_result.png' })], allowedMentions: { parse: [] } });
       }
-      return embed.reply(message, `<@${target.id}> avait un bouclier ! Le vol a echoue. (${targetShields - 1} bouclier(s) restant(s))`, { title: 'Vol Bloque', color: '#5865F2', image: 'attachment://vol_result.png', files: [new AttachmentBuilder(volImage, { name: 'vol_result.png' })] });
+      return embed.reply(message, `<@${target.id}> avait un bouclier ! Le vol a echoue. (${targetShields - 1} bouclier(s) restant(s))`, { title: 'Vol Bloque', image: 'attachment://vol_result.png', files: [new AttachmentBuilder(volImage, { name: 'vol_result.png' })] });
     }
 
     if (V2_AVAILABLE) {
-      const container = new ContainerBuilder().setAccentColor(0x5865F2);
+      const container = new ContainerBuilder();
       container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
         `## Vol Bloque\n\n` +
         `> <@${target.id}> avait un bouclier ! Le vol a echoue.\n` +
@@ -106,7 +105,7 @@ exports.run = async (client, message, args) => {
       ));
       return message.reply({ components: [container], flags: COMPONENTS_V2_FLAG, allowedMentions: { parse: [] } });
     }
-    return embed.reply(message, `<@${target.id}> avait un bouclier ! Le vol a echoue. (${targetShields - 1} bouclier(s) restant(s))`, { title: 'Vol Bloque', color: '#5865F2' });
+    return embed.reply(message, `<@${target.id}> avait un bouclier ! Le vol a echoue. (${targetShields - 1} bouclier(s) restant(s))`, { title: 'Vol Bloque' });
   }
 
   // Success roll
@@ -118,7 +117,6 @@ exports.run = async (client, message, args) => {
     logFn(message.guild, cfg, 'logChannelGames', {
       icon  : 'x',
       title : 'Vol Rate',
-      color : 0xED4245,
       user  : userId,
       lines : [
         `Cible : <@${target.id}>`,
@@ -137,15 +135,15 @@ exports.run = async (client, message, args) => {
 
     if (volImage) {
       if (V2_AVAILABLE) {
-        const container = new ContainerBuilder().setAccentColor(0xED4245);
+        const container = new ContainerBuilder();
         container.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL('attachment://vol_result.png')));
         return message.reply({ components: [container], flags: COMPONENTS_V2_FLAG, files: [new AttachmentBuilder(volImage, { name: 'vol_result.png' })], allowedMentions: { parse: [] } });
       }
-      return embed.reply(message, `Tu as tente de voler <@${target.id}> mais tu as echoue.`, { title: 'Vol Rate', color: '#ED4245', image: 'attachment://vol_result.png', files: [new AttachmentBuilder(volImage, { name: 'vol_result.png' })] });
+      return embed.reply(message, `Tu as tente de voler <@${target.id}> mais tu as echoue.`, { title: 'Vol Rate', image: 'attachment://vol_result.png', files: [new AttachmentBuilder(volImage, { name: 'vol_result.png' })] });
     }
 
     if (V2_AVAILABLE) {
-      const container = new ContainerBuilder().setAccentColor(0xED4245);
+      const container = new ContainerBuilder();
       container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
         `## Vol Rate\n\n` +
         `> Tu as tente de voler <@${target.id}> mais tu as echoue.\n` +
@@ -153,7 +151,7 @@ exports.run = async (client, message, args) => {
       ));
       return message.reply({ components: [container], flags: COMPONENTS_V2_FLAG, allowedMentions: { parse: [] } });
     }
-    return embed.reply(message, `Tu as tente de voler <@${target.id}> mais tu as echoue.`, { title: 'Vol Rate', color: '#ED4245' });
+    return embed.reply(message, `Tu as tente de voler <@${target.id}> mais tu as echoue.`, { title: 'Vol Rate' });
   }
 
   // Calculate stolen amount: random % between minPct and maxPct of target's coins
@@ -188,7 +186,6 @@ exports.run = async (client, message, args) => {
   sendCasinoLog(message.guild, cfg, 'logChannelGames', {
     icon  : '◆',
     title : 'Vol Reussi',
-    color : 0x57F287,
     user  : userId,
     lines : [
       `Cible : <@${target.id}>`,
@@ -212,18 +209,18 @@ exports.run = async (client, message, args) => {
 
   if (volImage) {
     if (V2_AVAILABLE) {
-      const container = new ContainerBuilder().setAccentColor(0x57F287);
+      const container = new ContainerBuilder();
       container.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL('attachment://vol_result.png')));
       return message.reply({ components: [container], flags: COMPONENTS_V2_FLAG, files: [new AttachmentBuilder(volImage, { name: 'vol_result.png' })], allowedMentions: { parse: [] } });
     }
     let desc = `+${embed.fmtCoins(stolenCoins)} coins (${stealPercent.toFixed(1)}%)`;
     if (stolenXp > 0) desc += `\n+${embed.fmtCoins(stolenXp)} XP`;
     desc += `\nSolde : ${embed.fmtCoins(updatedThief.coins)} coins`;
-    return embed.reply(message, desc, { title: 'Vol', color: '#57F287', image: 'attachment://vol_result.png', files: [new AttachmentBuilder(volImage, { name: 'vol_result.png' })] });
+    return embed.reply(message, desc, { title: 'Vol', image: 'attachment://vol_result.png', files: [new AttachmentBuilder(volImage, { name: 'vol_result.png' })] });
   }
 
   if (V2_AVAILABLE) {
-    const container = new ContainerBuilder().setAccentColor(0x57F287);
+    const container = new ContainerBuilder();
     let text = `## Vol Reussi\n\n` +
       `> Cible : <@${target.id}>\n` +
       `> ※ **+${embed.fmtCoins(stolenCoins)}** coins *(${stealPercent.toFixed(1)}% de sa fortune)*\n`;
@@ -236,5 +233,5 @@ exports.run = async (client, message, args) => {
   let text = `Vol reussi sur <@${target.id}> !\n+${embed.fmtCoins(stolenCoins)} coins (${stealPercent.toFixed(1)}%)`;
   if (stolenXp > 0) text += `\n+${embed.fmtCoins(stolenXp)} XP`;
   text += `\n\nSolde : ${embed.fmtCoins(updatedThief.coins)} coins`;
-  return embed.reply(message, text, { title: 'Vol', color: '#57F287' });
+  return embed.reply(message, text, { title: 'Vol' });
 };

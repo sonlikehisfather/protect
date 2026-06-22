@@ -23,9 +23,9 @@ const V2_AVAILABLE       = typeof ContainerBuilder    === 'function' &&
                            typeof SeparatorBuilder   === 'function';
 
 const DIFFICULTIES = {
-  easy:   { tiles: 4, bombs: 1, mult: 1.5,  label: 'Easy',   color: 0x57F287, floors: 5 },
-  medium: { tiles: 3, bombs: 1, mult: 2,    label: 'Medium', color: 0x5865F2, floors: 5 },
-  hard:   { tiles: 2, bombs: 1, mult: 3,    label: 'Hard',   color: 0xED4245, floors: 5 },
+  easy:   { tiles: 4, bombs: 1, mult: 1.5,  label: 'Easy',   floors: 5 },
+  medium: { tiles: 3, bombs: 1, mult: 2,    label: 'Medium', floors: 5 },
+  hard:   { tiles: 2, bombs: 1, mult: 3,    label: 'Hard',   floors: 5 },
 };
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -108,7 +108,7 @@ exports.run = async (client, message, args) => {
   const buildSelect = (dk) => {
     const d = DIFFICULTIES[dk];
     if (V2_AVAILABLE) {
-      const c = new ContainerBuilder().setAccentColor(d.color);
+      const c = new ContainerBuilder();
       c.addTextDisplayComponents(new TextDisplayBuilder().setContent(
         `## ▲ Tower\n\n> Mise : **${embed.fmtCoins(amount)}** coins\n` +
         `> **${d.label}** ・ ${d.tiles} tuiles ・ ${d.bombs} bombe\n\n` +
@@ -220,7 +220,7 @@ exports.run = async (client, message, args) => {
     }
 
     if (V2_AVAILABLE) {
-      const c = new ContainerBuilder().setAccentColor(diff.color);
+      const c = new ContainerBuilder();
       c.addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
       c.addSeparatorComponents(new SeparatorBuilder());
       for (const row of rows) c.addActionRowComponents(row);
@@ -251,7 +251,7 @@ exports.run = async (client, message, args) => {
     sendCasinoLog(message.guild, cfg, 'logChannelGames', {
       icon  : netGain > 0 ? '✸' : '↺',
       title : 'Tower',
-      color : netGain > 0 ? 0x57F287 : 0xED4245,
+
       user  : userId,
       lines : [
         `Mise : **${embed.fmtCoins(amount)}** coins ・ Difficulte : **${diff.label}**`,
@@ -274,7 +274,7 @@ exports.run = async (client, message, args) => {
 
     if (towerImage) {
       if (V2_AVAILABLE) {
-        const container = new ContainerBuilder().setAccentColor(netGain > 0 ? 0x57F287 : 0xED4245);
+        const container = new ContainerBuilder();
         container.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL('attachment://tower_result.png')));
         return { components: [container], flags: COMPONENTS_V2_FLAG, files: [new AttachmentBuilder(towerImage, { name: 'tower_result.png' })], allowedMentions: { parse: [] } };
       }
@@ -282,7 +282,7 @@ exports.run = async (client, message, args) => {
         embeds: [embed.build(guildId, null, {
           title: '▲ Tower', image: 'attachment://tower_result.png',
           description: `${diff.label} ・ ${netGain > 0 ? 'Gagne' : 'Perdu'} ・ Solde : ${embed.fmtCoins(finalCoins)} coins`,
-          color: netGain > 0 ? '#57F287' : '#ED4245', timestamp: false,
+          timestamp: false,
         })],
         files: [new AttachmentBuilder(towerImage, { name: 'tower_result.png' })],
         components: [],
@@ -317,7 +317,7 @@ exports.run = async (client, message, args) => {
       `### Resultat\n${resultLine}\n> Solde : **${embed.fmtCoins(finalCoins)}** coins`;
 
     if (V2_AVAILABLE) {
-      const c = new ContainerBuilder().setAccentColor(netGain > 0 ? 0x57F287 : 0xED4245);
+      const c = new ContainerBuilder();
       c.addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
       c.addSeparatorComponents(new SeparatorBuilder());
       for (const row of rows) c.addActionRowComponents(row);
@@ -375,7 +375,7 @@ exports.run = async (client, message, args) => {
         sendCasinoLog(message.guild, cfg, 'logChannelGames', {
           icon  : '↺',
           title : 'Tower',
-          color : 0xFEE75C,
+
           user  : userId,
           lines : [
             `Mise : **${embed.fmtCoins(amount)}** coins`,
@@ -384,7 +384,7 @@ exports.run = async (client, message, args) => {
           ],
         });
         if (V2_AVAILABLE) {
-          const c = new ContainerBuilder().setAccentColor(0xED4245);
+          const c = new ContainerBuilder();
           c.addTextDisplayComponents(new TextDisplayBuilder().setContent(
             `## ▲ Tower\n\n> Mise : **${embed.fmtCoins(amount)}** coins ・ Annule\n> Solde : **${embed.fmtCoins(finalCoins)}** coins`
           ));
@@ -444,7 +444,7 @@ exports.run = async (client, message, args) => {
         sendCasinoLog(message.guild, cfg, 'logChannelGames', {
           icon  : '↺',
           title : 'Tower',
-          color : 0xFEE75C,
+
           user  : userId,
           lines : [
             `Mise : **${embed.fmtCoins(amount)}** coins`,
@@ -453,7 +453,7 @@ exports.run = async (client, message, args) => {
           ],
         });
         if (V2_AVAILABLE) {
-          const c = new ContainerBuilder().setAccentColor(0xFEE75C);
+          const c = new ContainerBuilder();
           c.addTextDisplayComponents(new TextDisplayBuilder().setContent(
             `## ▲ Tower\n\n> Mise : **${embed.fmtCoins(amount)}** coins ・ **Expiré**\n> Remboursement : **${embed.fmtCoins(amount)}** coins\n> Solde : **${embed.fmtCoins(finalCoins)}** coins`
           ));

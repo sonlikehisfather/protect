@@ -44,7 +44,7 @@ exports.run = async (client, message, args) => {
   const waitingList = cooldowns.filter(c => !c.ready);
 
   if (V2_AVAILABLE) {
-    const container = new ContainerBuilder().setAccentColor(0xFFD700);
+    const container = new ContainerBuilder();
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
       '## ⏱ Cooldowns Casino\n' +
       `> <@${userId}> voici tes timers restants`
@@ -79,5 +79,5 @@ exports.run = async (client, message, args) => {
     const icon = c.ready ? '✓' : '❃';
     text += `${icon} **${c.name}** ・ ${formatTime(c.remaining)}\n`;
   }
-  return embed.reply(message, text, { title: '⏱ Timer', color: '#FFD700' });
+  return embed.reply(message, text, { title: '⏱ Timer' });
 };

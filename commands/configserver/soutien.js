@@ -869,7 +869,7 @@ function _buildLeaderboardRow(current, pageCount, disabled) {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('local:soutientop:prev')
-      .setLabel('\u25C0')
+      .setLabel('\u2190')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(disabled || current === 0),
 
@@ -881,7 +881,7 @@ function _buildLeaderboardRow(current, pageCount, disabled) {
 
     new ButtonBuilder()
       .setCustomId('local:soutientop:next')
-      .setLabel('\u25B6')
+      .setLabel('\u2192')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(disabled || current >= pageCount - 1),
 

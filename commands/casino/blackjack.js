@@ -158,7 +158,7 @@ exports.run = async (client, message, args) => {
           { name: '🎮 Toi',       value: formatHand(playerHand), inline: true },
           { name: '🎩 Croupier',  value: dealerDisp,             inline: true },
         ],
-        color: bust ? '#ED4245' : '#FFD700', timestamp: false,
+        timestamp: false,
       })],
       components: (!gameOver && !bust) ? [_btnRow()] : [],
     };
@@ -200,6 +200,7 @@ exports.run = async (client, message, args) => {
   });
 
   collector.on('end', async (_, reason) => {
+    try {
     if (reason !== 'bust' && reason !== 'done') {
       refundBet();
       const finalCoins = db.getCasinoUser(guildId, userId).coins;
@@ -207,7 +208,7 @@ exports.run = async (client, message, args) => {
       sendCasinoLog(message.guild, cfg, 'logChannelGames', {
         icon  : '↺',
         title : 'Blackjack',
-        color : 0xFEE75C,
+
         user  : userId,
         lines : [
           `Mise : **${embed.fmtCoins(amount)}** coins`,
@@ -216,7 +217,7 @@ exports.run = async (client, message, args) => {
         ],
       });
       if (V2_AVAILABLE) {
-        const c = new ContainerBuilder().setAccentColor(0xFEE75C);
+        const c = new ContainerBuilder();
         c.addTextDisplayComponents(new TextDisplayBuilder().setContent(
           `## 🎰 Blackjack\n\n> Mise : **${embed.fmtCoins(amount)}** coins ・ **Expiré**\n> Remboursement : **${embed.fmtCoins(amount)}** coins\n> Solde : **${embed.fmtCoins(finalCoins)}** coins`
         ));
@@ -286,7 +287,7 @@ exports.run = async (client, message, args) => {
     sendCasinoLog(message.guild, csCfg, 'logChannelGames', {
       icon  : win ? '✸' : push ? '◇' : '↺',
       title : 'Blackjack',
-      color : win ? 0x57F287 : push ? 0xFEE75C : 0xED4245,
+
       user  : userId,
       lines : [
         `Mise : **${embed.fmtCoins(amount)}** coins`,
@@ -312,7 +313,7 @@ exports.run = async (client, message, args) => {
 
     if (resultImage) {
       if (V2_AVAILABLE) {
-        const container = new ContainerBuilder().setAccentColor(win ? 0x57F287 : push ? 0xFEE75C : 0xED4245);
+        const container = new ContainerBuilder();
         container.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL('attachment://bj_result.png')));
         await sent.edit({
           components: [container],
@@ -327,7 +328,6 @@ exports.run = async (client, message, args) => {
             fields: [
               { name: '💰 Solde', value: `**${embed.fmtCoins(finalCoins)}** coins`, inline: false },
             ],
-            color: win ? '#57F287' : push ? '#F1C40F' : '#ED4245',
             timestamp: false,
           })],
           files: [new AttachmentBuilder(resultImage, { name: 'bj_result.png' })],
@@ -357,11 +357,14 @@ exports.run = async (client, message, args) => {
             { name: '🎩 Croupier', value: `${formatHand(dealerHand)}`, inline: true },
             { name: '💰 Solde', value: `**${embed.fmtCoins(finalCoins)}** coins`, inline: false },
           ],
-          color: pVal > dVal || dVal > 21 ? '#57F287' : pVal === dVal ? '#F1C40F' : '#ED4245',
           timestamp: false,
         })],
         components: [],
       }).catch(() => {});
+    }
+    } catch (endErr) {
+      console.error('[BJ] End handler error:', endErr?.message);
+      await sent.edit({ content: '🎰 Blackjack ・ Une erreur est survenue.', components: [] }).catch(() => {});
     }
   });
 

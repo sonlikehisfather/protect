@@ -54,7 +54,7 @@ exports.run = async (client, message, args) => {
   sendCasinoLog(message.guild, cfg, 'logChannelGains', {
     icon  : '×',
     title : 'Clear Profil',
-    color : 0xED4245,
+
     user  : target.id,
     lines : [
       `× Profil remis a zero`,
@@ -76,6 +76,6 @@ exports.run = async (client, message, args) => {
 
   return embed.reply(message,
     `Profil de <@${target.id}> remis a zero.\nCoins: ${embed.fmtCoins(coins)} → 0\nTirages: ${draws} → 0\nNiveau: ${realLevel} → 0\nXP: ${embed.fmtCoins(xp)} → 0\nInventaire: vide`,
-    { title: '× Clear Profil', color: '#ED4245' }
+    { title: '× Clear Profil' }
   );
 };

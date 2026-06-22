@@ -6,6 +6,10 @@ const {
   StringSelectMenuBuilder,
   ButtonBuilder,
   ButtonStyle,
+  ContainerBuilder,
+  TextDisplayBuilder,
+  SeparatorBuilder,
+  MessageFlags,
 } = require('discord.js');
 
 const embed  = require('../../utils/embed');
@@ -22,6 +26,9 @@ const TIMEOUT_MS    = 900_000;
 
 const EMBED_FIELD_VALUE_LIMIT = 1024;
 const EMBED_FIELD_SAFE_LIMIT  = 1000;
+
+const COMPONENTS_V2_FLAG = MessageFlags?.IsComponentsV2 ?? (1 << 15);
+const V2_AVAILABLE = typeof ContainerBuilder === 'function' && typeof TextDisplayBuilder === 'function';
 
 const CATEGORY_LABELS = {
   general      : 'Utilitaire',
@@ -119,6 +126,30 @@ const CATEGORY_ALIASES = {
 
 
 const _displayCommandsCache = new Map();
+
+function _buildPageContainer(pageData, actionRows = []) {
+  const parts = [];
+  if (pageData?.title) parts.push(`## ${pageData.title}`);
+  if (pageData?.intro) parts.push(pageData.intro);
+  if (pageData?.fields) {
+    for (const field of pageData.fields) {
+      parts.push(`### ${field.name}\n${field.value}`);
+    }
+  }
+  if (pageData?.footer) parts.push(`-# ${pageData.footer}`);
+
+  const container = new ContainerBuilder();
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(parts.join('\n\n')));
+
+  for (const row of actionRows) {
+    if (row && row.components) {
+      container.addActionRowComponents(row);
+      container.addSeparatorComponents(new SeparatorBuilder());
+    }
+  }
+
+  return container;
+}
 
 module.exports = {
   help: {
@@ -272,13 +303,13 @@ async function _handleSelectMenu(client, message, guildId, prefix, deleteReply, 
       new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId('help:prev_cat')
-          .setLabel('\u25C0')
+          .setLabel('\u2190')
           .setStyle(ButtonStyle.Secondary)
           .setDisabled(disabled || currentPage === 0),
 
         new ButtonBuilder()
           .setCustomId('help:next_cat')
-          .setLabel('\u25B6')
+          .setLabel('\u2190')
           .setStyle(ButtonStyle.Secondary)
           .setDisabled(disabled || currentPage >= maxPage),
 
@@ -298,8 +329,8 @@ async function _handleSelectMenu(client, message, guildId, prefix, deleteReply, 
   };
 
   const msg = await message.reply({
-    embeds          : [(categoryPages[currentCategory] ?? [])[0]],
-    components      : buildRows(),
+    components      : [_buildPageContainer((categoryPages[currentCategory] ?? [])[0], buildRows())],
+    flags           : COMPONENTS_V2_FLAG,
     allowedMentions : { parse: [] },
   }).catch(() => null);
 
@@ -347,8 +378,8 @@ async function _handleSelectMenu(client, message, guildId, prefix, deleteReply, 
       currentPage   = Math.max(0, Math.min(currentPage, maxPage));
 
       await i.update({
-        embeds     : [pages[currentPage]],
-        components : buildRows(),
+        components : [_buildPageContainer(pages[currentPage], buildRows())],
+        flags      : COMPONENTS_V2_FLAG,
       });
 
     } catch (err) {
@@ -444,8 +475,8 @@ async function _handleSelectOnlyMenu(client, message, guildId, prefix, deleteRep
   };
 
   const msg = await message.reply({
-    embeds          : [(categoryPages[currentCategory] ?? [])[0]],
-    components      : buildRows(),
+    components      : [_buildPageContainer((categoryPages[currentCategory] ?? [])[0], buildRows())],
+    flags           : COMPONENTS_V2_FLAG,
     allowedMentions : { parse: [] },
   }).catch(() => null);
 
@@ -488,8 +519,8 @@ async function _handleSelectOnlyMenu(client, message, guildId, prefix, deleteRep
       currentPage = Math.max(0, Math.min(currentPage, maxPage));
 
       return i.update({
-        embeds     : [pages[currentPage]],
-        components : buildRows(),
+        components : [_buildPageContainer(pages[currentPage], buildRows())],
+        flags      : COMPONENTS_V2_FLAG,
       });
     } catch (err) {
       if (err?.code !== 10062 && err?.code !== 40060) {
@@ -547,13 +578,13 @@ async function _handleButtonMenu(client, message, guildId, prefix, deleteReply, 
       new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId('help:btnprev')
-          .setLabel('\u25C0')
+          .setLabel('\u2190')
           .setStyle(ButtonStyle.Secondary)
           .setDisabled(disabled || currentPage === 0),
 
         new ButtonBuilder()
           .setCustomId('help:btnnext')
-          .setLabel('\u25B6')
+          .setLabel('\u2190')
           .setStyle(ButtonStyle.Secondary)
           .setDisabled(disabled || currentPage >= maxPage),
 
@@ -573,8 +604,8 @@ async function _handleButtonMenu(client, message, guildId, prefix, deleteReply, 
   };
 
   const msg = await message.reply({
-    embeds          : [(categoryPages[currentCategory] ?? [])[0]],
-    components      : buildRows(),
+    components      : [_buildPageContainer((categoryPages[currentCategory] ?? [])[0], buildRows())],
+    flags           : COMPONENTS_V2_FLAG,
     allowedMentions : { parse: [] },
   }).catch(() => null);
 
@@ -623,8 +654,8 @@ async function _handleButtonMenu(client, message, guildId, prefix, deleteReply, 
       currentPage = Math.max(0, Math.min(currentPage, maxPage));
 
       return i.update({
-        embeds     : [pages[currentPage]],
-        components : buildRows(),
+        components : [_buildPageContainer(pages[currentPage], buildRows())],
+        flags      : COMPONENTS_V2_FLAG,
       });
     } catch (err) {
       if (err?.code !== 10062 && err?.code !== 40060) {
@@ -673,15 +704,15 @@ async function _handlePagination(client, message, guildId, prefix, deleteReply, 
     return;
   }
 
-  const embeds     = [];
+  const pages     = [];
   const permStart  = {};
   const permLength = {};
 
   for (const perm of orderedPerms) {
-    const pages = _buildPermPages(groups[perm], perm, guildId, prefix);
-    permStart[perm]  = embeds.length;
-    permLength[perm] = pages.length;
-    for (const e of pages) embeds.push(e);
+    const permPages = _buildPermPages(groups[perm], perm, guildId, prefix);
+    permStart[perm]  = pages.length;
+    permLength[perm] = permPages.length;
+    for (const p of permPages) pages.push(p);
   }
 
   let current = 0;
@@ -718,15 +749,15 @@ async function _handlePagination(client, message, guildId, prefix, deleteReply, 
     const buttonRow = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('help:perm:prev')
-        .setLabel('\u25C0')
+        .setLabel('\u2190')
         .setStyle(ButtonStyle.Secondary)
         .setDisabled(disabled || current === 0),
 
       new ButtonBuilder()
         .setCustomId('help:perm:next')
-        .setLabel('\u25B6')
+        .setLabel('\u2190')
         .setStyle(ButtonStyle.Secondary)
-        .setDisabled(disabled || current >= embeds.length - 1),
+        .setDisabled(disabled || current >= pages.length - 1),
 
       new ButtonBuilder()
         .setCustomId('help:perm:close')
@@ -739,8 +770,8 @@ async function _handlePagination(client, message, guildId, prefix, deleteReply, 
   };
 
   const msg = await message.reply({
-    embeds          : [embeds[current]],
-    components      : buildRows(),
+    components      : [_buildPageContainer(pages[current], buildRows())],
+    flags           : COMPONENTS_V2_FLAG,
     allowedMentions : { parse: [] },
   }).catch(() => null);
 
@@ -772,11 +803,11 @@ async function _handlePagination(client, message, guildId, prefix, deleteReply, 
       }
 
       if (i.customId === 'help:perm:prev' && current > 0) current--;
-      if (i.customId === 'help:perm:next' && current < embeds.length - 1) current++;
+      if (i.customId === 'help:perm:next' && current < pages.length - 1) current++;
 
       await i.update({
-        embeds     : [embeds[current]],
-        components : buildRows(),
+        components : [_buildPageContainer(pages[current], buildRows())],
+        flags      : COMPONENTS_V2_FLAG,
       });
 
     } catch (err) {
@@ -904,17 +935,17 @@ function _buildPermPages(commands, perm, guildId, prefix) {
   if (!pages.length) return [];
 
   return pages.map((lines, idx) => {
-    return embed.build(guildId, null, {
+    return {
       title  : `Permission \u2022 ${label}`,
+      intro  : null,
       fields : [
         {
           name  : 'Commandes',
           value : _joinCommandLines(lines),
         },
       ],
-      footer    : `Page ${idx + 1}/${pages.length} \u2022 ${label}`,
-      timestamp : false,
-    });
+      footer : `Page ${idx + 1}/${pages.length} \u2022 ${label}`,
+    };
   });
 }
 
@@ -938,13 +969,13 @@ async function _handleSingleCategory(client, message, guildId, prefix, category,
     new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('help:prev_single')
-        .setLabel('\u25C0')
+        .setLabel('\u2190')
         .setStyle(ButtonStyle.Secondary)
         .setDisabled(disabled || current === 0),
 
       new ButtonBuilder()
         .setCustomId('help:next_single')
-        .setLabel('\u25B6')
+        .setLabel('\u2190')
         .setStyle(ButtonStyle.Secondary)
         .setDisabled(disabled || current >= pages.length - 1),
 
@@ -963,8 +994,8 @@ async function _handleSingleCategory(client, message, guildId, prefix, category,
   ];
 
   const msg = await message.reply({
-    embeds          : [pages[current]],
-    components      : buildRows(),
+    components      : [_buildPageContainer(pages[current], buildRows())],
+    flags           : COMPONENTS_V2_FLAG,
     allowedMentions : { parse: [] },
   }).catch(() => null);
 
@@ -992,8 +1023,8 @@ async function _handleSingleCategory(client, message, guildId, prefix, category,
       if (i.customId === 'help:next_single' && current < pages.length - 1) current++;
 
       await i.update({
-        embeds     : [pages[current]],
-        components : buildRows(),
+        components : [_buildPageContainer(pages[current], buildRows())],
+        flags      : COMPONENTS_V2_FLAG,
       });
 
     } catch (err) {
@@ -1026,9 +1057,10 @@ async function _handleCommandLookup(client, message, input, guildId, prefix, del
       : null;
 
     const sent = await message.reply({
-      embeds: [
-        embed.build(guildId, vIntro, {
+      components: [
+        _buildPageContainer({
           title  : `Commande • ${virtualCommand.name}`,
+          intro  : vIntro,
           fields : [
             {
               name  : 'Description',
@@ -1047,10 +1079,10 @@ async function _handleCommandLookup(client, message, input, guildId, prefix, del
               value : 'Aucun',
             },
           ],
-          timestamp : false,
         }),
       ],
-      allowedMentions: { parse: [] },
+      flags           : COMPONENTS_V2_FLAG,
+      allowedMentions : { parse: [] },
     }).catch(() => null);
 
     if (sent && deleteReply) {
@@ -1106,9 +1138,10 @@ async function _handleCommandLookup(client, message, input, guildId, prefix, del
     : null;
 
   const sent = await message.reply({
-    embeds: [
-      embed.build(guildId, intro, {
+    components: [
+      _buildPageContainer({
         title  : `Commande • ${h.name}`,
+        intro  : intro,
         fields : [
           {
             name  : 'Description',
@@ -1133,10 +1166,10 @@ async function _handleCommandLookup(client, message, input, guildId, prefix, del
             : 'Masqués',
           },
         ],
-        timestamp : false,
       }),
     ],
-    allowedMentions: { parse: [] },
+    flags           : COMPONENTS_V2_FLAG,
+    allowedMentions : { parse: [] },
   }).catch(() => null);
 
   if (sent && deleteReply) {
@@ -1144,7 +1177,7 @@ async function _handleCommandLookup(client, message, input, guildId, prefix, del
   }
 }
 
-function _buildHomeEmbed(client, message, guildId, prefix, helpMessage = null) {
+function _buildHomeData(client, message, guildId, prefix, helpMessage = null) {
   const cmdCount = _getDisplayCommands(client, message).length;
   const catCount = _getCategories(client, message).length;
 
@@ -1152,8 +1185,9 @@ function _buildHomeEmbed(client, message, guildId, prefix, helpMessage = null) {
     ? _interpolateHelpMessage(helpMessage, message, prefix, client)
     : null;
 
-  return embed.build(guildId, description, {
+  return {
     title  : `${client.user.username} • Panel des commandes`,
+    intro  : description,
     fields : [
       {
         name  : 'Infos',
@@ -1168,10 +1202,8 @@ function _buildHomeEmbed(client, message, guildId, prefix, helpMessage = null) {
           `\`${prefix}help <commande>\` • détails d'une commande`,
       },
     ],
-    thumbnail : client.user.displayAvatarURL({ dynamic: true }),
-    footer    : `Utilise ${prefix}help <commande> pour plus de détails`,
-    timestamp : false,
-  });
+    footer : `Utilise ${prefix}help <commande> pour plus de détails`,
+  };
 }
 
 function _interpolateHelpMessage(text, message, prefix, client) {
@@ -1327,17 +1359,17 @@ function _buildCategoryPages(client, message, categories, guildId, prefix) {
     result[cat] = pages.map((lines, idx) => {
       const intro = '*Les arguments peuvent \u00eatre des mentions, des noms ou des IDs Discord.\nS\'ils ne sont pas des mentions, s\u00e9pare-les par \`,\`*';
 
-      return embed.build(guildId, intro, {
+      return {
         title  : `Catégorie \u2022 ${_getCategoryLabel(cat)}`,
+        intro  : intro,
         fields : [
           {
             name  : 'Commandes',
             value : _joinCommandLines(lines),
           },
         ],
-        footer    : `Page ${idx + 1}/${pages.length} \u2022 ${_getCategoryLabel(cat)}`,
-        timestamp : false,
-      });
+        footer : `Page ${idx + 1}/${pages.length} \u2022 ${_getCategoryLabel(cat)}`,
+      };
     });
   }
 
@@ -1345,7 +1377,7 @@ function _buildCategoryPages(client, message, categories, guildId, prefix) {
 }
 
 function _buildAllCategoryEmbeds(client, message, categories, guildId, prefix) {
-  const embeds = [];
+  const result = [];
 
   for (const cat of categories) {
     const commands = _getCommandsByCategory(client, message, cat);
@@ -1354,23 +1386,21 @@ function _buildAllCategoryEmbeds(client, message, categories, guildId, prefix) {
     const intro = '*Les arguments peuvent \u00eatre des mentions, des noms ou des IDs Discord.\nS\'ils ne sont pas des mentions, s\u00e9pare-les par \`,\`*';
 
     for (let i = 0; i < pages.length; i++) {
-      embeds.push(
-        embed.build(guildId, intro, {
-          title  : `Catégorie \u2022 ${_getCategoryLabel(cat)}`,
-          fields : [
-            {
-              name  : 'Commandes',
-              value : _joinCommandLines(pages[i]),
-            },
-          ],
-          footer    : `Page ${i + 1}/${pages.length} \u2022 ${_getCategoryLabel(cat)}`,
-          timestamp : false,
-        })
-      );
+      result.push({
+        title  : `Catégorie \u2022 ${_getCategoryLabel(cat)}`,
+        intro  : intro,
+        fields : [
+          {
+            name  : 'Commandes',
+            value : _joinCommandLines(pages[i]),
+          },
+        ],
+        footer : `Page ${i + 1}/${pages.length} \u2022 ${_getCategoryLabel(cat)}`,
+      });
     }
   }
 
-  return embeds;
+  return result;
 }
 
 function _getCommandUsage(help) {

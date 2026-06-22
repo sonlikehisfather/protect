@@ -56,7 +56,7 @@ exports.run = async (client, message, args) => {
     sendCasinoLog(message.guild, cfg, 'logChannelGains', {
       icon  : '◆',
       title : 'Jackpot Gagné ! ',
-      color : 0xFFD700,
+
       user  : userId,
       lines : [
         `Numero gagnant : **${jackpotNumber}**`,
@@ -66,7 +66,7 @@ exports.run = async (client, message, args) => {
     });
 
     if (V2_AVAILABLE) {
-      const container = new ContainerBuilder().setAccentColor(0xFFD700);
+      const container = new ContainerBuilder();
       container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
         `## Jackpot Gagné !  !\n\n` +
         `> Numero tire : **${guess}** ・ Numero gagnant : **${jackpotNumber}**\n` +
@@ -78,7 +78,7 @@ exports.run = async (client, message, args) => {
 
     return embed.reply(message,
       `Jackpot Gagné !  !\nNumero : ${guess}\nCagnotte : ${embed.fmtCoins(winnings)} coins\nSolde : ${embed.fmtCoins(db.getCasinoUser(guildId, userId).coins)}`,
-      { title: '◆ Jackpot', color: '#FFD700' }
+      { title: '◆ Jackpot' }
     );
   }
 
@@ -88,7 +88,7 @@ exports.run = async (client, message, args) => {
   sendCasinoLog(message.guild, cfg, 'logChannelGains', {
     icon  : '◇',
     title : 'Jackpot rate',
-    color : 0xED4245,
+
     user  : userId,
     lines : [
       `Numero tire : **${guess}** (a ${distance} du numero gagnant)`,
@@ -97,7 +97,7 @@ exports.run = async (client, message, args) => {
   });
 
   if (V2_AVAILABLE) {
-    const container = new ContainerBuilder().setAccentColor(0xED4245);
+    const container = new ContainerBuilder();
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
       `## Jackpot rate\n\n` +
       `> Numero tire : **${guess}**\n` +
@@ -110,6 +110,6 @@ exports.run = async (client, message, args) => {
 
   return embed.reply(message,
     `Jackpot rate\nNumero tire : ${guess} (a ${distance} du bon numero)\nCagnotte : ${embed.fmtCoins(newAmount)} coins\n-${embed.fmtCoins(jackpotCost)} coins`,
-    { title: '◆ Jackpot', color: '#ED4245' }
+    { title: '◆ Jackpot' }
   );
 };

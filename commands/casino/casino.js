@@ -50,10 +50,10 @@ const LEVEL_RANKS = [
 const MAX_LEVEL = 1000;
 
 const PRESTIGE_RANKS = [
-  { prestige: 4, icon: '✯', name: 'Master',     color: '#FF00FF' },
-  { prestige: 3, icon: '❖', name: 'Prestige 3', color: '#00FFFF' },
-  { prestige: 2, icon: '✥', name: 'Prestige 2', color: '#FFD700' },
-  { prestige: 1, icon: '✤', name: 'Prestige 1', color: '#FF6B6B' },
+  { prestige: 4, icon: '✯', name: 'Master'     },
+  { prestige: 3, icon: '❖', name: 'Prestige 3' },
+  { prestige: 2, icon: '✥', name: 'Prestige 2' },
+  { prestige: 1, icon: '✤', name: 'Prestige 1' },
 ];
 
 function getPrestigeInfo(level) {
@@ -85,12 +85,12 @@ const CASINO_IMAGE_URL = 'https://media.discordapp.net/attachments/1343929434945
 const ACH_PER_PAGE = 4;
 
 const ACH_CATS = {
-  novice:        { label: 'Novice',        color: 0x57F287, desc: 'Tes premiers pas au Mysoul Casino.' },
-  intermediaire: { label: 'Intermédiaire', color: 0x5865F2, desc: 'Tu commences à trouver tes marques.' },
-  confirme:      { label: 'Confirmé',      color: 0xFEE75C, desc: 'Les bases du casino parfaitement maîtrisées.' },
-  expert:        { label: 'Expert',        color: 0xEB459E, desc: 'Tu es parmi les meilleurs joueurs.' },
-  legendaire:    { label: 'Légendaire',    color: 0xFF7F00, desc: 'Un niveau réservé à une infime élite.' },
-  mystique:      { label: 'Mystique',      color: 0xFFD700, desc: 'Des défis hors du commun pour les plus grands.' },
+  novice:        { label: 'Novice',        desc: 'Tes premiers pas au Mysoul Casino.' },
+  intermediaire: { label: 'Intermédiaire', desc: 'Tu commences à trouver tes marques.' },
+  confirme:      { label: 'Confirmé',      desc: 'Les bases du casino parfaitement maîtrisées.' },
+  expert:        { label: 'Expert',        desc: 'Tu es parmi les meilleurs joueurs.' },
+  legendaire:    { label: 'Légendaire',    desc: 'Un niveau réservé à une infime élite.' },
+  mystique:      { label: 'Mystique',      desc: 'Des défis hors du commun pour les plus grands.' },
 };
 
 const ACHIEVEMENTS = [
@@ -171,7 +171,7 @@ function buildAchHomePanel(guildId, userId) {
   const keys = _getUnlockedKeys(guildId, userId);
   const total = ACHIEVEMENTS.length;
   const unlockedCount = ACHIEVEMENTS.filter(a => keys.has(a.key)).length;
-  const container = new ContainerBuilder().setAccentColor(0xFFD700);
+  const container = new ContainerBuilder();
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
     `## Succès Mysoul Casino\n> Explore les catégories, suis ta progression et débloque des succès en jouant.`
   ));
@@ -207,7 +207,7 @@ function buildAchCategoryPanel(guildId, userId, cat, page) {
   const slice = catAchs.slice(currentPage * ACH_PER_PAGE, (currentPage + 1) * ACH_PER_PAGE);
   const catUnlocked = catAchs.filter(a => keys.has(a.key)).length;
 
-  const container = new ContainerBuilder().setAccentColor(catData.color);
+  const container = new ContainerBuilder();
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
     `## Succès ${catData.label}\n> ${catData.desc}`
   ));
@@ -234,7 +234,7 @@ function buildAchCategoryPanel(guildId, userId, cat, page) {
 function buildAchOwnedPanel(guildId, userId) {
   const keys = _getUnlockedKeys(guildId, userId);
   const owned = ACHIEVEMENTS.filter(a => keys.has(a.key));
-  const container = new ContainerBuilder().setAccentColor(0x57F287);
+  const container = new ContainerBuilder();
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
     `## Mes Succès\n> **${owned.length} / ${ACHIEVEMENTS.length}** succès débloqués au Mysoul Casino.`
   ));
@@ -279,7 +279,7 @@ function buildAchOwnedCategoryPanel(guildId, userId, cat) {
   owned.forEach(a => { if (!bycat[a.cat]) bycat[a.cat] = []; bycat[a.cat].push(a); });
   const catsWithUnlocked = Object.entries(ACH_CATS).filter(([val]) => bycat[val]);
 
-  const container = new ContainerBuilder().setAccentColor(catData.color);
+  const container = new ContainerBuilder();
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
     `## Mes Succès ${catData.label}\n> **${catAchs.length} / ${catTotal}** débloqués dans cette catégorie.`
   ));
@@ -485,7 +485,7 @@ exports.run = async (client, message, args) => {
 
 function buildCasinoHomePanel(guildId) {
   const sections = getPanelSections(guildId);
-  const container = new ContainerBuilder().setAccentColor(0xFFD700);
+  const container = new ContainerBuilder();
 
   for (const s of sections) {
     if (!s.title && !s.subtitle) {
@@ -778,7 +778,7 @@ function buildCasinoPage(guildId, userId, page) {
     }
     lines.push('');
     lines.push(`Sélectionne une catégorie ci-dessous pour voir les propositions et prix.`);
-    return embed.build(guildId, lines.join('\n'), { title: '◈ Shop', color: '#5865F2' });
+    return embed.build(guildId, lines.join('\n'), { title: '◈ Shop' });
   }
 
   if (page === 'profile') {
@@ -800,29 +800,29 @@ function buildCasinoPage(guildId, userId, page) {
       ``,
       `◆ **Activité**`,
       `❃ Vocal : **${vocHours}h ${vocMins}m**  •  Messages : **${user.msgCount}**`,
-    ].join('\n'), { title: '◈ Profil', color: '#5865F2' });
+    ].join('\n'), { title: '◈ Profil' });
   }
 
   if (page === 'inventory') {
     const inv = db.getInventory(guildId, userId);
-    if (!inv.length) return embed.build(guildId, 'Inventaire vide.', { title: '◈ Inventaire', color: '#FEE75C' });
+    if (!inv.length) return embed.build(guildId, 'Inventaire vide.', { title: '◈ Inventaire' });
     const lines = inv.slice(0, 20).map(item => `**#${item.itemId}** ${item.name} x${item.quantity} (${item.type})`);
-    return embed.build(guildId, `${lines.join('\n')}\n\nLa gestion d'équipement se fera directement depuis ce panel.`, { title: '◈ Inventaire', color: '#FEE75C' });
+    return embed.build(guildId, `${lines.join('\n')}\n\nLa gestion d'équipement se fera directement depuis ce panel.`, { title: '◈ Inventaire' });
   }
 
   if (page === 'achievements') {
     const achs = db.getAchievements(guildId);
     const unlocked = db.getUserAchievements(guildId, userId);
     const unlockedIds = new Set(unlocked.map(a => a.id));
-    if (!achs.length) return embed.build(guildId, 'Aucun succès configuré.', { title: '◈ Succès', color: '#FFD700' });
+    if (!achs.length) return embed.build(guildId, 'Aucun succès configuré.', { title: '◈ Succès' });
     let desc = `**${unlocked.length}/${achs.length}** succès débloqués\n\n`;
     achs.forEach(ach => {
       desc += `${unlockedIds.has(ach.id) ? '◆' : '◇'} **${ach.name}** ・ ${ach.description}\n`;
     });
-    return embed.build(guildId, desc, { title: '◈ Succès', color: '#FFD700' });
+    return embed.build(guildId, desc, { title: '◈ Succès' });
   }
 
-  return embed.build(guildId, `Tu as **${user.draws}** tirage(s).\n\nClique sur **Lancer un tirage** pour tenter ta chance.`, { title: '◈ Tirage', color: '#57F287' });
+  return embed.build(guildId, `Tu as **${user.draws}** tirage(s).\n\nClique sur **Lancer un tirage** pour tenter ta chance.`, { title: '◈ Tirage' });
 }
 
 const _UNIQUE_TYPES = new Set(['color', 'role', 'badge', 'decor', 'nitro', 'title']);
@@ -837,7 +837,7 @@ function _getAvailableShopItems(guildId, userId) {
 
 function buildShopCategoryRow(guildId, userId) {
   const items = _getAvailableShopItems(guildId, userId);
-  const categoryMap = { title: 'Titres', color: 'Couleurs', role: 'Roles', badge: 'Badges', decor: 'Decorations', item: 'Items', draws: 'Tirages', xp: 'XP' };
+  const categoryMap = { title: 'Titres', role: 'Roles', badge: 'Badges', decor: 'Decorations', item: 'Items', draws: 'Tirages', xp: 'XP' };
   const options = [];
   
   for (const [type, label] of Object.entries(categoryMap)) {
@@ -918,7 +918,7 @@ async function handleInteraction(interaction, id) {
   try {
     if (id !== 'cs_panel_profile') {
       const error = checkCasinoAccess(interaction);
-      if (error) return interaction.reply({ embeds: [embed.build(interaction.guild?.id, error, { color: '#ED4245' })], flags: MessageFlags.Ephemeral }).catch(() => {});
+      if (error) return interaction.reply({ embeds: [embed.build(interaction.guild?.id, error, { })], flags: MessageFlags.Ephemeral }).catch(() => {});
     }
 
     const guildId = interaction.guild.id;
@@ -928,7 +928,7 @@ async function handleInteraction(interaction, id) {
       const rawCount = id.split(':')[1];
       const user = db.getCasinoUser(guildId, userId);
       if (user.draws < 1) {
-        return interaction.reply({ embeds: [embed.build(guildId, 'Tu n\'as pas assez de tirages.', { title: '◈ Tirage', color: '#ED4245' })], flags: MessageFlags.Ephemeral }).catch(() => {});
+        return interaction.reply({ embeds: [embed.build(guildId, 'Tu n\'as pas assez de tirages.', { title: '◈ Tirage' })], flags: MessageFlags.Ephemeral }).catch(() => {});
       }
       let count;
       if (rawCount === 'all') {
@@ -937,7 +937,7 @@ async function handleInteraction(interaction, id) {
         count = parseInt(rawCount) || 1;
         if (count > user.draws) {
           return interaction.reply({
-            embeds: [embed.build(guildId, `Tu n\'as que **${user.draws}** tirage(s) restant(s).`, { title: '◈ Tirage', color: '#FEE75C' })],
+            embeds: [embed.build(guildId, `Tu n\'as que **${user.draws}** tirage(s) restant(s).`, { title: '◈ Tirage' })],
             components: [
               new ActionRowBuilder().addComponents(
                 new ButtonBuilder().setCustomId('cs_panel_draw_run:all').setLabel(`All (${user.draws})`).setStyle(ButtonStyle.Secondary),
@@ -978,7 +978,7 @@ async function handleInteraction(interaction, id) {
       sendCasinoLog(interaction.guild, cfg, 'logChannelGames', {
         icon  : '◆',
         title : `Tirage x${count}`,
-        color : 0x57F287,
+
         user  : userId,
         lines : [
           totalCoins > 0 ? `+${embed.fmtCoins(totalCoins)} coins` : null,
@@ -988,7 +988,7 @@ async function handleInteraction(interaction, id) {
       });
 
       return interaction.reply({
-        embeds: [embed.build(guildId, `${rewardText}\n\n◇ Solde : **${embed.fmtCoins(updated.coins)}** coins  •  **${updated.draws}** tirage(s) restant(s)`, { title: header, color: '#57F287' })],
+        embeds: [embed.build(guildId, `${rewardText}\n\n◇ Solde : **${embed.fmtCoins(updated.coins)}** coins  •  **${updated.draws}** tirage(s) restant(s)`, { title: header })],
         components: buildDrawRow(updated.draws < 1, updated.draws),
         flags: MessageFlags.Ephemeral,
       }).catch(() => {})
@@ -1006,23 +1006,28 @@ async function handleInteraction(interaction, id) {
       const cfg = db.getCasinoConfig(guildId);
       if (cfg.roleRequired && !interaction.member.roles.cache.has(cfg.roleRequired)) {
         try {
-          await interaction.member.roles.add(cfg.roleRequired).catch(() => {});
-        } catch {}
+          await interaction.member.roles.add(cfg.roleRequired).catch(err => {
+            console.error('[CASINO] Failed to add required role:', err?.message);
+          });
+        } catch (err) {
+          console.error('[CASINO] Role add exception:', err?.message);
+        }
       }
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral }).catch(() => {});
       const user        = db.getCasinoUser(guildId, userId);
       const levelData   = db.getLevel(guildId, userId);
       const levelConfig = db.getGuildConfig(guildId);
-      const realLevel   = levelConfig?.levelCumul ? levelFromXp(levelData.xp) : levelData.level;
+      const realLevel   = levelConfig?.levelCumul ? levelFromXp(levelData?.xp ?? 0) : (levelData?.level ?? 1);
       const rank        = getRankFromLevel(realLevel);
       const equipped    = db.getEquippedItemDetails(guildId, userId);
       try {
         const { generateProfileCard } = require('../../utils/profileCard');
         const buffer = await generateProfileCard(interaction.member, user, realLevel, levelData, rank, equipped, guildId, userId);
         const attachment = new AttachmentBuilder(buffer, { name: 'profile.png' });
-        return interaction.reply({ files: [attachment], flags: MessageFlags.Ephemeral }).catch(() => {});
+        return interaction.editReply({ files: [attachment] }).catch(() => {});
       } catch (cardErr) {
         console.error('[PROFILE-CARD] Error generating card:', cardErr?.message);
-        return interaction.reply({ embeds: [buildCasinoPage(guildId, userId, 'profile')], flags: MessageFlags.Ephemeral }).catch(() => {});
+        return interaction.editReply({ embeds: [buildCasinoPage(guildId, userId, 'profile')] }).catch(() => {});
       }
     }
 
@@ -1046,13 +1051,13 @@ async function handleInteraction(interaction, id) {
     return interaction.reply(payload).catch(() => {});
   } catch (err) {
     console.error(`[CASINO] handleInteraction error (${id}):`, err?.message);
-    return interaction.reply({ embeds: [embed.build(interaction.guild?.id, 'Une erreur est survenue.', { color: '#ED4245' })], flags: MessageFlags.Ephemeral }).catch(() => {});
+    return interaction.reply({ embeds: [embed.build(interaction.guild?.id, 'Une erreur est survenue.')], flags: MessageFlags.Ephemeral }).catch(() => {});
   }
 }
 
 async function handleShopSelect(interaction) {
   const error = checkCasinoAccess(interaction);
-  if (error) return interaction.reply({ embeds: [embed.build(interaction.guild?.id, error, { color: '#ED4245' })], flags: MessageFlags.Ephemeral }).catch(() => {});
+  if (error) return interaction.reply({ embeds: [embed.build(interaction.guild?.id, error, { })], flags: MessageFlags.Ephemeral }).catch(() => {});
 
   const guildId = interaction.guild.id;
   const userId = interaction.user.id;
@@ -1065,24 +1070,24 @@ async function handleShopSelect(interaction) {
         : result.reason === 'outofstock' ? 'Rupture de stock.'
           : result.reason === 'alreadyowned' ? 'Tu possèdes déjà cet item.'
             : 'Achat impossible.';
-    return interaction.reply({ embeds: [embed.build(guildId, reason, { title: '◈ Boutique', color: '#ED4245' })], flags: MessageFlags.Ephemeral }).catch(() => {});
+    return interaction.reply({ embeds: [embed.build(guildId, reason, { title: '◈ Boutique' })], flags: MessageFlags.Ephemeral }).catch(() => {});
   }
 
   const user = db.getCasinoUser(guildId, userId);
   return interaction.reply({
-    embeds: [embed.build(guildId, `Tu as acheté **${result.item.name}**.\n\nSolde : **${embed.fmtCoins(user.coins)}** coins`, { title: '◈ Achat confirmé', color: '#57F287' })],
+    embeds: [embed.build(guildId, `Tu as acheté **${result.item.name}**.\n\nSolde : **${embed.fmtCoins(user.coins)}** coins`, { title: '◈ Achat confirmé' })],
     flags: MessageFlags.Ephemeral,
   }).catch(() => {});
 }
 
 async function handleShopCategory(interaction) {
   const error = checkCasinoAccess(interaction);
-  if (error) return interaction.reply({ embeds: [embed.build(interaction.guild?.id, error, { color: '#ED4245' })], flags: MessageFlags.Ephemeral }).catch(() => {});
+  if (error) return interaction.reply({ embeds: [embed.build(interaction.guild?.id, error, { })], flags: MessageFlags.Ephemeral }).catch(() => {});
 
   const guildId = interaction.guild.id;
   const userId = interaction.user.id;
   const category = interaction.values?.[0];
-  const categoryLabels = { title: 'Titres', color: 'Couleurs', role: 'Roles', badge: 'Badges', decor: 'Decorations', item: 'Items', draws: 'Tirages', xp: 'XP' };
+  const categoryLabels = { title: 'Titres', role: 'Roles', badge: 'Badges', decor: 'Decorations', item: 'Items', draws: 'Tirages', xp: 'XP' };
 
   if (category === 'shields') {
     const cfg = db.getCasinoConfig(guildId);
@@ -1099,7 +1104,7 @@ async function handleShopCategory(interaction) {
     lines.push('1 bouclier = 1 vol bloqué.');
     const shieldsRow = buildShopShieldsRow(guildId);
     return interaction.reply({
-      embeds: [embed.build(guildId, `${lines.join('\n')}\n\nChoisis un lot à acheter :`, { title: '◊ Boucliers anti-vol', color: '#5865F2' })],
+      embeds: [embed.build(guildId, `${lines.join('\n')}\n\nChoisis un lot à acheter :`, { title: '◊ Boucliers anti-vol' })],
       components: [shieldsRow],
       flags: MessageFlags.Ephemeral,
     }).catch(() => {});
@@ -1108,13 +1113,13 @@ async function handleShopCategory(interaction) {
   // Handle category items
   const items = _getAvailableShopItems(guildId, userId).filter(i => i.type === category);
   if (!items.length) {
-    return interaction.reply({ embeds: [embed.build(guildId, 'Aucun item disponible dans cette catégorie.', { title: `◈ ${categoryLabels[category] || category}`, color: '#ED4245' })], flags: MessageFlags.Ephemeral }).catch(() => {});
+    return interaction.reply({ embeds: [embed.build(guildId, 'Aucun item disponible dans cette catégorie.', { title: `◈ ${categoryLabels[category] || category}` })], flags: MessageFlags.Ephemeral }).catch(() => {});
   }
 
   const lines = items.slice(0, 15).map(item => `**${item.name}** ・ ${embed.fmtCoins(item.price)} coins`);
   const itemsRow = buildShopItemsRow(guildId, userId, category);
   return interaction.reply({
-    embeds: [embed.build(guildId, `${lines.join('\n')}\n\nChoisis un item à acheter :`, { title: `◈ ${categoryLabels[category] || category}`, color: '#5865F2' })],
+    embeds: [embed.build(guildId, `${lines.join('\n')}\n\nChoisis un item à acheter :`, { title: `◈ ${categoryLabels[category] || category}` })],
     components: itemsRow ? [itemsRow] : [],
     flags: MessageFlags.Ephemeral,
   }).catch(() => {});
@@ -1122,7 +1127,7 @@ async function handleShopCategory(interaction) {
 
 async function handleShopShieldSelect(interaction) {
   const error = checkCasinoAccess(interaction);
-  if (error) return interaction.reply({ embeds: [embed.build(interaction.guild?.id, error, { color: '#ED4245' })], flags: MessageFlags.Ephemeral }).catch(() => {});
+  if (error) return interaction.reply({ embeds: [embed.build(interaction.guild?.id, error, { })], flags: MessageFlags.Ephemeral }).catch(() => {});
 
   const guildId = interaction.guild.id;
   const userId = interaction.user.id;
@@ -1133,12 +1138,12 @@ async function handleShopShieldSelect(interaction) {
   const user = db.getCasinoUser(guildId, userId);
 
   if (user.coins < price) {
-    return interaction.reply({ embeds: [embed.build(guildId, `Solde insuffisant. Prix : **${embed.fmtCoins(price)}** coins. Solde : **${embed.fmtCoins(user.coins)}**`, { title: '◊ Boucliers', color: '#ED4245' })], flags: MessageFlags.Ephemeral }).catch(() => {});
+    return interaction.reply({ embeds: [embed.build(guildId, `Solde insuffisant. Prix : **${embed.fmtCoins(price)}** coins. Solde : **${embed.fmtCoins(user.coins)}**`, { title: '◊ Boucliers' })], flags: MessageFlags.Ephemeral }).catch(() => {});
   }
 
   const currentShields = db.getShields(guildId, userId);
   if (currentShields >= 10) {
-    return interaction.reply({ embeds: [embed.build(guildId, `Tu as déjà le maximum de **10** boucliers.`, { title: '◊ Boucliers', color: '#FEE75C' })], flags: MessageFlags.Ephemeral }).catch(() => {});
+    return interaction.reply({ embeds: [embed.build(guildId, `Tu as déjà le maximum de **10** boucliers.`, { title: '◊ Boucliers' })], flags: MessageFlags.Ephemeral }).catch(() => {});
   }
 
   db.removeCasinoCoins(guildId, userId, price, 'spend');
@@ -1146,7 +1151,7 @@ async function handleShopShieldSelect(interaction) {
   const newShields = db.getShields(guildId, userId);
   const updated = db.getCasinoUser(guildId, userId);
   return interaction.reply({
-    embeds: [embed.build(guildId, `Tu as acheté **${qty}** bouclier(s) pour **${embed.fmtCoins(price)}** coins.\n\nBoucliers : **${newShields}**\nSolde : **${embed.fmtCoins(updated.coins)}** coins`, { title: '◊ Achat confirmé', color: '#57F287' })],
+    embeds: [embed.build(guildId, `Tu as acheté **${qty}** bouclier(s) pour **${embed.fmtCoins(price)}** coins.\n\nBoucliers : **${newShields}**\nSolde : **${embed.fmtCoins(updated.coins)}** coins`, { title: '◊ Achat confirmé' })],
     flags: MessageFlags.Ephemeral,
   }).catch(() => {});
 }
@@ -1175,7 +1180,7 @@ function buildConfigPanel(guild, view = 'overview') {
   const shopPreview = shopItems.length ? shopItems.slice(0, 6).map(item => `• **${item.name}** ・ ${embed.fmtCoins(item.price)} coins (${item.type})`).join('\n') : '*Aucun item configuré*';
   const gachaPreview = gachaPool.length ? gachaPool.slice(0, 6).map(item => `• **#${item.id}** ${item.name} ・ ${item.type} / poids ${item.weight}`).join('\n') : '*Aucune récompense configurée*';
   const levelPreview = levelRoles.length ? levelRoles.slice(0, 6).map(item => `• Niveau **${item.level}** ・ <@&${item.roleId}>`).join('\n') : '*Aucun rôle de niveau configuré*';
-  const container = new ContainerBuilder().setAccentColor(config.enabled ? 0x57F287 : 0xED4245);
+  const container = new ContainerBuilder();
   if (view === 'overview') {
     container.addTextDisplayComponents(
       new TextDisplayBuilder().setContent(`## Administration Casino\n> Statut : ${status}`),
@@ -1524,17 +1529,17 @@ exports.handlePanelDraw = handlePanelDraw;
 exports.handleInteraction = handleInteraction;
 async function handleInventoryCategory(interaction) {
   const error = checkCasinoAccess(interaction);
-  if (error) return interaction.reply({ embeds: [embed.build(interaction.guild?.id, error, { color: '#ED4245' })], flags: MessageFlags.Ephemeral }).catch(() => {});
+  if (error) return interaction.reply({ embeds: [embed.build(interaction.guild?.id, error, { })], flags: MessageFlags.Ephemeral }).catch(() => {});
 
   const guildId = interaction.guild.id;
   const userId = interaction.user.id;
   const category = interaction.values?.[0];
-  const categoryLabels = { title: 'Titres', color: 'Couleurs', role: 'Roles', badge: 'Badges', decor: 'Decorations', item: 'Items', draws: 'Tirages', xp: 'XP' };
+  const categoryLabels = { title: 'Titres', role: 'Roles', badge: 'Badges', decor: 'Decorations', item: 'Items', draws: 'Tirages', xp: 'XP' };
 
   if (category === 'shields') {
     const userShields = db.getShields(guildId, userId);
     return interaction.reply({
-      embeds: [embed.build(guildId, `Tu as **${userShields}** bouclier(s).\n\n1 bouclier = 1 vol bloqué.`, { title: '◊ Boucliers anti-vol', color: '#5865F2' })],
+      embeds: [embed.build(guildId, `Tu as **${userShields}** bouclier(s).\n\n1 bouclier = 1 vol bloqué.`, { title: '◊ Boucliers anti-vol' })],
       flags: MessageFlags.Ephemeral,
     }).catch(() => {});
   }
@@ -1543,7 +1548,7 @@ async function handleInventoryCategory(interaction) {
   const inv = db.getInventory(guildId, userId);
   const items = inv.filter(i => i.type === category);
   if (!items.length) {
-    return interaction.reply({ embeds: [embed.build(guildId, 'Aucun item dans cette catégorie.', { title: `◈ ${categoryLabels[category] || category}`, color: '#ED4245' })], flags: MessageFlags.Ephemeral }).catch(() => {});
+    return interaction.reply({ embeds: [embed.build(guildId, 'Aucun item dans cette catégorie.', { title: `◈ ${categoryLabels[category] || category}` })], flags: MessageFlags.Ephemeral }).catch(() => {});
   }
 
   const lines = items.map(item => `**${item.name}** x${item.quantity}`);
@@ -1557,7 +1562,7 @@ async function handleInventoryCategory(interaction) {
     })));
 
   return interaction.reply({
-    embeds: [embed.build(guildId, `${lines.join('\n')}\n\nChoisis un item :`, { title: `◈ ${categoryLabels[category] || category}`, color: '#5865F2' })],
+    embeds: [embed.build(guildId, `${lines.join('\n')}\n\nChoisis un item :`, { title: `◈ ${categoryLabels[category] || category}` })],
     components: [new ActionRowBuilder().addComponents(select)],
     flags: MessageFlags.Ephemeral,
   }).catch(() => {});
@@ -1566,7 +1571,7 @@ async function handleInventoryCategory(interaction) {
 async function handleInventorySelect(interaction) {
   console.log(`[1] handleInventorySelect called`);
   const error = checkCasinoAccess(interaction);
-  if (error) return interaction.reply({ embeds: [embed.build(interaction.guild?.id, error, { color: '#ED4245' })], flags: MessageFlags.Ephemeral }).catch(() => {});
+  if (error) return interaction.reply({ embeds: [embed.build(interaction.guild?.id, error, { })], flags: MessageFlags.Ephemeral }).catch(() => {});
 
   const guildId = interaction.guild.id;
   const userId = interaction.user.id;
@@ -1583,7 +1588,7 @@ async function handleInventorySelect(interaction) {
   
   if (!item) {
     console.log(`[ERROR] Item not found: ${itemId}`);
-    return interaction.reply({ embeds: [embed.build(guildId, 'Item non trouvé.', { color: '#ED4245' })], flags: MessageFlags.Ephemeral }).catch(() => {});
+    return interaction.reply({ embeds: [embed.build(guildId, 'Item non trouvé.', { })], flags: MessageFlags.Ephemeral }).catch(() => {});
   }
 
   if (category === 'xp') {
@@ -1592,7 +1597,7 @@ async function handleInventorySelect(interaction) {
       new ButtonBuilder().setCustomId(`cs_inv_remove:${itemId}`).setLabel('Clear').setStyle(ButtonStyle.Danger),
     );
     return interaction.reply({
-      embeds: [embed.build(guildId, `**${item.name}** x${item.quantity}\n\nChoisis une action :`, { title: 'XP', color: '#5865F2' })],
+      embeds: [embed.build(guildId, `**${item.name}** x${item.quantity}\n\nChoisis une action :`, { title: 'XP' })],
       components: [buttons],
       flags: MessageFlags.Ephemeral,
     }).catch(() => {});
@@ -1606,7 +1611,7 @@ async function handleInventorySelect(interaction) {
       new ButtonBuilder().setCustomId(`cs_inv_remove:${itemId}`).setLabel('Clear').setStyle(ButtonStyle.Danger),
     );
     return interaction.reply({
-      embeds: [embed.build(guildId, `**${item.name}** x${item.quantity}\n\n${hasRole ? '✓ Actuellement équipé' : 'Non équipé'}\n\nChoisis une action :`, { title: category === 'color' ? 'Couleur' : category === 'badge' ? 'Badge' : category === 'decor' ? 'Décoration' : 'Rôle', color: '#5865F2' })],
+      embeds: [embed.build(guildId, `**${item.name}** x${item.quantity}\n\n${hasRole ? '✓ Actuellement équipé' : 'Non équipé'}\n\nChoisis une action :`, { title: category === 'color' ? 'Couleur' : category === 'badge' ? 'Badge' : category === 'decor' ? 'Décoration' : 'Rôle' })],
       components: [buttons],
       flags: MessageFlags.Ephemeral,
     }).catch(() => {});
@@ -1620,7 +1625,7 @@ async function handleInventorySelect(interaction) {
       new ButtonBuilder().setCustomId(`cs_inv_remove:${itemId}`).setLabel('Clear').setStyle(ButtonStyle.Danger),
     );
     return interaction.reply({
-      embeds: [embed.build(guildId, `**${item.name}** x${item.quantity}\n\n${isActive ? '✓ Actuellement affiché' : 'Non affiché'}\n\nChoisis une action :`, { title: 'Titre', color: '#5865F2' })],
+      embeds: [embed.build(guildId, `**${item.name}** x${item.quantity}\n\n${isActive ? '✓ Actuellement affiché' : 'Non affiché'}\n\nChoisis une action :`, { title: 'Titre' })],
       components: [buttons],
       flags: MessageFlags.Ephemeral,
     }).catch(() => {});
@@ -1630,7 +1635,7 @@ async function handleInventorySelect(interaction) {
     new ButtonBuilder().setCustomId(`cs_inv_remove:${itemId}`).setLabel('Clear').setStyle(ButtonStyle.Danger),
   );
   return interaction.reply({
-    embeds: [embed.build(guildId, `**${item.name}** x${item.quantity}`, { title: 'Item', color: '#5865F2' })],
+    embeds: [embed.build(guildId, `**${item.name}** x${item.quantity}`, { title: 'Item' })],
     components: [buttons],
     flags: MessageFlags.Ephemeral,
   }).catch(() => {});
@@ -1638,7 +1643,7 @@ async function handleInventorySelect(interaction) {
 
 async function handleInventoryAction(interaction, id) {
   const error = checkCasinoAccess(interaction);
-  if (error) return interaction.reply({ embeds: [embed.build(interaction.guild?.id, error, { color: '#ED4245' })], flags: MessageFlags.Ephemeral }).catch(() => {});
+  if (error) return interaction.reply({ embeds: [embed.build(interaction.guild?.id, error, { })], flags: MessageFlags.Ephemeral }).catch(() => {});
 
   const guildId = interaction.guild.id;
   const userId = interaction.user.id;
@@ -1689,7 +1694,7 @@ async function handleInventoryAction(interaction, id) {
         new ButtonBuilder().setCustomId(`cs_inv_remove:${itemId}`).setLabel('Clear').setStyle(ButtonStyle.Danger),
       );
       return interaction.update({
-        embeds: [embed.build(guildId, `**${item.name}** x${item.quantity}\n\n${newHasRole ? '✓ Actuellement équipé' : 'Non équipé'}\n\nChoisis une action :`, { title: item.type === 'color' ? 'Couleur' : item.type === 'badge' ? 'Badge' : item.type === 'decor' ? 'Décoration' : 'Rôle', color: '#5865F2' })],
+        embeds: [embed.build(guildId, `**${item.name}** x${item.quantity}\n\n${newHasRole ? '✓ Actuellement équipé' : 'Non équipé'}\n\nChoisis une action :`, { title: item.type === 'color' ? 'Couleur' : item.type === 'badge' ? 'Badge' : item.type === 'decor' ? 'Décoration' : 'Rôle' })],
         components: [buttons],
       }).catch(() => {});
     } catch (e) {
@@ -1711,7 +1716,7 @@ async function handleInventoryAction(interaction, id) {
       new ButtonBuilder().setCustomId(`cs_inv_remove:${itemId}`).setLabel('Clear').setStyle(ButtonStyle.Danger),
     );
     return interaction.update({
-      embeds: [embed.build(guildId, `**${item.name}** x${item.quantity}\n\n${isActive ? '✓ Actuellement affiché' : 'Non affiché'}\n\nChoisis une action :`, { title: 'Titre', color: '#5865F2' })],
+      embeds: [embed.build(guildId, `**${item.name}** x${item.quantity}\n\n${isActive ? '✓ Actuellement affiché' : 'Non affiché'}\n\nChoisis une action :`, { title: 'Titre' })],
       components: [buttons],
     }).catch(() => {});
   }
@@ -1751,8 +1756,7 @@ function sendCasinoLog(guild, cfg, channelType, opts) {
   const logCh = guild.channels.cache.get(cfg[channelType]);
   if (!logCh) return;
 
-  const { icon, title, color, lines, user } = opts;
-  const accent = color || 0x57F287;
+  const { icon, title, lines, user } = opts;
 
   const parts = [
     `### ${icon} ${title}`,
@@ -1762,7 +1766,7 @@ function sendCasinoLog(guild, cfg, channelType, opts) {
   if (user) parts.push(`<@${user}>`);
   for (const line of lines) parts.push(line);
 
-  const container = new ContainerBuilder().setAccentColor(accent);
+  const container = new ContainerBuilder();
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent(parts.join('\n')));
 
   logCh.send({
@@ -1982,7 +1986,7 @@ function _buildHomePage(guildId, userId, member) {
   const user = db.getCasinoUser(guildId, userId);
   const vocHours = Math.floor(user.vocMinutes / 60);
   const vocMins = user.vocMinutes % 60;
-  const container = new ContainerBuilder().setAccentColor(0xFFD700);
+  const container = new ContainerBuilder();
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
     '## ═══════════════════════════\n##      Myoul Casino\n## ═══════════════════════════'),
   );
@@ -2005,7 +2009,7 @@ function _buildProfilePage(guildId, userId) {
     ? Math.round((user.totalGamesWon / (user.totalGamesWon + user.totalGamesLost)) * 100) : 0;
   const rank = getRankFromLevel(realLevel);
   const nextRankEntry = [...LEVEL_RANKS].reverse().find(r => r.min > realLevel);
-  const container = new ContainerBuilder().setAccentColor(0x5865F2);
+  const container = new ContainerBuilder();
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
     `### ◈ Profil  ・  ${rank.icon} **${rank.name}**
 ` +
@@ -2036,7 +2040,7 @@ function _buildProfilePage(guildId, userId) {
 
 function _buildGamesPage(guildId, userId) {
   const user = db.getCasinoUser(guildId, userId);
-  const container = new ContainerBuilder().setAccentColor(0x57F287);
+  const container = new ContainerBuilder();
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent('## IIIIIIIIIIIIIIIIIIIIIIIIIII\n##              JEUX\n## IIIIIIIIIIIIIIIIIIIIIIIIIII'));
   container.addSeparatorComponents(new SeparatorBuilder());
   if (user.draws < 1) {
@@ -2060,7 +2064,7 @@ function _buildGamesPage(guildId, userId) {
 
 function _buildShopPage(guildId, userId) {
   const items = _getAvailableShopItems(guildId, userId);
-  const categoryMap = { title: 'Titres', color: 'Couleurs', role: 'Roles', badge: 'Badges', decor: 'Decorations', item: 'Items', draws: 'Tirages', xp: 'XP' };
+  const categoryMap = { title: 'Titres', role: 'Roles', badge: 'Badges', decor: 'Decorations', item: 'Items', draws: 'Tirages', xp: 'XP' };
   const options = [];
   
   for (const [type, label] of Object.entries(categoryMap)) {
@@ -2081,7 +2085,7 @@ function _buildShopPage(guildId, userId) {
   });
   
   const totalItems = items.length;
-  const container = new ContainerBuilder().setAccentColor(0xEB459E);
+  const container = new ContainerBuilder();
   
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
     `## Boutique\n\n> **Items disponibles :** ${totalItems}\n\n-# Selectionne une categorie pour voir les items.`
@@ -2104,7 +2108,7 @@ function _buildShopPage(guildId, userId) {
 
 function buildInventoryCategoryRow(guildId, userId) {
   const inv = db.getInventory(guildId, userId);
-  const categoryMap = { title: 'Titres', color: 'Couleurs', role: 'Roles', badge: 'Badges', decor: 'Decorations', item: 'Items', draws: 'Tirages', xp: 'XP' };
+  const categoryMap = { title: 'Titres', role: 'Roles', badge: 'Badges', decor: 'Decorations', item: 'Items', draws: 'Tirages', xp: 'XP' };
   const options = [];
   
   for (const [type, label] of Object.entries(categoryMap)) {
@@ -2140,7 +2144,7 @@ function _buildInventoryPage(guildId, userId) {
   const inv = db.getInventory(guildId, userId);
   const userShields = db.getShields(guildId, userId);
   const totalItems = inv.length + (userShields > 0 ? 1 : 0);
-  const container = new ContainerBuilder().setAccentColor(0xFEE75C);
+  const container = new ContainerBuilder();
   
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
     `## Inventaire\n\n> **Objets :** ${totalItems}\n\n-# Selectionne une categorie pour voir tes items.`
@@ -2160,7 +2164,7 @@ function _buildAchievementsPage(guildId, userId) {
   const keys = _getUnlockedKeys(guildId, userId);
   const total = ACHIEVEMENTS.length;
   const unlockedCount = ACHIEVEMENTS.filter(a => keys.has(a.key)).length;
-  const container = new ContainerBuilder().setAccentColor(0xFFD700);
+  const container = new ContainerBuilder();
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
     `## Succès\n> **${unlockedCount}/${total}** succès débloqués\n\n-# Clique sur **Succès** depuis le panel public pour explorer les catégories et suivre ta progression.`
   ));
@@ -2170,7 +2174,7 @@ function _buildAchievementsPage(guildId, userId) {
 
 function _buildLeaderboardPage(guildId) {
   const top = db.getCasinoTop(guildId, 10);
-  const container = new ContainerBuilder().setAccentColor(0xFFD700);
+  const container = new ContainerBuilder();
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent('## ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ\n##         CLASSEMENT TOP 10\n## ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ'));
   container.addSeparatorComponents(new SeparatorBuilder());
   let desc = '';
@@ -2183,7 +2187,7 @@ function _buildLeaderboardPage(guildId) {
 
 function _executeDraw(guildId, userId, drawCount = 1, guild = null) {
   const user = db.getCasinoUser(guildId, userId);
-  const container = new ContainerBuilder().setAccentColor(0x57F287);
+  const container = new ContainerBuilder();
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
     drawCount > 1 ? `## Resultat ${drawCount} Tirages` : '## Resultat Tirage'
   ));
@@ -2219,7 +2223,7 @@ function _executeDraw(guildId, userId, drawCount = 1, guild = null) {
     if (guild) sendCasinoLog(guild, cfg, 'logChannelGames', {
       icon  : '◆',
       title : `Tirage x${actualCount}`,
-      color : 0x57F287,
+
       user  : userId,
       lines : [
         totalCoins > 0 ? `+${embed.fmtCoins(totalCoins)} coins` : null,

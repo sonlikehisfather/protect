@@ -114,7 +114,7 @@ exports.run = async (client, message, args) => {
   const sent = V2_AVAILABLE
     ? await message.reply(_buildV2('pick')).catch(() => null)
     : await message.reply({
-        embeds: [embed.build(guildId, null, { title: '🪙 Pile ou Face', description: 'Choisis ton côté :', color: '#F1C40F', timestamp: false })],
+        embeds: [embed.build(guildId, null, { title: '🪙 Pile ou Face', description: 'Choisis ton côté :', timestamp: false })],
         components: [btnRow],
         allowedMentions: { parse: [] },
       }).catch(() => null);
@@ -165,7 +165,7 @@ exports.run = async (client, message, args) => {
     sendCasinoLog(message.guild, cfg, 'logChannelGames', {
       icon  : win ? '✸' : '↺',
       title : 'Pile ou Face',
-      color : win ? 0x57F287 : 0xED4245,
+
       user  : userId,
       lines : [
         `Mise : **${embed.fmtCoins(amount)}** coins`,
@@ -190,7 +190,7 @@ exports.run = async (client, message, args) => {
 
     if (cfImage) {
       if (V2_AVAILABLE) {
-        const container = new ContainerBuilder().setAccentColor(win ? 0x57F287 : 0xED4245);
+        const container = new ContainerBuilder();
         container.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL('attachment://cf_result.png')));
         await sent.edit({
           components: [container],
@@ -203,7 +203,7 @@ exports.run = async (client, message, args) => {
             title: 'Pile ou Face',
             image: 'attachment://cf_result.png',
             description: `${choice.toUpperCase()} vs ${result.toUpperCase()} ・ ${win ? 'Gagne' : 'Perdu'} \nSolde : ${embed.fmtCoins(finalCoins)} coins`,
-            color: win ? '#57F287' : '#ED4245', timestamp: false,
+            timestamp: false,
           })],
           files: [new AttachmentBuilder(cfImage, { name: 'cf_result.png' })],
           components: [],
@@ -225,7 +225,7 @@ exports.run = async (client, message, args) => {
             { name: 'Score',     value: `${winEmoji} ${resultText}`, inline: false },
             { name: 'Solde',     value: `${embed.fmtCoins(finalCoins)} coins`, inline: false },
           ],
-          color: win ? '#57F287' : '#ED4245', timestamp: false,
+          timestamp: false,
         })],
         components: [],
       }).catch(() => {});
@@ -240,7 +240,7 @@ exports.run = async (client, message, args) => {
     sendCasinoLog(message.guild, cfg, 'logChannelGames', {
       icon  : '↺',
       title : 'Pile ou Face',
-      color : 0xFEE75C,
+
       user  : userId,
       lines : [
         `Mise : **${embed.fmtCoins(amount)}** coins`,
@@ -249,7 +249,7 @@ exports.run = async (client, message, args) => {
       ],
     });
     if (V2_AVAILABLE) {
-      const c = new ContainerBuilder().setAccentColor(0xFEE75C);
+      const c = new ContainerBuilder();
       c.addTextDisplayComponents(new TextDisplayBuilder().setContent(
         `## 🪙 Pile ou Face\n\n> Mise : **${embed.fmtCoins(amount)}** coins ・ **Expiré**\n> Remboursement : **${embed.fmtCoins(amount)}** coins\n> Solde : **${embed.fmtCoins(finalCoins)}** coins`
       ));

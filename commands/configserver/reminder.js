@@ -809,7 +809,7 @@ function _buildListV2(config, rows, page) {
       new ButtonBuilder()
         .setCustomId(`local:reminder:list_prev:${page - 1}`)
         .setLabel('Precedent')
-        .setEmoji('\u25C0')
+        .setEmoji('\u2192')
         .setStyle(ButtonStyle.Secondary)
         .setDisabled(page <= 0),
     );

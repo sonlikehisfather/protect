@@ -356,7 +356,7 @@ function _buildRow(current, total, disabled) {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('local:helpmsg:prev')
-      .setLabel('\u25C0')
+      .setLabel('\u2190')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(disabled || current === 0),
 
@@ -368,7 +368,7 @@ function _buildRow(current, total, disabled) {
 
     new ButtonBuilder()
       .setCustomId('local:helpmsg:next')
-      .setLabel('\u25B6')
+      .setLabel('\u2192')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(disabled || current === total - 1),
 

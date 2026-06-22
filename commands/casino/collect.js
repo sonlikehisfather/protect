@@ -99,6 +99,6 @@ exports.run = async (client, message, args) => {
 
   return embed.reply(message,
     `${vocMinutes} min vocal${isPublic ? ` (x${multiplier} public)` : ''}\n\n+${embed.fmtCoins(coinsEarned)} coins (bonus x${bonusRate})\n+${drawsEarned} tirage(s)\n\nSolde : ${embed.fmtCoins(updated.coins)} | Tirages : ${updated.draws}`,
-    { title: '✸ Collect', color: '#57F287' }
+    { title: '✸ Collect' }
   );
 };

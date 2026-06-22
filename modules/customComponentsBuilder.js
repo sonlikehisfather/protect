@@ -1587,9 +1587,9 @@ async function _handleCreatePagination(interaction, guildId, isStillActive = () 
         }),
       ),
       new ActionRowBuilder().addComponents(
-        _input('labels', 'Labels boutons prev|next (defaut: \u25c0|\u25b6)', TextInputStyle.Short, {
+        _input('labels', 'Labels boutons prev|next (defaut: \u2192|\u25b6)', TextInputStyle.Short, {
           required: false, maxLength: 40,
-          placeholder: '\u25c0|\u25b6',
+          placeholder: '\u2192|\u25b6',
         }),
       ),
       new ActionRowBuilder().addComponents(
@@ -1645,9 +1645,9 @@ async function _handleCreatePagination(interaction, guildId, isStillActive = () 
   const hasExisting = !!(custom.componentsJson || custom.componentsPagesJson);
 
   const prefix   = (submit.fields.getTextInputValue('prefix') || '').trim() || 'Page';
-  const rawLabel = (submit.fields.getTextInputValue('labels') || '').trim() || '\u25c0|\u25b6';
+  const rawLabel = (submit.fields.getTextInputValue('labels') || '').trim() || '\u2192|\u25b6';
   const parts    = rawLabel.split('|');
-  const prevLabel = (parts[0] || '\u25c0').trim().slice(0, 20) || '\u25c0';
+  const prevLabel = (parts[0] || '\u2192').trim().slice(0, 20) || '\u2192';
   const nextLabel = (parts[1] || '\u25b6').trim().slice(0, 20) || '\u25b6';
 
   const rawStyle = (submit.fields.getTextInputValue('style') || '').trim().toLowerCase() || 'secondary';
@@ -2313,7 +2313,7 @@ function _buildDocPayload(guildId, docPage) {
     new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('local:cccomp:doc:prev')
-        .setEmoji('\u25c0')
+        .setEmoji('\u2192')
         .setStyle(ButtonStyle.Secondary)
         .setDisabled(p === 0),
       new ButtonBuilder()

@@ -88,7 +88,7 @@ exports.run = async (client, message, args) => {
   sendCasinoLog(message.guild, cfg, 'logChannelGames', {
     icon  : '➺',
     title : 'Don',
-    color : 0x57F287,
+
     user  : userId,
     lines : [
       `De : <@${userId}> → <@${target.id}>`,
@@ -115,6 +115,6 @@ exports.run = async (client, message, args) => {
 
   return embed.reply(message,
     `Envoyé : ${embed.fmtCoins(amount)} | Taxe : -${embed.fmtCoins(tax)} | Reçu : ${embed.fmtCoins(net)}\n\nVotre solde : ${embed.fmtCoins(sender.coins)} | Solde ${target.username} : ${embed.fmtCoins(receiver.coins)}`,
-    { title: '➺ Don', color: '#57F287' }
+    { title: '➺ Don' }
   );
 };

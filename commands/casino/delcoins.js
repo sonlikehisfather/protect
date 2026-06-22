@@ -68,7 +68,7 @@ exports.run = async (client, message, args) => {
   sendCasinoLog(message.guild, cfg, 'logChannelGains', {
     icon  : '↺',
     title : 'Remove Coins',
-    color : 0xED4245,
+
     lines : [
       `※ **-${embed.fmtCoins(effective)}** coins ← <@${target.id}>`,
       `> par <@${authorId}>${effective < amount ? ` (plafonné ・ solde était ${embed.fmtCoins(current)})` : ''}`,
@@ -87,6 +87,6 @@ exports.run = async (client, message, args) => {
   const note = effective < amount ? `\n*(demandé : ${embed.fmtCoins(amount)} ・ plafonné au solde)*` : '';
   return embed.reply(message,
     `**${embed.fmtCoins(effective)}** coins retirés à <@${target.id}>.${note}`,
-    { title: '↺ Remove Coins', color: '#ED4245' }
+    { title: '↺ Remove Coins' }
   );
 };

@@ -3708,13 +3708,15 @@ up(db) {
   {
     version: 108,
     up(db) {
-      db.exec(`
-        ALTER TABLE casino_config ADD COLUMN coteBlackjack REAL DEFAULT 2.0;
-        ALTER TABLE casino_config ADD COLUMN coteBlackjackBonus REAL DEFAULT 2.5;
-        ALTER TABLE casino_config ADD COLUMN coteCoinflip REAL DEFAULT 2.0;
-        ALTER TABLE casino_config ADD COLUMN coteCoinflipBonus REAL DEFAULT 2.5;
-        ALTER TABLE casino_config ADD COLUMN coteBonusRole TEXT;
-      `);
+      const cols = db.prepare("PRAGMA table_info(casino_config)").all().map(c => c.name);
+      const add = (name, type, dflt) => {
+        if (!cols.includes(name)) db.exec(`ALTER TABLE casino_config ADD COLUMN ${name} ${type} DEFAULT ${dflt};`);
+      };
+      add('coteBlackjack',      'REAL', '2.0');
+      add('coteBlackjackBonus', 'REAL', '2.5');
+      add('coteCoinflip',       'REAL', '2.0');
+      add('coteCoinflipBonus',  'REAL', '2.5');
+      if (!cols.includes('coteBonusRole')) db.exec(`ALTER TABLE casino_config ADD COLUMN coteBonusRole TEXT;`);
     },
   },
 
