@@ -115,7 +115,7 @@ module.exports = {
 
       const sent = await embed.replyError(
         message,
-        'Ce membre est protégé.',
+        'T’as essayé de ban un utilisateur protégé ? ',
         { timestamp: false }
       ).catch(() => null);
 
@@ -237,6 +237,7 @@ module.exports = {
       targetTag   : target.user.tag,
       targetId    : target.id,
       moderatorTag: message.author.tag,
+      moderatorId : message.author.id,
       reason,
       duration    : durationStr,
     });

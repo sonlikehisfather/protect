@@ -2,6 +2,8 @@
 
 
 const db = require('../core/database');
+const embed = require('../utils/embed');
+const { EmbedBuilder } = require('discord.js');
 
 const LOG_CHANNELS = {
   modlog     : 'modLogChannel',
@@ -57,10 +59,58 @@ async function send(client, guildId, type, embedBuilt, options = null) {
       return null;
     }
 
-    return await channel.send({
-      embeds: [embedBuilt],
+    const _normalize = (guildId, type, built, opts = {}) => {
+      try {
+        const data = built?.data || built || {};
+        const e = new EmbedBuilder(data);
+
+        if (!data.timestamp) e.setTimestamp();
+
+        if (!data.footer?.text) {
+          try { e.setFooter({ text: `${type} • ${guildId}`.slice(0, 2048) }); } catch {}
+        }
+
+        if ((!data.fields || data.fields.length === 0) && data.description) {
+          const desc = String(data.description).slice(0, 1024) || ' ';
+          try { e.addFields({ name: 'Détails', value: desc, inline: false }); } catch {}
+          try { e.setDescription(null); } catch {}
+        }
+
+        // Best-effort: add actor/target fields when provided in options and not already present
+        try {
+          const hasField = (name) => (e.data?.fields || []).some(f => String(f.name).toLowerCase().includes(String(name).toLowerCase()));
+
+          const actor = opts?.actor;
+          if (actor && !hasField('auteur') && !hasField('modérateur') && !hasField('exécuteur')) {
+            const aid = actor.id ?? actor.userId ?? null;
+            const atag = actor.tag ?? actor.username ?? null;
+            const aVal = aid ? `${atag ? `${atag} ` : ''}(<@${aid}>) \`${aid}\`` : (atag ?? 'Inconnu');
+            try { e.addFields({ name: 'Auteur', value: aVal, inline: false }); } catch {}
+          }
+
+          const target = opts?.target;
+          if (target && !hasField('cible') && !hasField('membre') && !hasField('utilisateur') && !hasField('concern')) {
+            const tid = target.id ?? target.userId ?? null;
+            const ttag = target.tag ?? target.username ?? null;
+            const tVal = tid ? `${ttag ? `${ttag} ` : ''}(<@${tid}>) \`${tid}\`` : (ttag ?? 'Inconnu');
+            try { e.addFields({ name: 'Concerné', value: tVal, inline: false }); } catch {}
+          }
+        } catch {}
+
+        return e;
+      } catch {
+        return built;
+      }
+    };
+
+    const normalized = _normalize(guildId, type, embedBuilt);
+
+    const payload = embed.embedToPayload(guildId, normalized, {
       allowedMentions: { parse: [] },
-    }).catch(() => null);
+      forceV2: type !== 'ticketlog',
+    });
+
+    return await channel.send(payload).catch(() => null);
   } catch {
     return null;
   }

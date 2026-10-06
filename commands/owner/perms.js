@@ -57,9 +57,9 @@ exports.run = async (client, message, args) => {
         return embed.replyError(message, 'Vous ne pouvez pas assigner cette permission.');
       }
 
-      if (!client.commands.has(cmdName)) {
-        return embed.replyError(message, `Commande \`${cmdName}\` introuvable.`);
-      }
+      // Allow setting permissions for command-like names that may not be
+      // registered as real commands (eg. ticket sub-actions like "close").
+      // Previously this check prevented assigning perms for internal actions.
 
       db.setCmdPerm(guildId, cmdName, perm);
       return embed.reply(message, `Commande \`${cmdName}\` → **${perms.permLabel(perm)}**`);

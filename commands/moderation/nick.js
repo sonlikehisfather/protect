@@ -11,7 +11,7 @@ module.exports = {
     name        : 'nick',
     description : 'Modifie le pseudo d’un membre.',
     usage       : 'nick <membre> <pseudo|reset>',
-    aliases     : ['nickname'],
+    aliases     : ['nickname', 'rename'],
   },
 
   async run(client, message, args) {
@@ -53,6 +53,17 @@ module.exports = {
       const sent = await embed.replyError(
         message,
         'Ce membre est protégé.',
+        { timestamp: false }
+      ).catch(() => null);
+
+      if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
+      return;
+    }
+
+    if (perms.isAngelProtected(target.id, guildId)) {
+      const sent = await embed.replyError(
+        message,
+        'T’as essayé de changer le pseudo d’un utilisateur angel ? ',
         { timestamp: false }
       ).catch(() => null);
 

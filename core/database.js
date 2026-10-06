@@ -71,6 +71,13 @@ function getDb() {
       PRIMARY KEY (guildId, userId)
     );
 
+    CREATE TABLE IF NOT EXISTS fivem_owners (
+      guildId   TEXT NOT NULL,
+      userId    TEXT NOT NULL,
+      createdAt INTEGER NOT NULL DEFAULT (unixepoch()),
+      PRIMARY KEY (guildId, userId)
+    );
+
     CREATE TABLE IF NOT EXISTS cmd_aliases (
       guildId     TEXT NOT NULL,
       alias       TEXT NOT NULL,
@@ -241,6 +248,24 @@ const GUILD_CONFIG_KEYS = new Set([
 
   'embedMode',
   'embedModeExceptions',
+
+  'fivemKpRoles',
+  'fivemKpKeepRoleId',
+  'fivemRcRoles',
+  'fivemFblRoles',
+  'fivemBlacklistRoleId',
+  'fivemPresenceMentionRoles',
+  'fivemPresenceChannelId',
+  'fivemPresenceChannelOpId',
+  'fivemPresenceChannelMission1Id',
+  'fivemPresenceChannelMission2Id',
+  'fivemMission1MessageId',
+  'fivemPromotionChannelId',
+  'fivemPromotionUpChannelId',
+  'fivemPromotionDownChannelId',
+  'fivemPromotionRankHierarchy',
+  'fivemEmbedMode',
+  'fivemActivePresence',
 ]);
 
 const CUSTOM_COMMAND_KEYS = new Set([
@@ -3757,6 +3782,101 @@ up(db) {
     },
   },
 
+  {
+    version: 111,
+    up(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS fivem_owners (
+          guildId   TEXT NOT NULL,
+          userId    TEXT NOT NULL,
+          createdAt INTEGER NOT NULL DEFAULT (unixepoch()),
+          PRIMARY KEY (guildId, userId)
+        );
+      `);
+
+      const cols = db.prepare('PRAGMA table_info(guild_config)').all().map(c => c.name);
+      if (!cols.includes('fivemKpRoles'))            db.exec(`ALTER TABLE guild_config ADD COLUMN fivemKpRoles TEXT`);
+      if (!cols.includes('fivemRcRoles'))            db.exec(`ALTER TABLE guild_config ADD COLUMN fivemRcRoles TEXT`);
+      if (!cols.includes('fivemFblRoles'))           db.exec(`ALTER TABLE guild_config ADD COLUMN fivemFblRoles TEXT`);
+      if (!cols.includes('fivemBlacklistRoleId'))    db.exec(`ALTER TABLE guild_config ADD COLUMN fivemBlacklistRoleId TEXT`);
+      if (!cols.includes('fivemPresenceMentionRoles')) db.exec(`ALTER TABLE guild_config ADD COLUMN fivemPresenceMentionRoles TEXT`);
+      if (!cols.includes('fivemPresenceChannelId'))  db.exec(`ALTER TABLE guild_config ADD COLUMN fivemPresenceChannelId TEXT`);
+      if (!cols.includes('fivemPresenceChannelOpId'))  db.exec(`ALTER TABLE guild_config ADD COLUMN fivemPresenceChannelOpId TEXT`);
+      if (!cols.includes('fivemPresenceChannelMission1Id'))  db.exec(`ALTER TABLE guild_config ADD COLUMN fivemPresenceChannelMission1Id TEXT`);
+      if (!cols.includes('fivemPresenceChannelMission2Id'))  db.exec(`ALTER TABLE guild_config ADD COLUMN fivemPresenceChannelMission2Id TEXT`);
+      if (!cols.includes('fivemMission1MessageId'))  db.exec(`ALTER TABLE guild_config ADD COLUMN fivemMission1MessageId TEXT`);
+      if (!cols.includes('fivemPromotionChannelId')) db.exec(`ALTER TABLE guild_config ADD COLUMN fivemPromotionChannelId TEXT`);
+      if (!cols.includes('fivemEmbedMode'))          db.exec(`ALTER TABLE guild_config ADD COLUMN fivemEmbedMode TEXT NOT NULL DEFAULT 'v2'`);
+      if (!cols.includes('fivemActivePresence'))     db.exec(`ALTER TABLE guild_config ADD COLUMN fivemActivePresence TEXT`);
+    },
+  },
+
+  {
+    version: 112,
+    up(db) {
+      const cols = db.prepare('PRAGMA table_info(guild_config)').all().map(c => c.name);
+      if (!cols.includes('fivemPresenceChannelOpId')) db.exec(`ALTER TABLE guild_config ADD COLUMN fivemPresenceChannelOpId TEXT`);
+      if (!cols.includes('fivemPresenceChannelMission1Id')) db.exec(`ALTER TABLE guild_config ADD COLUMN fivemPresenceChannelMission1Id TEXT`);
+      if (!cols.includes('fivemPresenceChannelMission2Id')) db.exec(`ALTER TABLE guild_config ADD COLUMN fivemPresenceChannelMission2Id TEXT`);
+      if (!cols.includes('fivemMission1MessageId')) db.exec(`ALTER TABLE guild_config ADD COLUMN fivemMission1MessageId TEXT`);
+    },
+  },
+
+  {
+    version: 113,
+    up(db) {
+      const cols = db.prepare('PRAGMA table_info(guild_config)').all().map(c => c.name);
+      if (!cols.includes('fivemKpKeepRoleId')) db.exec(`ALTER TABLE guild_config ADD COLUMN fivemKpKeepRoleId TEXT`);
+    },
+  },
+
+  {
+    version: 114,
+    up(db) {
+      const cols = db.prepare('PRAGMA table_info(guild_config)').all().map(c => c.name);
+      if (!cols.includes('fivemPromotionRankHierarchy')) db.exec(`ALTER TABLE guild_config ADD COLUMN fivemPromotionRankHierarchy TEXT`);
+    },
+  },
+
+  {
+    version: 115,
+    up(db) {
+      const cols = db.prepare('PRAGMA table_info(guild_config)').all().map(c => c.name);
+      if (!cols.includes('fivemPromotionUpChannelId')) db.exec(`ALTER TABLE guild_config ADD COLUMN fivemPromotionUpChannelId TEXT`);
+      if (!cols.includes('fivemPromotionDownChannelId')) db.exec(`ALTER TABLE guild_config ADD COLUMN fivemPromotionDownChannelId TEXT`);
+    },
+  },
+
+  {
+    version: 116,
+    up(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS protected_users (
+          guildId   TEXT    NOT NULL,
+          userId    TEXT    NOT NULL,
+          addedBy   TEXT    NOT NULL,
+          addedAt   INTEGER NOT NULL DEFAULT (unixepoch()),
+          PRIMARY KEY (guildId, userId)
+        );
+      `);
+    },
+  },
+
+  {
+    version: 117,
+    up(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS angel_users (
+          guildId   TEXT    NOT NULL,
+          userId    TEXT    NOT NULL,
+          addedBy   TEXT    NOT NULL,
+          addedAt   INTEGER NOT NULL DEFAULT (unixepoch()),
+          PRIMARY KEY (guildId, userId)
+        );
+      `);
+    },
+  },
+
 ];
 
 
@@ -4312,6 +4432,11 @@ function prepareStatements(db) {
     deleteOwner        : db.prepare('DELETE FROM owners WHERE guildId = ? AND userId = ?'),
     deleteGuildOwners  : db.prepare('DELETE FROM owners WHERE guildId = ?'),
     isOwner            : db.prepare('SELECT 1 FROM owners WHERE guildId = ? AND userId = ?'),
+
+    getFivemOwners     : db.prepare('SELECT userId FROM fivem_owners WHERE guildId = ? ORDER BY createdAt ASC'),
+    insertFivemOwner   : db.prepare('INSERT OR IGNORE INTO fivem_owners (guildId, userId) VALUES (?, ?)'),
+    deleteFivemOwner   : db.prepare('DELETE FROM fivem_owners WHERE guildId = ? AND userId = ?'),
+    isFivemOwner       : db.prepare('SELECT 1 FROM fivem_owners WHERE guildId = ? AND userId = ?'),
 
     getGlobalBuyers    : db.prepare('SELECT userId FROM global_buyers ORDER BY createdAt ASC'),
     insertGlobalBuyer  : db.prepare('INSERT OR IGNORE INTO global_buyers (userId) VALUES (?)'),
@@ -5000,6 +5125,26 @@ const db = {
   isOwner(guildId, userId) {
     getDb();
     return !!_stmts.isOwner.get(guildId, userId);
+  },
+
+  getFivemOwners(guildId) {
+    getDb();
+    return _stmts.getFivemOwners.all(guildId).map(r => r.userId);
+  },
+
+  addFivemOwner(guildId, userId) {
+    getDb();
+    _stmts.insertFivemOwner.run(guildId, userId);
+  },
+
+  removeFivemOwner(guildId, userId) {
+    getDb();
+    _stmts.deleteFivemOwner.run(guildId, userId);
+  },
+
+  isFivemOwner(guildId, userId) {
+    getDb();
+    return !!_stmts.isFivemOwner.get(guildId, userId);
   },
 
   getBlacklistRanks(guildId) {
@@ -6046,6 +6191,50 @@ const db = {
 
   isBlacklisted(userId) {
     return !!getDb().prepare('SELECT 1 FROM blacklist WHERE userId = ? AND deletedAt IS NULL').get(userId);
+  },
+
+  getProtectedUsers(guildId) {
+    return getDb().prepare('SELECT * FROM protected_users WHERE guildId = ? ORDER BY addedAt DESC').all(guildId);
+  },
+
+  getProtectedUser(guildId, userId) {
+    return getDb().prepare('SELECT * FROM protected_users WHERE guildId = ? AND userId = ?').get(guildId, userId) ?? null;
+  },
+
+  addProtectedUser(guildId, userId, addedBy) {
+    return getDb().prepare('INSERT OR IGNORE INTO protected_users (guildId, userId, addedBy) VALUES (?, ?, ?)').run(guildId, userId, addedBy).changes > 0;
+  },
+
+  removeProtectedUser(guildId, userId) {
+    return getDb().prepare('DELETE FROM protected_users WHERE guildId = ? AND userId = ?').run(guildId, userId).changes > 0;
+  },
+
+  isProtectedUser(guildId, userId) {
+    return !!getDb().prepare('SELECT 1 FROM protected_users WHERE guildId = ? AND userId = ?').get(guildId, userId);
+  },
+
+  isProtectedUserAnywhere(userId) {
+    return !!getDb().prepare('SELECT 1 FROM protected_users WHERE userId = ? LIMIT 1').get(userId);
+  },
+
+  getAngelUsers(guildId) {
+    return getDb().prepare('SELECT * FROM angel_users WHERE guildId = ? ORDER BY addedAt DESC').all(guildId);
+  },
+
+  getAngelUser(guildId, userId) {
+    return getDb().prepare('SELECT * FROM angel_users WHERE guildId = ? AND userId = ?').get(guildId, userId) ?? null;
+  },
+
+  addAngelUser(guildId, userId, addedBy) {
+    return getDb().prepare('INSERT OR IGNORE INTO angel_users (guildId, userId, addedBy) VALUES (?, ?, ?)').run(guildId, userId, addedBy).changes > 0;
+  },
+
+  removeAngelUser(guildId, userId) {
+    return getDb().prepare('DELETE FROM angel_users WHERE guildId = ? AND userId = ?').run(guildId, userId).changes > 0;
+  },
+
+  isAngelUser(guildId, userId) {
+    return !!getDb().prepare('SELECT 1 FROM angel_users WHERE guildId = ? AND userId = ?').get(guildId, userId);
   },
 
 

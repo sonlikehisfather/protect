@@ -3,6 +3,7 @@
 const db    = require('../../core/database');
 const embed = require('../../utils/embed');
 const perms = require('../../utils/permissions');
+const { generateTicketStatsImage } = require('../../utils/ticketStatsImage');
 
 exports.help = {
   name       : 'ticketstats',
@@ -36,14 +37,32 @@ exports.run = async (client, message) => {
     }
   }
 
-  return embed.reply(message, null, {
-    title  : 'Statistiques des tickets',
-    fields : [
-      { name: 'Tickets fermés',     value: String(stats.total),   inline: true },
-      { name: 'Tickets évalués',    value: String(stats.rated),   inline: true },
-      { name: 'Note moyenne',       value: avgRatingStr,          inline: false },
-      { name: 'Durée moyenne',      value: avgCloseStr,           inline: true },
-    ],
-    timestamp: false,
-  });
+  // Try to generate an image summary; fallback to embed on error
+  try {
+    const buffer = await generateTicketStatsImage({
+      guildId: guildId,
+      guildName: message.guild?.name ?? null,
+      guildIconUrl: message.guild?.iconURL ? message.guild.iconURL({ dynamic: true, size: 128 }) : null,
+      total: stats.total,
+      rated: stats.rated,
+      avgRating: stats.avgRating,
+      avgClose: stats.avgClose,
+    });
+
+    const AttachmentBuilder = require('discord.js').AttachmentBuilder;
+    const sent = await message.reply({ files: [new AttachmentBuilder(buffer, { name: 'ticketstats.png' })], allowedMentions: { parse: [] } }).catch(() => null);
+    return sent;
+  } catch (e) {
+    console.error('[ticketstats] image error:', e?.message);
+    return embed.reply(message, null, {
+      title  : 'Statistiques des tickets',
+      fields : [
+        { name: 'Tickets fermés',     value: String(stats.total),   inline: true },
+        { name: 'Tickets évalués',    value: String(stats.rated),   inline: true },
+        { name: 'Note moyenne',       value: avgRatingStr,          inline: false },
+        { name: 'Durée moyenne',      value: avgCloseStr,           inline: true },
+      ],
+      timestamp: false,
+    });
+  }
 };

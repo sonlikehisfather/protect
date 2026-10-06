@@ -1,7 +1,13 @@
 'use strict';
 
+const { AuditLogEvent, PermissionFlagsBits } = require('discord.js');
+
 const logger = require('../utils/logger');
 const embed = require('../utils/embed');
+const db = require('../core/database');
+const angelActions = require('../utils/angelActions');
+
+const pendingAngelOverwriteRestores = new Map();
 
 module.exports = {
   name: 'channelUpdate',
@@ -12,17 +18,32 @@ module.exports = {
       if (!newChannel.guild) return;
 
       const guildId = newChannel.guild.id;
+      await _restoreAngelOverwrites(oldChannel, newChannel);
 
       if (oldChannel.name !== newChannel.name) {
         await logger.send(
           client,
           guildId,
           'channellog',
-          embed.build(guildId, null, {
-            title       : 'Salon renommé',
-            description : `Ancien: **${oldChannel.name}**\nNouveau: **${newChannel.name}**\n<#${newChannel.id}>`,
-            color       : '#FEE75C',
-            timestamp   : true,
+          embed.log(guildId, 'Salon renommé', [
+            {
+              name   : 'Salon',
+              value  : `<#${newChannel.id}>`,
+              inline : false,
+            },
+            {
+              name   : 'Ancien nom',
+              value  : `**${oldChannel.name}**`,
+              inline : true,
+            },
+            {
+              name   : 'Nouveau nom',
+              value  : `**${newChannel.name}**`,
+              inline : true,
+            },
+          ], {
+            color     : '#FEE75C',
+            timestamp : true,
           })
         );
       }
@@ -69,3 +90,82 @@ module.exports = {
     } catch {}
   },
 };
+
+async function _restoreAngelOverwrites(oldChannel, newChannel) {
+  const guild = newChannel.guild;
+  const oldPerms = oldChannel.permissionOverwrites?.cache;
+  const newPerms = newChannel.permissionOverwrites?.cache;
+  if (!oldPerms || !newPerms) return;
+
+  const targetIds = new Set([
+    ...oldPerms.filter(overwrite => overwrite.type === 1).keys(),
+    ...newPerms.filter(overwrite => overwrite.type === 1).keys(),
+  ]);
+
+  for (const userId of targetIds) {
+    if (!db.isAngelUser(guild.id, userId)) continue;
+
+    const oldOverwrite = oldPerms.get(userId);
+    const newOverwrite = newPerms.get(userId);
+    const muteFlags = [
+      PermissionFlagsBits.SendMessages,
+      PermissionFlagsBits.SendMessagesInThreads,
+      PermissionFlagsBits.Speak,
+    ];
+    const muteRestrictionAdded = muteFlags.some(flag =>
+      newOverwrite?.deny.has(flag) && !oldOverwrite?.deny.has(flag)
+    );
+    if (!muteRestrictionAdded) continue;
+
+    const expected = oldOverwrite ? _overwriteFingerprint(oldOverwrite) : null;
+    const key = `${guild.id}:${newChannel.id}:${userId}`;
+    const pending = pendingAngelOverwriteRestores.get(key);
+
+    if (pending === _overwriteFingerprint(newOverwrite)) {
+      pendingAngelOverwriteRestores.delete(key);
+      continue;
+    }
+
+    if (_overwriteFingerprint(oldOverwrite) === _overwriteFingerprint(newOverwrite)) continue;
+
+    pendingAngelOverwriteRestores.set(key, expected);
+    setTimeout(() => {
+      if (pendingAngelOverwriteRestores.get(key) === expected) pendingAngelOverwriteRestores.delete(key);
+    }, 10_000).unref?.();
+
+    let restored = false;
+    if (!oldOverwrite) {
+      restored = await newChannel.permissionOverwrites.delete(userId, 'Angel protection: channel mute reverted')
+        .then(() => true).catch(() => false);
+    } else {
+      const permissions = Object.fromEntries(
+        Object.entries(PermissionFlagsBits)
+          .filter(([, flag]) => typeof flag === 'bigint')
+          .map(([name, flag]) => [
+            name,
+            oldOverwrite.allow.has(flag) ? true : oldOverwrite.deny.has(flag) ? false : null,
+          ])
+      );
+      restored = await newChannel.permissionOverwrites.edit(
+        userId,
+        permissions,
+        'Angel protection: channel mute reverted'
+      ).then(() => true).catch(() => false);
+    }
+
+    const executor = await angelActions.findRecentExecutor(
+      guild,
+      newChannel.id,
+      AuditLogEvent.ChannelOverwriteUpdate
+    );
+    await angelActions.notify(
+      guild,
+      `<@${userId}> est un ange. Mute/permissions de salon ${restored ? 'annulé' : 'non restauré'}${executor ? ` (tenté par <@${executor.id}>)` : ''}.`,
+      newChannel,
+    );
+  }
+}
+
+function _overwriteFingerprint(overwrite) {
+  return overwrite ? `${overwrite.allow.bitfield}:${overwrite.deny.bitfield}` : null;
+}

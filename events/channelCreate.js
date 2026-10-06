@@ -1,6 +1,7 @@
 'use strict';
 
 
+const { AuditLogEvent }               = require('discord.js');
 const db                              = require('../core/database');
 const logger                          = require('../utils/logger');
 const embed                           = require('../utils/embed');
@@ -26,17 +27,39 @@ module.exports = {
           15: 'Forum',
         };
 
-        await logger.send(
-          client,
-          guild.id,
-          'channellog',
-          embed.build(guild.id, null, {
-            title: 'Salon créé',
-            description: `**${channel.name}** (${typeNames[channel.type] || 'Inconnu'})\n<#${channel.id}>`,
-            color: '#57F287',
-            timestamp: true,
-          })
-        );
+        const built = embed.log(guild.id, 'Salon créé', [
+            {
+              name   : 'Salon',
+              value  : `**${channel.name}** <#${channel.id}>`,
+              inline : false,
+            },
+            {
+              name   : 'Type',
+              value  : typeNames[channel.type] || 'Inconnu',
+              inline : true,
+            },
+            {
+              name   : 'Catégorie',
+              value  : channel.parent ? `<#${channel.parentId}>` : 'Aucune',
+              inline : true,
+            },
+          ], {
+            color     : '#57F287',
+            timestamp : true,
+          });
+
+        // Try to resolve the executor from audit logs (best-effort)
+        let actor = null;
+        try {
+          const fetched = await guild.fetchAuditLogs({ type: AuditLogEvent.ChannelCreate, limit: 6 }).catch(() => null);
+          if (fetched && fetched.entries) {
+            const now = Date.now();
+            const entry = [...fetched.entries.values()].find(e => e.target?.id === channel.id || (now - (e.createdTimestamp || 0)) < 5000);
+            if (entry?.executor) actor = { id: entry.executor.id, tag: entry.executor.tag, avatar: entry.executor.displayAvatarURL?.({ dynamic: true }) };
+          }
+        } catch {}
+
+        await logger.send(client, guild.id, 'channellog', built, { actor }).catch(() => {});
       } catch {}
 
 

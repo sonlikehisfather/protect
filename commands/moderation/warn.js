@@ -96,7 +96,8 @@ module.exports = {
         skippedBot.push(target); continue;
       }
 
-      if (perms.isProtected(target.id, guildId, target)) {
+      if (perms.isProtected(target.id, guildId, target) ||
+          perms.isAngelProtected(target.id, guildId)) {
         skippedProtected.push(target); continue;
       }
 
@@ -143,6 +144,7 @@ module.exports = {
         targetTag   : target.user.tag,
         targetId    : target.id,
         moderatorTag: message.author.tag,
+        moderatorId : message.author.id,
         reason,
       });
 
@@ -208,6 +210,8 @@ async function _applyWarnThreshold(client, message, guild, guildId, target, hit,
 
   try {
     if (sanction === 'mute') {
+      if (perms.isAngelProtected(target.id, guildId)) return;
+
       if (useTimeout) {
         if (!me.permissions.has('ModerateMembers')) return;
         if (!target.moderatable || target.roles.highest.position >= me.roles.highest.position) return;
@@ -317,6 +321,7 @@ async function _applyWarnThreshold(client, message, guild, guildId, target, hit,
       targetTag   : target.user.tag,
       targetId    : target.id,
       moderatorTag: client.user.tag,
+      moderatorId : client.user.id,
       reason,
       duration    : sanction === 'mute' || sanction === 'tempban'
         ? _formatDuration(duration)

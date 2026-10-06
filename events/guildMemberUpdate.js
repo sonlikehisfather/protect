@@ -8,11 +8,14 @@ const logger       = require('../utils/logger');
 const errorHandler = require('../utils/errorHandler');
 const db           = require('../core/database');
 const perms        = require('../utils/permissions');
+const angelActions = require('../utils/angelActions');
 const { replaceVariables } = require('../utils/variables');
 const { applyMute }        = require('../utils/applyMute');
 
 const DEFAULT_BOOST_MESSAGE =
   'Merci {user} pour le boost sur **{server}**.\nLe serveur possede maintenant **{boosts}** boost(s).';
+
+const pendingAngelRestores = new Map();
 
 module.exports = {
   name : 'guildMemberUpdate',
@@ -22,6 +25,8 @@ module.exports = {
     const guildId = newMember.guild.id;
 
     if (newMember.user.bot) return;
+
+    if (await _restoreAngelMemberChanges(oldMember, newMember)) return;
 
     // ── Prevnames : nickname ───────────────────────────────────────────────
     try {
@@ -203,6 +208,69 @@ module.exports = {
     }
   },
 };
+
+async function _restoreAngelMemberChanges(oldMember, newMember) {
+  const guild = newMember.guild;
+  const guildId = guild.id;
+  const key = `${guildId}:${newMember.id}`;
+  const pending = pendingAngelRestores.get(key);
+
+  if (pending) {
+    const nicknameRestored =
+      Object.hasOwn(pending, 'nickname') &&
+      oldMember.nickname !== newMember.nickname &&
+      newMember.nickname === pending.nickname;
+    const timeoutRestored =
+      Object.hasOwn(pending, 'timeout') &&
+      oldMember.communicationDisabledUntilTimestamp !== newMember.communicationDisabledUntilTimestamp &&
+      newMember.communicationDisabledUntilTimestamp === pending.timeout;
+    if (nicknameRestored || timeoutRestored) {
+      return true;
+    }
+  }
+
+  if (!db.isAngelUser(guildId, newMember.id)) return false;
+
+  const nicknameChanged = oldMember.nickname !== newMember.nickname;
+  const previousTimeout = oldMember.communicationDisabledUntilTimestamp ?? 0;
+  const currentTimeout = newMember.communicationDisabledUntilTimestamp ?? 0;
+  const timeoutExtended = currentTimeout > previousTimeout;
+  if (!nicknameChanged && !timeoutExtended) return false;
+
+  const expected = {};
+  if (nicknameChanged) expected.nickname = oldMember.nickname;
+  if (timeoutExtended) expected.timeout = oldMember.communicationDisabledUntilTimestamp;
+  pendingAngelRestores.set(key, expected);
+  setTimeout(() => {
+    if (pendingAngelRestores.get(key) === expected) pendingAngelRestores.delete(key);
+  }, 10_000).unref?.();
+
+  const executor = await angelActions.findRecentExecutor(guild, newMember.id);
+  const restored = [];
+
+  if (nicknameChanged) {
+    const ok = await newMember.setNickname(oldMember.nickname, 'Angel protection: nickname restored')
+      .then(() => true).catch(() => false);
+    restored.push(ok ? 'pseudo' : 'pseudo (échec restauration)');
+  }
+
+  if (timeoutExtended) {
+    const previousUntil = oldMember.communicationDisabledUntilTimestamp;
+    const duration = previousUntil && previousUntil > Date.now()
+      ? previousUntil - Date.now()
+      : null;
+    const ok = await newMember.timeout(duration, 'Angel protection: timeout restored')
+      .then(() => true).catch(() => false);
+    restored.push(ok ? 'timeout' : 'timeout (échec restauration)');
+  }
+
+  await angelActions.notify(
+    guild,
+    `<@${newMember.id}> est un ange. Action ${restored.join(' et ')} annulée${executor ? ` (tentée par <@${executor.id}>)` : ''}.`,
+  );
+
+  return true;
+}
 
 async function _sendBoostEmbed(client, member) {
   const guild   = member.guild;

@@ -93,6 +93,13 @@ function loadCommands(client) {
 }
 
 function _loadCommand(client, filePath, category) {
+  const baseName = path.basename(filePath);
+
+  if (baseName.startsWith('_')) {
+    dbg(`Commande utilitaire ignorée : ${baseName}`);
+    return 0;
+  }
+
   try {
     delete require.cache[require.resolve(filePath)];
     const mod = require(filePath);
@@ -108,7 +115,7 @@ function _loadCommand(client, filePath, category) {
         const run    = mod[runKey];
 
         if (!help?.name || typeof run !== 'function') {
-          console.warn(`[Loader] Sous-commande ignorée dans ${path.basename(filePath)} : ${key}`);
+          console.warn(`[Loader] Sous-commande ignorée dans ${baseName} : ${key}`);
           continue;
         }
 
@@ -128,7 +135,7 @@ function _loadCommand(client, filePath, category) {
     }
 
     if (!mod?.help?.name || typeof mod.run !== 'function') {
-      console.warn(`[Loader] Ignoré (pas de help.name ou run manquant) : ${path.basename(filePath)}`);
+      console.warn(`[Loader] Ignoré (pas de help.name ou run manquant) : ${baseName}`);
       return 0;
     }
 
@@ -136,7 +143,7 @@ function _loadCommand(client, filePath, category) {
 
     return _registerPrefixCommand(client, mod, category, filePath) ? 1 : 0;
   } catch (err) {
-    console.error(`[Loader] Erreur commande ${path.basename(filePath)} :`, err.message);
+    console.error(`[Loader] Erreur commande ${baseName} :`, err.message);
     return 0;
   }
 }

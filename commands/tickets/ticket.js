@@ -1536,7 +1536,7 @@ function _buildAdvancedSelectOptions(panel) {
 }
 
 function _buildPanelV2Payload(panel, options, viewState, guild, accentColor) {
-  if (!embed.shouldUseV2(guildId, module.exports.help.name)) return null;
+  if (!embed.shouldUseV2(guild.id, module.exports.help.name)) return null;
 
   try {
     const container = new ContainerBuilder();
@@ -2500,7 +2500,7 @@ function _buildOptionConfigRows() {
 
 
 function _buildOptionV2Payload(option, panel, guild, accentColor) {
-  if (!embed.shouldUseV2(guildId, module.exports.help.name)) return null;
+  if (!embed.shouldUseV2(guild.id, module.exports.help.name)) return null;
   try {
     const container = new ContainerBuilder();
     _appendOptionV2(container, option, panel, guild);

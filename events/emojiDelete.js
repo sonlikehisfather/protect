@@ -9,17 +9,16 @@ module.exports = {
 
   async execute(client, emoji) {
     try {
-      await logger.send(
-        client,
-        emoji.guild.id,
-        'emojilog',
-        embed.build(emoji.guild.id, null, {
-          title: 'Emoji supprimé',
-          description: `**${emoji.name}**`,
-          color: '#ED4245',
-          timestamp: true,
-        })
-      );
+      const fields = [
+        { name: 'Emoji', value: `**${emoji.name}** ${emoji.toString()}`, inline: false },
+        { name: 'ID', value: `\`${emoji.id}\``, inline: true },
+        { name: 'Animé', value: emoji.animated ? 'Oui' : 'Non', inline: true },
+      ];
+
+      await logger.send(client, emoji.guild.id, 'emojilog', embed.log(emoji.guild.id, 'Emoji supprimé', fields, {
+        color: '#ED4245',
+        timestamp: true,
+      }));
     } catch {}
   },
 };

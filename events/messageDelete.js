@@ -86,41 +86,34 @@ module.exports = {
         ? [...message.attachments.values()]
         : [];
 
-      const lines = [`Message supprim\u00e9 dans ${channelRef}`];
+      const createdAt = message.createdTimestamp ? `<t:${Math.floor(message.createdTimestamp/1000)}:F>` : 'Inconnu';
 
-      if (!isPartial && message.content) {
-        lines.push(message.content.slice(0, 1800));
-      } else if (isPartial) {
-        lines.push('*Contenu non disponible (message non cach\u00e9)*');
-      } else if (!attachmentList.length) {
-        lines.push('*Aucun contenu*');
-      }
+      const contentValue = (!isPartial && message.content)
+        ? (message.content.length > 1024 ? message.content.slice(0, 1021) + '...' : message.content)
+        : (isPartial ? '*Contenu non disponible*' : (attachmentList.length ? '*Pièces jointes uniquement*' : '*Aucun contenu*'));
 
-      if (attachmentList.length) {
-        const urls = attachmentList
-          .map(a => `[${a.name ?? 'fichier'}](${a.url})`)
-          .join(' ');
-        lines.push(urls);
-      }
+      const attachmentsValue = attachmentList.length
+        ? attachmentList.map(a => `[${a.name ?? 'fichier'}](${a.url})`).join('\n')
+        : 'Aucun';
 
-      const imageAttach = attachmentList.find(a =>
-        a.contentType && a.contentType.startsWith('image/')
-      );
+      const imageAttach = attachmentList.find(a => a.contentType && a.contentType.startsWith('image/'));
 
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+      const fields = [
+        { name: 'Auteur', value: `${authorTag} (<@${authorId}>) \`${authorId || 'unknown'}\``, inline: false },
+        { name: 'Salon', value: channelRef, inline: true },
+        { name: 'Message', value: `\`${message.id || 'unknown'}\``, inline: true },
+        { name: 'Créé le', value: createdAt, inline: true },
+        { name: 'Contenu', value: contentValue || ' ', inline: false },
+        { name: 'Pièces jointes', value: attachmentsValue, inline: false },
+      ];
 
-      const e = embed.build(guildId, lines.join('\n'), {
-        authorName: authorTag,
-        authorIcon,
-        image : imageAttach?.url ?? undefined,
-        footer: `Aujourd'hui \u00e0 ${timeStr}`,
-        timestamp: false,
+      const e = embed.log(guildId, 'Message supprimé', fields, {
+        thumbnail: authorIcon,
+        image: imageAttach?.url ?? undefined,
+        timestamp: true,
       });
 
-      await logger.send(client, guildId, 'messagelog', e, {
-        sourceChannelId: channelId,
-      });
+      await logger.send(client, guildId, 'messagelog', e, { sourceChannelId: channelId });
 
     } catch (err) {
       errorHandler.handle(err, {

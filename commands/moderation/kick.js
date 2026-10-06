@@ -54,7 +54,7 @@ module.exports = {
     }
 
     if (perms.isProtected(target.id, guildId, target)) {
-      const sent = await embed.replyError(message, 'Ce membre est protégé.', { timestamp: false }).catch(() => null);
+      const sent = await embed.replyError(message, 'T’as essayé de kick un utilisateur protégé ? ', { timestamp: false }).catch(() => null);
       if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
       return;
     }
@@ -124,6 +124,7 @@ module.exports = {
       targetTag   : target.user.tag,
       targetId    : target.id,
       moderatorTag: message.author.tag,
+      moderatorId : message.author.id,
       reason,
     });
 

@@ -1,5 +1,6 @@
 'use strict';
 
+const db = require('../core/database');
 
 const MAX_TIMEOUT_MS = 28 * 24 * 60 * 60 * 1000;
 
@@ -17,6 +18,10 @@ async function applyMute(opts) {
 
   if (!guild || !member) {
     return _fail('Membre ou guild manquant.');
+  }
+
+  if (db.isAngelUser(guild.id, member.id)) {
+    return _fail('Ce membre est protégé par la liste angel.');
   }
 
   const useTimeout = Boolean(config?.useTimeout);

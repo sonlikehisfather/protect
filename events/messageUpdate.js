@@ -32,28 +32,23 @@ module.exports = {
 
       const jumpUrl = newMessage.url ?? '';
 
-      const lines = [];
-      lines.push(`Message \u00e9dit\u00e9 dans ${channelRef}` + (jumpUrl ? ` [*(aller au message)*](${jumpUrl})` : ''));
-      lines.push('');
-      lines.push('**Avant**');
-      lines.push(before);
-      lines.push('');
-      lines.push('**Apr\u00e8s**');
-      lines.push(after);
+      const beforeVal = before || '*(non disponible)*';
+      const afterVal = after || '*(non disponible)*';
 
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+      const fields = [
+        { name: 'Auteur', value: `${newMessage.author.tag} (<@${newMessage.author.id}>) \`${newMessage.author.id}\``, inline: false },
+        { name: 'Salon', value: channelRef, inline: true },
+        { name: 'Message', value: `\`${newMessage.id}\`` , inline: true },
+        { name: 'Avant', value: beforeVal, inline: false },
+        { name: 'Après', value: afterVal, inline: false },
+      ];
 
-      const e = embed.build(guildId, lines.join('\n'), {
-        authorName: newMessage.author.tag,
-        authorIcon: newMessage.author.displayAvatarURL({ size: 64 }),
-        footer    : `Aujourd'hui \u00e0 ${timeStr}`,
-        timestamp : false,
+      const e = embed.log(guildId, 'Message édité', fields, {
+        thumbnail: newMessage.author.displayAvatarURL({ size: 64 }),
+        timestamp: true,
       });
 
-      await logger.send(client, guildId, 'messagelog', e, {
-        sourceChannelId: channelId,
-      });
+      await logger.send(client, guildId, 'messagelog', e, { sourceChannelId: channelId });
 
     } catch (err) {
       errorHandler.handle(err, {

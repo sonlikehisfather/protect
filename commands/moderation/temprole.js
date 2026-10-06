@@ -243,7 +243,8 @@ module.exports = {
       type         : 'temprole',
       targetTag    : member.user.username,
       targetId     : member.id,
-      moderatorTag : message.author.username,
+      moderatorTag : message.author.tag,
+      moderatorId  : message.author.id,
       reason       : `Ajout du rôle ${role.name}`,
       duration     : durationStr,
     });

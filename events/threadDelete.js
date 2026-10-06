@@ -12,11 +12,25 @@ module.exports = {
     try {
       if (!thread.guild) return;
 
-      const e = embed.build(thread.guild.id, null, {
-        title       : 'Fil supprimé',
-        description : `**${thread.name}**`,
-        color       : '#ED4245',
-        timestamp   : true,
+      const e = embed.log(thread.guild.id, 'Fil supprimé', [
+        {
+          name   : 'Fil',
+          value  : `**${thread.name}** \`${thread.id}\``,
+          inline : false,
+        },
+        {
+          name   : 'Salon parent',
+          value  : thread.parentId ? `<#${thread.parentId}>` : 'Aucun',
+          inline : true,
+        },
+        {
+          name   : 'Type',
+          value  : thread.isPrivate ? 'Privé' : 'Public',
+          inline : true,
+        },
+      ], {
+        color     : '#ED4245',
+        timestamp : true,
       });
 
       await logger.send(client, thread.guild.id, 'channellog', e);

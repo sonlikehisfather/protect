@@ -34,7 +34,7 @@ exports.run = async (client, message, args) => {
     return embed.replyError(message, 'Ce ticket est fermé.');
   }
 
-  if (!isTicketStaff(message, ticket)) {
+  if (!isTicketStaff(message, ticket, exports.help.name)) {
     return embed.replyError(message, 'Vous n\'avez pas la permission de g\u00e9rer ce ticket.');
   }
 

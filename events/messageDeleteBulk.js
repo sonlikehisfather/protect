@@ -17,16 +17,21 @@ module.exports = {
 
       const count = messages.size;
 
-      const e = embed.build(guild.id, null, {
-        title       : 'Suppression en masse',
-        description : `**${count}** messages supprimés dans <#${channel.id}>`,
-        color       : '#ED4245',
-        timestamp   : new Date(),
+      const authors = [...new Set(messages.map(m => m.author?.id).filter(Boolean))].slice(0, 6);
+      const authorList = authors.length ? authors.map(a => `<@${a}>`).join(' ') : 'N/A';
+
+      const fields = [
+        { name: 'Salon', value: `<#${channel.id}>`, inline: true },
+        { name: 'Total', value: String(count), inline: true },
+        { name: 'Auteurs (ex.)', value: authorList, inline: false },
+      ];
+
+      const e = embed.log(guild.id, 'Suppression en masse', fields, {
+        color: '#ED4245',
+        timestamp: true,
       });
 
-      await logger.send(client, guild.id, 'messagelog', e, {
-        sourceChannelId: channel.id,
-      });
+      await logger.send(client, guild.id, 'messagelog', e, { sourceChannelId: channel.id });
     } catch (err) {
       errorHandler.handle(err, {
         source : 'messageDeleteBulk',

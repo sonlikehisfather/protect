@@ -157,9 +157,10 @@ module.exports = {
         }
       }
 
+      let inviterId = null;
       if (!member.user.bot) {
         try {
-          const inviterId = await inviteTracker.findInviter(client, guild);
+          inviterId = await inviteTracker.findInviter(client, guild);
           db.trackInvite(guildId, member.id, inviterId ?? null);
 
           if (inviterId) {
@@ -225,12 +226,22 @@ module.exports = {
         {
           name   : 'Membre',
           value  : `<@${member.id}> (${member.user.tag}) \`${member.id}\``,
+          inline : false,
+        },
+        {
+          name   : 'Créé le',
+          value  : `<t:${Math.floor(member.user.createdTimestamp / 1000)}:F>`,
           inline : true,
         },
         {
-          name   : 'Compte créé le',
-          value  : `<t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`,
+          name   : 'Type',
+          value  : member.user.bot ? 'Bot' : 'Humain',
           inline : true,
+        },
+        {
+          name   : 'Invité par',
+          value  : inviterId ? `<@${inviterId}>` : 'Inconnu',
+          inline : false,
         },
         {
           name   : 'Membres total',

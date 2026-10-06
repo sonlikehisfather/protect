@@ -311,6 +311,7 @@ function sanction(guildId, {
   targetTag,
   targetId,
   moderatorTag,
+  moderatorId,
   reason,
   duration,
 }) {
@@ -331,7 +332,7 @@ function sanction(guildId, {
     },
     {
       name  : 'Modérateur',
-      value : moderatorTag,
+      value : (moderatorId ? `<@${moderatorId}>` + (moderatorTag ? ` (${moderatorTag})` : ` \`${moderatorId}\``) : (moderatorTag ?? 'Inconnu')),
       inline: true,
     },
     {
@@ -384,14 +385,9 @@ async function reply(message, description, options = {}) {
   const { allowedMentions: customAllowed, ...buildOpts } = options;
 
   const guildId = message.guild?.id;
-  const cmdName = message.commandName || null;
+  const cmdName = buildOpts._cmdName ?? message.commandName ?? null;
   if (shouldUseV2(guildId, cmdName)) {
-    const container = new ContainerBuilder();
-    const parts = [];
-    if (buildOpts.title) parts.push(`### ${buildOpts.title}`);
-    if (description) parts.push(String(description));
-    if (!parts.length) parts.push('');
-    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(parts.join('\n\n')));
+    const container = buildV2Container(guildId, description, buildOpts);
     return message.reply({
       components      : [container],
       flags           : _V2_FLAG,
@@ -418,14 +414,9 @@ async function replyError(message, description, options = {}) {
   const { allowedMentions: customAllowed, ...buildOpts } = options;
 
   const guildId = message.guild?.id;
-  const cmdName = message.commandName || null;
+  const cmdName = buildOpts._cmdName ?? message.commandName ?? null;
   if (shouldUseV2(guildId, cmdName)) {
-    const container = new ContainerBuilder();
-    const parts = [];
-    if (buildOpts.title) parts.push(`### ${buildOpts.title}`);
-    if (description) parts.push(String(description));
-    if (!parts.length) parts.push('');
-    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(parts.join('\n\n')));
+    const container = buildV2Container(guildId, description, buildOpts);
     return message.reply({
       components      : [container],
       flags           : _V2_FLAG,
@@ -539,10 +530,10 @@ function _embedBuilderToContainer(embedBuilder) {
 
 
 function embedToPayload(guildId, embedBuilder, options = {}) {
-  const { allowedMentions: customAllowed, components, ...rest } = options;
+  const { allowedMentions: customAllowed, components, forceV2, ...rest } = options;
   const cmdName = options._cmdName || null;
 
-  if (shouldUseV2(guildId, cmdName)) {
+  if ((forceV2 || shouldUseV2(guildId, cmdName)) && _V2_AVAILABLE) {
     try {
       const container = _embedBuilderToContainer(embedBuilder);
       const payload = {

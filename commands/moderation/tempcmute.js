@@ -79,6 +79,19 @@ module.exports = {
       return;
     }
 
+    if (perms.isAngelProtected(member.id, guildId)) {
+      const sent = await embed.replyError(
+        message,
+        'T’as essayé de mute un ange ? ',
+        { timestamp: false }
+      ).catch(() => null);
+
+      if (sent && deleteReply)
+        embed.scheduleDelete(sent, deleteDelay);
+
+      return;
+    }
+
     const isBuyer       = perms.isBuyer(message.author.id);
     const isGlobalOwner = db.isOwner(guildId,message.author.id);
 
@@ -171,6 +184,7 @@ module.exports = {
       targetTag   : member.user.tag,
       targetId    : member.id,
       moderatorTag: message.author.tag,
+      moderatorId : message.author.id,
       reason,
       duration    : durationStr,
     });

@@ -108,26 +108,33 @@ module.exports = {
 
       const roles = member.roles.cache
         .filter(role => role.id !== guild.id)
-        .map(role => `<@&${role.id}>`)
-        .join(', ') || 'Aucun';
+        .map(role => `<@&${role.id}>`);
 
-      const userTag    = member.user?.tag ?? `Utilisateur inconnu`;
+      const roleFieldValue = roles.length === 0
+        ? 'Aucun'
+        : roles.length <= 8
+          ? roles.join(', ')
+          : `**${roles.length}** rôles`;
+
+      const userTag    = member.user?.tag ?? 'Utilisateur inconnu';
       const userAvatar = member.user?.displayAvatarURL?.({ dynamic: true }) ?? null;
 
       const e = embed.log(guildId, 'Membre parti', [
         {
           name   : 'Membre',
           value  : `${userTag} (<@${member.id}>) \`${member.id}\``,
-          inline : true,
+          inline : false,
         },
         {
-          name   : 'Profil',
-          value  : `https://discord.com/users/${member.id}`,
+          name   : 'Créé le',
+          value  : member.user?.createdTimestamp
+            ? `<t:${Math.floor(member.user.createdTimestamp / 1000)}:F>`
+            : 'Inconnu',
           inline : true,
         },
         {
           name   : 'Rôles',
-          value  : roles,
+          value  : roleFieldValue,
           inline : false,
         },
         {

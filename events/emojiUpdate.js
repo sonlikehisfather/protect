@@ -11,17 +11,16 @@ module.exports = {
     try {
       if (oldEmoji.name === newEmoji.name) return;
 
-      await logger.send(
-        client,
-        newEmoji.guild.id,
-        'emojilog',
-        embed.build(newEmoji.guild.id, null, {
-          title: 'Emoji renommé',
-          description: `Ancien: **${oldEmoji.name}**\nNouveau: **${newEmoji.name}** ${newEmoji.toString()}`,
-          color: '#FEE75C',
-          timestamp: true,
-        })
-      );
+      const fields = [
+        { name: 'Ancien nom', value: `**${oldEmoji.name}**`, inline: true },
+        { name: 'Nouveau nom', value: `**${newEmoji.name}** ${newEmoji.toString()}`, inline: true },
+        { name: 'ID', value: `\`${newEmoji.id}\``, inline: true },
+      ];
+
+      await logger.send(client, newEmoji.guild.id, 'emojilog', embed.log(newEmoji.guild.id, 'Emoji renommé', fields, {
+        color: '#FEE75C',
+        timestamp: true,
+      }));
     } catch {}
   },
 };

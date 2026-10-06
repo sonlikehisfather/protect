@@ -185,6 +185,7 @@ module.exports = {
       targetTag   : member.user.tag,
       targetId    : member.id,
       moderatorTag: message.author.tag,
+      moderatorId : message.author.id,
       reason      : `Ajout du rôle ${role.name}`,
     });
 

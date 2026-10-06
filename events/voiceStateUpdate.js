@@ -13,12 +13,14 @@ const perms        = require('../utils/permissions');
 const punishSteps  = require('../modules/punishSteps');
 const errorHandler = require('../utils/errorHandler');
 const tempvoc      = require('../modules/tempvoc');
+const angelActions = require('../utils/angelActions');
 
 
 const pollMap = new Map();
 
 
 const _decoRaw = new Map();
+const pendingAngelVoiceRestores = new Map();
 
 function _sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -34,6 +36,8 @@ module.exports = {
     const guildId = guild.id;
 
     if (!member || member.user.bot) return;
+
+    if (await _restoreAngelVoiceChanges(oldState, newState, member, guild, guildId)) return;
 
     try {
       await _handleAntideco(client, oldState, newState, member, guild, guildId);
@@ -52,6 +56,56 @@ module.exports = {
     }
   },
 };
+
+async function _restoreAngelVoiceChanges(oldState, newState, member, guild, guildId) {
+  const key = `${guildId}:${member.id}`;
+  const pending = pendingAngelVoiceRestores.get(key);
+  if (pending && (
+    (oldState.serverMute !== newState.serverMute && pending.serverMute === newState.serverMute) ||
+    (oldState.serverDeaf !== newState.serverDeaf && pending.serverDeaf === newState.serverDeaf)
+  )) {
+    return true;
+  }
+
+  if (!db.isAngelUser(guildId, member.id)) return false;
+
+  const muteApplied = !oldState.serverMute && newState.serverMute;
+  const deafApplied = !oldState.serverDeaf && newState.serverDeaf;
+  if (!muteApplied && !deafApplied) return false;
+
+  const expected = {
+    serverMute : muteApplied ? oldState.serverMute : newState.serverMute,
+    serverDeaf : deafApplied ? oldState.serverDeaf : newState.serverDeaf,
+  };
+  pendingAngelVoiceRestores.set(key, expected);
+  setTimeout(() => {
+    if (pendingAngelVoiceRestores.get(key) === expected) pendingAngelVoiceRestores.delete(key);
+  }, 10_000).unref?.();
+
+  const executor = await angelActions.findRecentExecutor(guild, member.id);
+  const actions = [];
+  const restores = [];
+
+  if (muteApplied) {
+    actions.push('serveur-mute');
+    restores.push(member.voice.setMute(oldState.serverMute, 'Angel protection: voice mute restored'));
+  }
+  if (deafApplied) {
+    actions.push('serveur-deafen');
+    restores.push(member.voice.setDeaf(oldState.serverDeaf, 'Angel protection: voice deafen restored'));
+  }
+
+  const results = await Promise.all(restores.map(result => result.then(() => true).catch(() => false)));
+  const status = results.every(Boolean) ? 'annulée' : 'restauration échouée';
+  const channel = newState.channel ?? oldState.channel;
+  await angelActions.notify(
+    guild,
+    `<@${member.id}> est un ange. Action ${actions.join(' et ')} ${status}${executor ? ` (tentée par <@${executor.id}>)` : ''}.`,
+    channel,
+  );
+
+  return true;
+}
 
 async function _handleAntideco(client, oldState, newState, member, guild, guildId) {
   const config = db.getAntiraidConfig(guildId);
@@ -398,9 +452,19 @@ async function _handleVoiceLog(client, oldState, newState, member, guildId) {
 
   if (!desc) return;
 
-  const e = embed.build(guildId, desc, {
-    authorName: member.user.tag,
-    authorIcon: member.user.displayAvatarURL({ size: 64 }),
+  const fields = [
+    { name: 'Membre', value: `${member.user.tag} (<@${member.id}>) \`${member.id}\``, inline: false },
+    { name: 'Action', value: desc, inline: false },
+  ];
+
+  // include channel references when relevant
+  if (oldState.channelId || newState.channelId) {
+    fields.push({ name: 'Salon', value: (newState.channelId ? `<#${newState.channelId}>` : `<#${oldState.channelId}>`) , inline: true });
+  }
+
+  const e = embed.log(guildId, 'Événement vocal', fields, {
+    thumbnail: member.user.displayAvatarURL({ size: 64 }),
+    timestamp: true,
   });
 
   await logger.send(client, guildId, 'voicelog', e);

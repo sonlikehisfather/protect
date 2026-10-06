@@ -190,6 +190,7 @@ async function _runUnmuteAll(client, message, guild, guildId, config, deleteRepl
   const e = embed.sanction(guildId, {
     type        : 'unmuteall',
     moderatorTag: message.author.tag,
+    moderatorId : message.author.id,
     reason      : 'Suppression globale des mutes',
   });
 

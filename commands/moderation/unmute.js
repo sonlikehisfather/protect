@@ -184,6 +184,7 @@ module.exports = {
       targetTag   : target.user.tag,
       targetId    : target.id,
       moderatorTag: message.author.tag,
+      moderatorId : message.author.id,
       reason,
     });
 

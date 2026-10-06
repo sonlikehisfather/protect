@@ -107,6 +107,13 @@ exports.run = async (client, message, args) => {
     );
   }
 
+  if (db.isProtectedUserAnywhere(target.id)) {
+    return embed.replyError(
+      message,
+      'T’as essayé de BL un utilisateur protégé ? '
+    );
+  }
+
   if (perms.isProtected(target.id, message.guild.id, null)) {
 
     return embed.replyError(

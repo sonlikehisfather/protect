@@ -32,10 +32,20 @@ const _rolemenuBusy = new Set();
 const _casinoConfigPanels = new Map(); // guildId:userId -> panel message
 const _casinoConfigViews = new Map();
 const DEBUG_ROLEMENU = process.env.DEBUG_ROLEMENU === 'true';
+const DEBUG_FCONFIG = process.env.DEBUG_FCONFIG === 'true';
 
 function _debugRolemenu(tag, data) {
   if (!DEBUG_ROLEMENU) return;
   console.log(`[ROLEMENU:${tag}]`, JSON.stringify(data));
+}
+
+function _debugFconfig(tag, data) {
+  if (!DEBUG_FCONFIG) return;
+  try {
+    console.log(`[FCONFIG-ROUTER:${tag}]`, JSON.stringify(data));
+  } catch {
+    console.log(`[FCONFIG-ROUTER:${tag}]`);
+  }
 }
 
 function _rebuildSelectRow(menu, options, defaultRoleIds) {
@@ -501,6 +511,27 @@ async function _handleButton(client, interaction) {
     return;
   }
 
+  // Presence panel interactions are handled by command-local collectors.
+  if (id.startsWith('fp:')) {
+    return;
+  }
+
+  // FiveM config panel interactions are handled by command-local collectors.
+  if (id.startsWith('fc:')) {
+    _debugFconfig('BUTTON_BYPASS', {
+      customId: id,
+      guildId: interaction.guild?.id,
+      userId: interaction.user?.id,
+      messageId: interaction.message?.id,
+    });
+    return;
+  }
+
+  // FiveM promotion/demotion panels are handled by command-local collectors.
+  if (id.startsWith('prm:') || id.startsWith('dmt:')) {
+    return;
+  }
+
   if (id === 'cf:setblacklist') {
     const guildId = interaction.guild?.id;
     const db = require('../core/database');
@@ -891,6 +922,27 @@ async function _handleSelectMenu(client, interaction) {
 async function _handleModal(client, interaction) {
   const id = interaction.customId;
   const guildId = interaction.guild?.id;
+
+  // Presence modals are handled by command-local awaitModalSubmit.
+  if (id.startsWith('fp:modal:')) {
+    return;
+  }
+
+  // FiveM config modals are handled by command-local awaitModalSubmit.
+  if (id.startsWith('fc:modal:')) {
+    _debugFconfig('MODAL_BYPASS', {
+      customId: id,
+      guildId: interaction.guild?.id,
+      userId: interaction.user?.id,
+      messageId: interaction.message?.id,
+    });
+    return;
+  }
+
+  // FiveM promotion/demotion modals are handled by command-local awaitModalSubmit.
+  if (id.startsWith('prm:modal:') || id.startsWith('dmt:modal:')) {
+    return;
+  }
 
 
   if (id.startsWith('embed:')) {

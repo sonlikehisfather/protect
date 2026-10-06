@@ -66,6 +66,16 @@ function check(message, commandName) {
     db.getCmdPerm(guildId, commandName)
     ?? 'everyone';
 
+  const cmdTargets = db.getCmdTargets(guildId, commandName);
+  if (cmdTargets.length) {
+    const memberRoleIds = member.roles.cache.map(r => r.id);
+    const hasTarget = cmdTargets.some(t =>
+      (t.targetType === 'user' && t.targetId === userId) ||
+      (t.targetType === 'role' && memberRoleIds.includes(t.targetId))
+    );
+    if (hasTarget) return true;
+  }
+
   if (required === 'buyer') {
     return isBuyer(userId);
   }
@@ -80,16 +90,6 @@ function check(message, commandName) {
 
   if (required === 'everyone') {
     return true;
-  }
-
-  const cmdTargets = db.getCmdTargets(guildId, commandName);
-  if (cmdTargets.length) {
-    const memberRoleIds = member.roles.cache.map(r => r.id);
-    const hasTarget = cmdTargets.some(t =>
-      (t.targetType === 'user' && t.targetId === userId) ||
-      (t.targetType === 'role' && memberRoleIds.includes(t.targetId))
-    );
-    if (hasTarget) return true;
   }
 
   if (required === 'public') {
@@ -193,6 +193,10 @@ function isProtected(
     return true;
 
 
+  if (db.isProtectedUser(guildId, targetId))
+    return true;
+
+
   if (isOwner(guildId, targetId))
     return true;
 
@@ -216,6 +220,10 @@ function isProtected(
   }
 
   return false;
+}
+
+function isAngelProtected(targetId, guildId) {
+  return db.isAngelUser(guildId, targetId);
 }
 
 
@@ -317,6 +325,7 @@ module.exports = {
   hasLevel,
 
   isProtected,
+  isAngelProtected,
 
   parsePerm,
   permLabel,

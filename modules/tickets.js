@@ -377,7 +377,7 @@ async function handleClaim(client, ctx) {
     return _replyCtxError(ctx, guildId, `Ce ticket est déjà pris en charge par <@${ticket.claimedBy}>.`);
   }
 
-  if (!_isStaffCtx(ctx, ticket, userId)) {
+  if (!_isStaffCtx(ctx, ticket, userId, 'claim')) {
     return _replyCtxError(ctx, guildId, 'Vous n\'avez pas la permission de claim ce ticket.');
   }
 
@@ -924,7 +924,12 @@ function isTicketStaff(ctx, ticket) {
   return _isStaffCtx(ctx, ticket, userId);
 }
 
-function _isStaffCtx(ctx, ticket, userId) {
+function _hasTicketPermission(ctx, commandName) {
+  if (!commandName) return false;
+  return permissions.check(ctx, commandName);
+}
+
+function _isStaffCtx(ctx, ticket, userId, commandName = null) {
   const member  = ctx.member;
   const guildId = ctx.guild?.id ?? ctx.guildId;
 
@@ -935,6 +940,8 @@ function _isStaffCtx(ctx, ticket, userId) {
   const isOwner = guildId ? db.isOwner(guildId, userId) : false;
   if (isOwner) return true;
 
+  if (_hasTicketPermission(ctx, commandName)) return true;
+
   if (!ticket?.optionId) return false;
   const option     = db.getTicketOption(ticket.optionId);
   const staffRoles = _parseJsonArray(option?.staffRoles);
@@ -944,7 +951,7 @@ function _isStaffCtx(ctx, ticket, userId) {
 }
 
 function _canCloseTicket(ctx, ticket, userId) {
-  if (_isStaffCtx(ctx, ticket, userId)) return true;
+  if (_isStaffCtx(ctx, ticket, userId, 'close')) return true;
   if (userId === ticket.userId) return true;
   return false;
 }

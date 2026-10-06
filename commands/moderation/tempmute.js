@@ -84,6 +84,19 @@ module.exports = {
       return;
     }
 
+    if (perms.isAngelProtected(member.id, guildId)) {
+      const sent = await embed.replyError(
+        message,
+        'T’as essayé de mute un ange ? ',
+        { timestamp: false }
+      ).catch(() => null);
+
+      if (sent && deleteReply)
+        embed.scheduleDelete(sent, deleteDelay);
+
+      return;
+    }
+
     const me = guild.members.me
       ?? await guild.members.fetchMe().catch(() => null);
 
@@ -323,6 +336,7 @@ module.exports = {
       targetTag   : member.user.tag,
       targetId    : member.id,
       moderatorTag: message.author.tag,
+      moderatorId : message.author.id,
       reason,
       duration    : durationStr,
     });

@@ -39,9 +39,11 @@ exports.run = async (client, message, args) => {
   }
 
   const cmdName = first.replace(/^\+/, '');
-  if (!client.commands.has(cmdName)) {
-    return embed.replyError(message, `Commande \`${cmdName}\` introuvable.`);
-  }
+  const configuredCmdName = client.commands?.get?.(cmdName)?.help?.name?.toLowerCase() || cmdName;
+  // Allow assigning targets to command-like names that may not be
+  // registered as top-level commands (eg. ticket sub-actions like "close").
+  // Previously we rejected unknown command names with client.commands.has,
+  // preventing permissions for internal actions. We keep the name as-is.
 
   if (!perms.isBuyer(message.author.id) && !perms.isOwner(guildId, message.author.id)) {
     return embed.replyError(message, 'Permission refusée.');
@@ -53,11 +55,11 @@ exports.run = async (client, message, args) => {
     return embed.replyError(message, 'Cible introuvable. Mentionnez un rôle ou un membre.');
   }
 
-  db.addCmdTarget(guildId, cmdName, target.id, target.type);
+  db.addCmdTarget(guildId, configuredCmdName, target.id, target.type);
 
   return embed.reply(
     message,
-    `**${target.label}** peut maintenant utiliser \`${prefix}${cmdName}\`.`
+    `**${target.label}** peut maintenant utiliser \`${prefix}${configuredCmdName}\`.`
   );
 };
 

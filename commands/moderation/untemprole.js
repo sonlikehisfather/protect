@@ -131,7 +131,8 @@ module.exports = {
       type         : 'untemprole',
       targetTag    : target.user.username,
       targetId     : target.id,
-      moderatorTag : message.author.username,
+      moderatorTag : message.author.tag,
+      moderatorId  : message.author.id,
       reason       : 'Suppression rôle temporaire',
     });
 

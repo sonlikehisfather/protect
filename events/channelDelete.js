@@ -1,11 +1,12 @@
 'use strict';
 
 
-const db           = require('../core/database');
-const logger       = require('../utils/logger');
-const embed        = require('../utils/embed');
-const giveaways    = require('../modules/giveaways');
-const errorHandler = require('../utils/errorHandler');
+const { AuditLogEvent } = require('discord.js');
+const db                = require('../core/database');
+const logger            = require('../utils/logger');
+const embed             = require('../utils/embed');
+const giveaways         = require('../modules/giveaways');
+const errorHandler      = require('../utils/errorHandler');
 
 module.exports = {
   name : 'channelDelete',
@@ -18,32 +19,40 @@ module.exports = {
       const guildId = channel.guild.id;
 
       try {
-        await logger.send(
-          client,
-          guildId,
-          'channellog',
-          embed.build(guildId, null, {
-            title: 'Salon supprimé',
-            description: `**${channel.name}**`,
-            color: '#ED4245',
-            timestamp: true,
-          })
-        );
+        const built = embed.log(guildId, 'Salon supprimé', [
+          {
+            name   : 'Salon',
+            value  : `**${channel.name}** \`${channel.id}\``,
+            inline : false,
+          },
+          {
+            name   : 'Type',
+            value  : channel.isTextBased?.() ? 'Texte' : 'Autre',
+            inline : true,
+          },
+          {
+            name   : 'Catégorie',
+            value  : channel.parentId ? `<#${channel.parentId}>` : 'Aucune',
+            inline : true,
+          },
+        ], {
+          color     : '#ED4245',
+          timestamp : true,
+        });
+
+        // Try to resolve the executor from audit logs (best-effort)
+        let actor = null;
+        try {
+          const fetched = await channel.guild.fetchAuditLogs({ type: AuditLogEvent.ChannelDelete, limit: 6 }).catch(() => null);
+          if (fetched && fetched.entries) {
+            const now = Date.now();
+            const entry = [...fetched.entries.values()].find(e => e.target?.id === channel.id || (now - (e.createdTimestamp || 0)) < 5000);
+            if (entry?.executor) actor = { id: entry.executor.id, tag: entry.executor.tag, avatar: entry.executor.displayAvatarURL?.({ dynamic: true }) };
+          }
+        } catch {}
+
+        await logger.send(client, guildId, 'channellog', built, { actor }).catch(() => {});
       } catch {}
-
-      const ticket = db.getTicket(channel.id);
-
-
-      if (ticket && ticket.status !== 'closed') {
-        if (typeof db.closeTicket === 'function') {
-          db.closeTicket(
-            channel.id,
-            client.user.id,
-            'Salon supprimé manuellement',
-            null
-          );
-        }
-      }
 
       if (typeof db.getTicketPanels === 'function') {
         const panels = db.getTicketPanels(guildId);

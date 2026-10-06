@@ -145,6 +145,7 @@ module.exports = {
       targetTag   : ban.user.tag,
       targetId    : userId,
       moderatorTag: message.author.tag,
+      moderatorId : message.author.id,
       reason,
     });
 
