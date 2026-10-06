@@ -107,7 +107,7 @@ exports.run = async (client, message, args) => {
 
   const buildSelect = (dk) => {
     const d = DIFFICULTIES[dk];
-    if (V2_AVAILABLE) {
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
       const c = new ContainerBuilder();
       c.addTextDisplayComponents(new TextDisplayBuilder().setContent(
         `## ▲ Tower\n\n> Mise : **${embed.fmtCoins(amount)}** coins\n` +
@@ -219,7 +219,7 @@ exports.run = async (client, message, args) => {
       }
     }
 
-    if (V2_AVAILABLE) {
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
       const c = new ContainerBuilder();
       c.addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
       c.addSeparatorComponents(new SeparatorBuilder());
@@ -273,7 +273,7 @@ exports.run = async (client, message, args) => {
     }
 
     if (towerImage) {
-      if (V2_AVAILABLE) {
+      if (embed.shouldUseV2(guildId, module.exports.help.name)) {
         const container = new ContainerBuilder();
         container.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL('attachment://tower_result.png')));
         return { components: [container], flags: COMPONENTS_V2_FLAG, files: [new AttachmentBuilder(towerImage, { name: 'tower_result.png' })], allowedMentions: { parse: [] } };
@@ -316,7 +316,7 @@ exports.run = async (client, message, args) => {
     let text = `## ▲ Tower\n\n> Mise : **${embed.fmtCoins(amount)}** coins ・ **${diff.label}**\n\n` +
       `### Resultat\n${resultLine}\n> Solde : **${embed.fmtCoins(finalCoins)}** coins`;
 
-    if (V2_AVAILABLE) {
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
       const c = new ContainerBuilder();
       c.addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
       c.addSeparatorComponents(new SeparatorBuilder());
@@ -383,7 +383,7 @@ exports.run = async (client, message, args) => {
             `Solde : **${embed.fmtCoins(finalCoins)}** coins`,
           ],
         });
-        if (V2_AVAILABLE) {
+        if (embed.shouldUseV2(guildId, module.exports.help.name)) {
           const c = new ContainerBuilder();
           c.addTextDisplayComponents(new TextDisplayBuilder().setContent(
             `## ▲ Tower\n\n> Mise : **${embed.fmtCoins(amount)}** coins ・ Annule\n> Solde : **${embed.fmtCoins(finalCoins)}** coins`
@@ -452,7 +452,7 @@ exports.run = async (client, message, args) => {
             `Solde : **${embed.fmtCoins(finalCoins)}** coins`,
           ],
         });
-        if (V2_AVAILABLE) {
+        if (embed.shouldUseV2(guildId, module.exports.help.name)) {
           const c = new ContainerBuilder();
           c.addTextDisplayComponents(new TextDisplayBuilder().setContent(
             `## ▲ Tower\n\n> Mise : **${embed.fmtCoins(amount)}** coins ・ **Expiré**\n> Remboursement : **${embed.fmtCoins(amount)}** coins\n> Solde : **${embed.fmtCoins(finalCoins)}** coins`

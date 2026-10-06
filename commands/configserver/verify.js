@@ -102,19 +102,10 @@ async function _show(message, guildId, config, deleteReply, deleteDelay) {
     `Rôle : ${roleId ? `<@&${roleId}>` : '`Aucun`'}\n` +
     `Message : ${messageStatus}`;
 
-  const sent = await message.channel.send({
-    embeds: [
-      embed.build(
-        guildId,
-        text,
-        {
+  const sent = await embed.sendEmbed(message.channel, guildId, text, {
           title    : 'Vérification',
           timestamp: false,
-        }
-      ),
-    ],
-    allowedMentions: { parse: [] },
-  }).catch(() => null);
+          allowedMentions: { parse: [] } });
 
   if (sent && deleteReply) {
     embed.scheduleDelete(sent, deleteDelay);

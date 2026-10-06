@@ -67,7 +67,7 @@ exports.run = async (client, message, args) => {
   }
 
   const _v2Panel = (text, disabled = false) => {
-    if (V2_AVAILABLE) {
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
       try {
         const container = new ContainerBuilder();
         container.addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
@@ -135,7 +135,7 @@ exports.run = async (client, message, args) => {
     `**Raison** › ${reason}\n\n` +
     `-# <t:${Math.floor(Date.now() / 1000)}:f>`;
 
-  if (V2_AVAILABLE) {
+  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
     try {
       const container = new ContainerBuilder();
       container.addTextDisplayComponents(new TextDisplayBuilder().setContent(doneText));
@@ -173,19 +173,19 @@ async function _showList(message, guildId) {
 
     const prevBtn = new ButtonBuilder()
       .setCustomId('local:blcasino:prev')
-      .setLabel('◀')
+      .setLabel('←')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(disabled || page === 0);
 
     const nextBtn = new ButtonBuilder()
       .setCustomId('local:blcasino:next')
-      .setLabel('▶')
+      .setLabel('→')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(disabled || page >= totalPages - 1);
 
     const navRow = new ActionRowBuilder().addComponents(prevBtn, nextBtn);
 
-    if (V2_AVAILABLE) {
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
       try {
         const container = new ContainerBuilder();
         container.addTextDisplayComponents(new TextDisplayBuilder().setContent(body));

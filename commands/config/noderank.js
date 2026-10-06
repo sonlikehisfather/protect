@@ -95,18 +95,13 @@ async function _list(message, guildId) {
     ? roleIds.map(id => `<@&${id}>`).join(', ')
     : 'Aucun role protege';
 
-  return message.channel.send({
-    embeds: [
-      embed.build(guildId, null, {
+  return embed.sendEmbed(message.channel, guildId, null, {
         title  : 'Roles proteges (noderank)',
         fields : [
           { name: 'Roles', value: value.slice(0, 1024), inline: false },
         ],
         timestamp: false,
-      }),
-    ],
-    allowedMentions: { parse: [] },
-  }).catch(() => null);
+      });
 }
 
 function _parseRoles(raw) {

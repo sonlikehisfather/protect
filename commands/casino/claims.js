@@ -54,7 +54,7 @@ exports.run = async (client, message, args) => {
 
   const updatedUser = db.getCasinoUser(guildId, userId);
 
-  if (V2_AVAILABLE) {
+  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
     const container = new ContainerBuilder().addTextDisplayComponents(new TextDisplayBuilder().setContent(
       `## Gains Investissement
 

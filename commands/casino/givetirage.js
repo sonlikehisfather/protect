@@ -89,7 +89,7 @@ exports.run = async (client, message, args) => {
     ],
   });
 
-  if (V2_AVAILABLE) {
+  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
     const after = db.getCasinoUser(guildId, target.id);
     const container = new ContainerBuilder().addTextDisplayComponents(new TextDisplayBuilder().setContent(
       `## ✸ Give Tirages\n\n◆ **+${amount}** tirage${amount !== 1 ? 's' : ''} → <@${target.id}>\n▱ Nouveau solde : **${after.draws}** tirage${after.draws !== 1 ? 's' : ''}`

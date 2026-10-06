@@ -253,19 +253,10 @@ module.exports = {
 };
 
 async function _runMassiveRole(message, guild, guildId, members, sourceRole, targetRole, protectedCount, deleteReply, deleteDelay) {
-  const pending = await message.channel.send({
-    embeds: [
-      embed.build(
-        guildId,
-        `Ajout du rôle ${targetRole} en cours sur \`${members.size}\` membre(s).`,
-        {
+  const pending = await embed.sendEmbed(message.channel, guildId, `Ajout du rôle ${targetRole} en cours sur \`${members.size}\` membre(s).`, {
           title     : 'Massiverole en cours',
           timestamp : false,
-        }
-      ),
-    ],
-    allowedMentions: { parse: [] },
-  }).catch(() => null);
+          allowedMentions: { parse: [] } });
 
   let success = 0;
   let failed  = 0;

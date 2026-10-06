@@ -180,7 +180,6 @@ module.exports = {
           sendCasinoLog(message.guild, cfg, 'logChannelGains', {
             icon  : '✦',
             title : 'Bonus de création de profil',
-            color : 0x57F287,
             user  : message.author.id,
             lines : [
               `Nouveau profil casino créé`,
@@ -220,7 +219,6 @@ module.exports = {
             sendCasinoLog(message.guild, cfg, 'logChannelGains', {
               icon  : '✸',
               title : 'Messages',
-              color : 0x57F287,
               user  : message.author.id,
               lines : [
                 `※ **+${embed.fmtCoins(coins)}** coins (x${multiplier})`,
@@ -366,6 +364,8 @@ module.exports = {
         } catch {}
       }
 
+      message.commandName = cmdName;
+
       await errorHandler.run(
         () => command.run(client, message, args),
         {
@@ -430,7 +430,7 @@ module.exports = {
 
       let sent;
 
-      if (V2_AVAILABLE) {
+      if (embed.shouldUseV2(message.guild.id, null)) {
         const container = new ContainerBuilder().setAccentColor(0xFEE75C);
 
         const closeButton = new ButtonBuilder()
@@ -456,7 +456,6 @@ module.exports = {
       if (!sent) {
         const suggestionEmbed = embed.build(message.guild.id, desc, {
           title       : 'Commande introuvable',
-          color       : '#FEE75C',
           timestamp   : false,
         });
 

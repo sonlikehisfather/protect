@@ -1,5 +1,20 @@
 'use strict';
 
+const {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ContainerBuilder,
+  TextDisplayBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  MessageFlags,
+} = require('discord.js');
+
+const COMPONENTS_V2_FLAG = MessageFlags?.IsComponentsV2 ?? (1 << 15);
+const V2_AVAILABLE       = typeof ContainerBuilder === 'function' &&
+                           typeof TextDisplayBuilder === 'function';
+
 const db    = require('../../core/database');
 const embed = require('../../utils/embed');
 const perms = require('../../utils/permissions');
@@ -23,7 +38,7 @@ exports.run = async (client, message, args) => {
 
   if (
     !perms.isBuyer(authorId) &&
-    !perms.isOwner(guildId,authorId)
+    !perms.isOwner(guildId, authorId)
   ) {
     const sent = await embed.replyError(
       message,
@@ -95,18 +110,41 @@ exports.run = async (client, message, args) => {
     removed.push(resolved);
   }
 
-  const lines = [];
-  if (removed.length)  lines.push(`**${removed.length}** retir\u00e9(s) : ${removed.map(t => t.display).join(', ')}`);
-  if (notInWl.length)  lines.push(`**${notInWl.length}** pas dans la whitelist : ${notInWl.map(t => t.display).join(', ')}`);
-  if (notFound.length) lines.push(`**${notFound.length}** introuvable(s) : ${notFound.map(t => `\`${t}\``).join(', ')}`);
+  const parts = [];
+  parts.push('## Whitelist antiraid');
+
+  if (removed.length) {
+    parts.push('**Retir\u00e9(s)** \u203a ' + removed.map(t => t.display).join(', '));
+  }
+  if (notInWl.length) {
+    parts.push('**Pas en whitelist** \u203a ' + notInWl.map(t => t.display).join(', '));
+  }
+  if (notFound.length) {
+    parts.push('**Introuvable(s)** \u203a ' + notFound.map(t => `\`${t}\``).join(', '));
+  }
+  if (!removed.length && !notInWl.length && !notFound.length) {
+    parts.push('> Aucune action.');
+  }
+
+  const text = parts.join('\n\n');
+
+  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
+    try {
+      const container = new ContainerBuilder();
+      container.addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
+      const sent = await message.channel.send({
+        components      : [container],
+        flags           : COMPONENTS_V2_FLAG,
+        allowedMentions : { parse: [] },
+      }).catch(() => null);
+      if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
+      return;
+    } catch {}
+  }
 
   const sent = await message.channel.send({
     embeds: [
-      embed.build(
-        guildId,
-        lines.join('\n').slice(0, 2000),
-        { timestamp: false }
-      )
+      embed.build(guildId, text.replace(/^##[^\n]*\n/, ''), { timestamp: false })
     ],
     allowedMentions: { parse: [] },
   }).catch(() => null);

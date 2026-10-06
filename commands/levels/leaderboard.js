@@ -69,15 +69,10 @@ exports.handleButton = async (interaction) => {
   const payload = _buildLeaderboardPayload(guildId, page);
 
   if (payload.error) {
-    return interaction.update({
-      embeds: [
-        embed.build(guildId, payload.error, {
+    return interaction.update({ ...embed.buildPayload(guildId, payload.error, {
           title    : 'Leaderboard',
           timestamp: false,
-        }),
-      ],
-      components: [],
-    });
+          components: [] }) });
   }
 
   return interaction.update({

@@ -5,7 +5,16 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  ContainerBuilder,
+  TextDisplayBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  MessageFlags,
 } = require('discord.js');
+
+const COMPONENTS_V2_FLAG = MessageFlags?.IsComponentsV2 ?? (1 << 15);
+const V2_AVAILABLE       = typeof ContainerBuilder === 'function' &&
+                           typeof TextDisplayBuilder === 'function';
 
 const db    = require('../../core/database');
 const embed = require('../../utils/embed');
@@ -63,110 +72,90 @@ module.exports = {
       .map(member => formatMemberLine(member));
 
     if (!members.length) {
-      const sent = await message.channel.send({
-        embeds: [
-          embed.build(
-            guildId,
-            null,
-            {
-              title     : 'Membres du rôle',
-              authorName: role.name,
-              fields    : [
-                {
-                  name  : 'Résultat',
-                  value : 'Aucun membre ne possède ce rôle.',
-                  inline: false,
-                },
-                {
-                  name  : 'Rôle',
-                  value : `<@&${role.id}>`,
-                  inline: true,
-                },
-                {
-                  name  : 'ID',
-                  value : role.id,
-                  inline: true,
-                },
-              ],
-              timestamp : false,
-            }
-          )
-        ],
-        allowedMentions: {
-          repliedUser: false,
-        },
-      }).catch(() => null);
-
-      if (sent && deleteReply) {
-        embed.scheduleDelete(sent, deleteDelay);
+      const text = '## Membres du r\u00f4le\n\n> ' + role.name + '\n\nAucun membre ne poss\u00e8de ce r\u00f4le.\n<@&' + role.id + '> \u2022 ' + role.id;
+      let sent = null;
+      if (embed.shouldUseV2(guildId, module.exports.help.name)) {
+        try {
+          const container = new ContainerBuilder();
+          container.addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
+          sent = await message.channel.send({
+            components      : [container],
+            flags           : COMPONENTS_V2_FLAG,
+            allowedMentions : { repliedUser: false },
+          }).catch(() => null);
+        } catch {}
       }
-
+      if (!sent) {
+        sent = await embed.sendEmbed(message.channel, guildId, null, {
+            title     : 'Membres du r\u00f4le',
+            authorName: role.name,
+            fields    : [
+              { name: 'R\u00e9sultat', value: 'Aucun membre ne poss\u00e8de ce r\u00f4le.', inline: false },
+              { name: 'R\u00f4le', value: `<@&${role.id}>`, inline: true },
+              { name: 'ID', value: role.id, inline: true },
+            ],
+            timestamp : false,
+          });
+      }
+      if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
       return;
     }
 
     const pages = chunkArray(members, PAGE_SIZE);
     let page = 0;
 
-    const buildEmbed = () => embed.build(
-      guildId,
-      null,
-      {
-        title      : 'Membres du rôle',
-        authorName : role.name,
-        fields     : [
-          {
-            name  : 'Rôle',
-            value : `<@&${role.id}>`,
-            inline: true,
-          },
-          {
-            name  : 'ID',
-            value : role.id,
-            inline: true,
-          },
-          {
-            name  : 'Membres',
-            value : String(members.length),
-            inline: true,
-          },
-          {
-            name  : 'Liste',
-            value : pages[page].join('\n').slice(0, 1024),
-            inline: false,
-          },
-        ],
-        footer    : `Page ${page + 1}/${pages.length}`,
-        timestamp : false,
+const buildPayload = (disabled = false) => {
+      const header = '## Membres du r\u00f4le\n> ' + role.name + '';
+      const body   = header + '\n' + pages[page].join('\n').slice(0, 3500);
+      const footer = '-# R\u00f4le : <@&' + role.id + '> \u2022 ' + members.length + ' membre(s) \u2022 Page ' + (page + 1) + '/' + pages.length;
+
+      const prevBtn = new ButtonBuilder()
+        .setCustomId('rolemembers:prev')
+        .setLabel('\u2190')
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(disabled || page === 0);
+      const nextBtn = new ButtonBuilder()
+        .setCustomId('rolemembers:next')
+        .setLabel('\u2192')
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(disabled || page >= pages.length - 1);
+      const closeBtn = new ButtonBuilder()
+        .setCustomId('rolemembers:close')
+        .setLabel('\u2716')
+        .setStyle(ButtonStyle.Danger)
+        .setDisabled(disabled);
+      const navRow = new ActionRowBuilder().addComponents(prevBtn, nextBtn, closeBtn);
+
+      if (embed.shouldUseV2(guildId, module.exports.help.name)) {
+        try {
+          const container = new ContainerBuilder();
+          container.addTextDisplayComponents(new TextDisplayBuilder().setContent(body));
+          container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
+          container.addTextDisplayComponents(new TextDisplayBuilder().setContent(footer));
+          if (pages.length > 1) container.addActionRowComponents(navRow);
+          return { embeds: [], components: [container], flags: COMPONENTS_V2_FLAG, allowedMentions: { repliedUser: false } };
+        } catch {}
       }
-    );
 
-    const buildRows = (disabled = false) => [
-      new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId('rolemembers:prev')
-          .setLabel('\u2190')
-          .setStyle(ButtonStyle.Secondary)
-          .setDisabled(disabled || page === 0),
-        new ButtonBuilder()
-          .setCustomId('rolemembers:next')
-          .setLabel('\u2192')
-          .setStyle(ButtonStyle.Secondary)
-          .setDisabled(disabled || page >= pages.length - 1),
-        new ButtonBuilder()
-          .setCustomId('rolemembers:close')
-          .setLabel('\u2716')
-          .setStyle(ButtonStyle.Danger)
-          .setDisabled(disabled),
-      ),
-    ];
+      return {
+        embeds: [embed.build(guildId, null, {
+          title      : 'Membres du r\u00f4le',
+          authorName : role.name,
+          fields     : [
+            { name: 'R\u00f4le', value: `<@&${role.id}>`, inline: true },
+            { name: 'ID', value: role.id, inline: true },
+            { name: 'Membres', value: String(members.length), inline: true },
+            { name: 'Liste', value: pages[page].join('\n').slice(0, 1024), inline: false },
+          ],
+          footer    : `Page ${page + 1}/${pages.length}`,
+          timestamp : false,
+        })],
+        components: pages.length > 1 ? [navRow] : [],
+        allowedMentions: { repliedUser: false },
+      };
+    };
 
-    const sent = await message.channel.send({
-      embeds: [buildEmbed()],
-      components: pages.length > 1 ? buildRows() : [],
-      allowedMentions: {
-        repliedUser: false,
-      },
-    }).catch(() => null);
+    const sent = await message.channel.send(buildPayload()).catch(() => null);
 
     if (!sent) return;
 
@@ -198,10 +187,7 @@ const collector = sent.createMessageComponentCollector({
         if (i.customId === 'rolemembers:prev' && page > 0) page--;
         if (i.customId === 'rolemembers:next' && page < pages.length - 1) page++;
 
-        await i.update({
-          embeds     : [buildEmbed()],
-          components : buildRows(),
-        });
+        await i.update(buildPayload());
 
       } catch (err) {
         if (err?.code !== 10062 && err?.code !== 40060) {
@@ -213,9 +199,7 @@ const collector = sent.createMessageComponentCollector({
     collector.on('end', (_, reason) => {
       embed.clearPrivateInteraction(sent);
       if (reason === 'closed') return;
-      sent.edit({
-        components: [],
-      }).catch(() => {});
+      sent.edit(buildPayload(true)).catch(() => {});
     });
   },
 };

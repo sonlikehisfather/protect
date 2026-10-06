@@ -264,7 +264,7 @@ exports.run = async (client, message, args) => {
       return;
     }
 
-    if (V2_AVAILABLE) {
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
       await sent.edit(buildV2('playing')).catch((e) => console.error('[MINE] edit V2 playing error:', e?.message));
     } else {
       await sent.edit(buildLegacy('playing')).catch((e) => console.error('[MINE] edit legacy playing error:', e?.message));
@@ -311,7 +311,7 @@ exports.run = async (client, message, args) => {
           `Solde : **${embed.fmtCoins(finalCoins)}** coins`,
         ],
       });
-      if (V2_AVAILABLE) {
+      if (embed.shouldUseV2(guildId, module.exports.help.name)) {
         const c = new ContainerBuilder();
         c.addTextDisplayComponents(new TextDisplayBuilder().setContent(
           `## ■ Mines\n\n> Mise : **${embed.fmtCoins(amount)}** coins ・ **Expiré**\n> Remboursement : **${embed.fmtCoins(amount)}** coins\n> Solde : **${embed.fmtCoins(finalCoins)}** coins`
@@ -362,7 +362,7 @@ exports.run = async (client, message, args) => {
     }
 
     if (mineImage) {
-      if (V2_AVAILABLE) {
+      if (embed.shouldUseV2(guildId, module.exports.help.name)) {
         const container = new ContainerBuilder();
         container.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL('attachment://mine_result.png')));
         await sent.edit({
@@ -378,7 +378,7 @@ exports.run = async (client, message, args) => {
         }).catch((e) => console.error('[MINE] edit legacy image error:', e?.message));
       }
     } else {
-      if (V2_AVAILABLE) {
+      if (embed.shouldUseV2(guildId, module.exports.help.name)) {
         await sent.edit(buildV2(state)).catch((e) => console.error('[MINE] edit V2 end error:', e?.message));
       } else {
         await sent.edit(buildLegacy(state)).catch((e) => console.error('[MINE] edit legacy end error:', e?.message));

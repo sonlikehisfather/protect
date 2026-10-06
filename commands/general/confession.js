@@ -60,12 +60,12 @@ async function postSubmitButton(channel) {
     ),
   );
 
-  return channel.send({
+  return channel.send(embed.wrapPayload(channel.guild?.id, {
     flags      : COMPONENTS_V2_FLAG,
     components : [container],
     embeds     : [],
     allowedMentions: { parse: [] },
-  }).catch(() => null);
+  }, 'confession')).catch(() => null);
 }
 
 async function openConfessionModal(client, user, guildId, cfg) {
@@ -222,23 +222,23 @@ async function postConfessionMessage(client, channel, confession, cfg) {
     const prevMsg = await channel.messages.fetch(prevConfession.messageId).catch(() => null);
     if (prevMsg) {
       const prevContainer = buildConfessionContainer(prevConfession, cfg, false);
-      prevMsg.edit({
+      prevMsg.edit(embed.wrapPayload(guildId, {
         flags      : COMPONENTS_V2_FLAG,
         components : [prevContainer],
         embeds     : [],
         allowedMentions: { parse: [] },
-      }).catch(() => {});
+      }, 'confession')).catch(() => {});
     }
   }
 
   const container = buildConfessionContainer(confession, cfg, true);
 
-  return channel.send({
+  return channel.send(embed.wrapPayload(guildId, {
     flags      : COMPONENTS_V2_FLAG,
     components : [container],
     embeds     : [],
     allowedMentions: { parse: [] },
-  }).catch(() => null);
+  }, 'confession')).catch(() => null);
 }
 
 async function postReviewMessage(client, reviewCh, confession, cfg) {
@@ -271,12 +271,12 @@ async function postReviewMessage(client, reviewCh, confession, cfg) {
     ).addComponents(...[].filter(Boolean)),
   );
 
-  return reviewCh.send({
+  return reviewCh.send(embed.wrapPayload(reviewCh.guild?.id, {
     flags      : COMPONENTS_V2_FLAG,
     components : [container],
     embeds     : [],
     allowedMentions: { parse: [] },
-  }).catch(() => null);
+  }, 'confession')).catch(() => null);
 }
 
 async function handleButton(client, interaction) {
@@ -345,12 +345,12 @@ async function handleApprove(client, interaction, guildId, confId) {
       `## Confession approuvee\n${confession.content}\n\n-# Approuvee par <@${interaction.user.id}>`,
     ),
   );
-  return interaction.message?.edit({
+  return interaction.message?.edit(embed.wrapPayload(guildId, {
     flags      : COMPONENTS_V2_FLAG,
     components : [container],
     embeds     : [],
     allowedMentions: { parse: [] },
-  }).catch(() => {});
+  }, 'confession')).catch(() => {});
 }
 
 async function handleRefuse(client, interaction, guildId, confId) {
@@ -372,12 +372,12 @@ async function handleRefuse(client, interaction, guildId, confId) {
       `## Confession refusee\n${confession.content}\n\n-# Refusee par <@${interaction.user.id}>`,
     ),
   );
-  return interaction.message?.edit({
+  return interaction.message?.edit(embed.wrapPayload(guildId, {
     flags      : COMPONENTS_V2_FLAG,
     components : [container],
     embeds     : [],
     allowedMentions: { parse: [] },
-  }).catch(() => {});
+  }, 'confession')).catch(() => {});
 }
 
 async function handleReveal(client, interaction, guildId, confId) {
@@ -418,12 +418,12 @@ async function handleReport(client, interaction, guildId, confId) {
         `## Confession signalee\nConfession #${confession.number} signalee par <@${interaction.user.id}>\n\n${confession.content}`,
       ),
     );
-    await reviewCh.send({
+    await reviewCh.send(embed.wrapPayload(reviewCh.guild?.id, {
       flags      : COMPONENTS_V2_FLAG,
       components : [container],
       embeds     : [],
       allowedMentions: { parse: [] },
-    }).catch(() => {});
+    }, 'confession')).catch(() => {});
   }
 
   return interaction.editReply({
@@ -491,12 +491,12 @@ async function handleReplyModal(client, interaction) {
     );
   }
 
-  await confCh.send({
+  await confCh.send(embed.wrapPayload(guildId, {
     flags      : COMPONENTS_V2_FLAG,
     components : [container],
     embeds     : [],
     allowedMentions: { parse: [] },
-  }).catch(() => {});
+  }, 'confession')).catch(() => {});
 
   return interaction.editReply({ content: 'Ta reponse anonyme a ete publiee.' }).catch(() => {});
 }

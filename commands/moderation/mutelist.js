@@ -60,12 +60,7 @@ module.exports = {
     const entries = [...rows.values()];
 
     if (!entries.length) {
-      const sent = await message.channel.send({
-        embeds: [
-          embed.build(guildId, 'Aucun membre n’est actuellement mute.', { timestamp: false })
-        ],
-        allowedMentions: { repliedUser: false },
-      }).catch(() => null);
+      const sent = await embed.sendEmbed(message.channel, guildId, 'Aucun membre n’est actuellement mute.', { timestamp: false , allowedMentions: { repliedUser: false } });
 
       if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
       return;

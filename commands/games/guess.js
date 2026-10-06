@@ -86,7 +86,7 @@ exports.run = async (client, message, args) => {
     const remaining = maxAttempts - attempts;
     const bar       = '█'.repeat(remaining) + '░'.repeat(maxAttempts - remaining);
 
-    if (V2_AVAILABLE) {
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
       await sent.edit(_v2([
         `## ${hint}`,
         ``,
@@ -95,13 +95,11 @@ exports.run = async (client, message, args) => {
         `\`${bar}\` (${remaining} restant${remaining > 1 ? 's' : ''})`,
       ].join('\n'))).catch(() => {});
     } else {
-      await sent.edit({
-        embeds: [embed.build(guildId, null, {
+      await embed.editEmbed(sent, guildId, null, {
           title: hint,
           description: `Essai **${attempts}/${maxAttempts}** ・ proposé **${guess}**`,
           color: guess < target ? '#E74C3C' : '#3498DB', timestamp: false,
-        })],
-      }).catch(() => {});
+        });
     }
   });
 
@@ -118,12 +116,10 @@ exports.run = async (client, message, args) => {
       text = `## Temps écoulé !\n\nPartie abandonnée ・ le nombre était **${target}**.`;
     }
 
-    if (V2_AVAILABLE) {
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
       await sent.edit(_v2(text)).catch(() => {});
     } else {
-      await sent.edit({
-        embeds: [embed.build(guildId, text.replace(/## .+\n\n/, ''), { timestamp: false })],
-      }).catch(() => {});
+      await embed.editEmbed(sent, guildId, text.replace(/## .+\n\n/, ''), { timestamp: false });
     }
   });
 

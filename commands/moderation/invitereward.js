@@ -55,14 +55,7 @@ module.exports = {
 
       db.setInviteReward(guildId, threshold, role.id);
 
-      const sent = await message.channel.send({
-        embeds: [embed.build(
-          guildId,
-          `Récompense ajoutée : **${threshold}** invitation(s) → ${role}`,
-          { timestamp: false }
-        )],
-        allowedMentions: { parse: [] },
-      }).catch(() => null);
+      const sent = await embed.sendEmbed(message.channel, guildId, `Récompense ajoutée : **${threshold}** invitation(s) → ${role}`, { timestamp: false });
       if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
       return;
     }
@@ -82,10 +75,7 @@ module.exports = {
 
       db.deleteInviteReward(guildId, threshold);
 
-      const sent = await message.channel.send({
-        embeds: [embed.build(guildId, `Récompense pour **${threshold}** invitation(s) supprimée.`, { timestamp: false })],
-        allowedMentions: { parse: [] },
-      }).catch(() => null);
+      const sent = await embed.sendEmbed(message.channel, guildId, `Récompense pour **${threshold}** invitation(s) supprimée.`, { timestamp: false, allowedMentions: { parse: [] } }).catch(() => null);
       if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
       return;
     }
@@ -96,10 +86,7 @@ module.exports = {
       ? rewards.map(r => `**${r.threshold}** invitation(s) → <@&${r.roleId}>`).join('\n')
       : 'Aucune récompense configurée.';
 
-    const sent = await message.channel.send({
-      embeds: [embed.build(guildId, text, { title: 'Récompenses d\'invitations', timestamp: false })],
-      allowedMentions: { parse: [] },
-    }).catch(() => null);
+    const sent = await embed.sendEmbed(message.channel, guildId, text, { title: 'Récompenses d\'invitations', timestamp: false, allowedMentions: { parse: [] } }).catch(() => null);
     if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
   },
 };

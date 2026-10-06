@@ -60,9 +60,9 @@ exports.run = async (client, message, args) => {
 
   let payload;
 
-  if (V2_AVAILABLE) {
+  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
     try {
-      const container = new ContainerBuilder().setAccentColor(0xED4245);
+      const container = new ContainerBuilder();
       container.addTextDisplayComponents(new TextDisplayBuilder().setContent(body));
       payload = {
         embeds          : [],

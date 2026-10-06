@@ -137,7 +137,7 @@ module.exports = {
 
     if (deleteCmd) await message.delete().catch(() => {});
 
-    if (!V2_AVAILABLE) {
+    if (!embed.shouldUseV2(guildId, module.exports.help.name)) {
       const joke = JOKES[Math.floor(Math.random() * JOKES.length)];
       const s = await embed.reply(message, `**${joke.q}**\n||\`${joke.a}\`||`, { timestamp: false }).catch(() => null);
       if (s && deleteReply) embed.scheduleDelete(s, deleteDelay);

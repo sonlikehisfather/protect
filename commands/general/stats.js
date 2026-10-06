@@ -2,6 +2,16 @@
 
 
 const { ChannelType } = require('discord.js');
+const {
+  ContainerBuilder,
+  TextDisplayBuilder,
+  MessageFlags,
+} = require('discord.js');
+
+const COMPONENTS_V2_FLAG = MessageFlags?.IsComponentsV2 ?? (1 << 15);
+const V2_AVAILABLE       = typeof ContainerBuilder === 'function' &&
+                           typeof TextDisplayBuilder === 'function';
+
 const db    = require('../../core/database');
 const embed = require('../../utils/embed');
 const perms = require('../../utils/permissions');
@@ -65,24 +75,48 @@ module.exports = {
       ? `<#${busiestChannel.id}> - ${busiestCount}`
       : 'Aucun';
 
-    const e = embed.build(guildId, null, {
-      title    : guild.name,
-      thumbnail: guild.iconURL({ dynamic: true, size: 256 }) || client.user.displayAvatarURL({ size: 256 }),
-      fields   : [
-        { name: 'Membres en vocal',   value: String(inVoice),   inline: true },
-        { name: 'Membres mute',     value: String(muted),     inline: true },
-        { name: 'Membres sourds',   value: String(deafened),  inline: true },
-        { name: 'Membres en vid\u00e9o', value: String(inVideo),   inline: true },
-        { name: 'Membres en stream', value: String(streaming), inline: true },
-        { name: 'Salon le plus actif', value: busiestText,    inline: true },
-      ],
-      timestamp: false,
-    });
+    const text =
+      `## ${guild.name}\n\n` +
+      `Membres en vocal \u203a ${inVoice}\n` +
+      `Membres mute \u203a ${muted}\n` +
+      `Membres sourds \u203a ${deafened}\n` +
+      `Membres en vid\u00e9o \u203a ${inVideo}\n` +
+      `Membres en stream \u203a ${streaming}\n` +
+      `Salon le plus actif \u203a ${busiestText}`;
 
-    const sent = await message.channel.send({
-      embeds         : [e],
-      allowedMentions: { repliedUser: false },
-    }).catch(() => null);
+    let sent = null;
+
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
+      try {
+        const container = new ContainerBuilder();
+        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
+        sent = await message.channel.send({
+          components      : [container],
+          flags           : COMPONENTS_V2_FLAG,
+          allowedMentions : { repliedUser: false },
+        }).catch(() => null);
+      } catch {}
+    }
+
+    if (!sent) {
+      const e = embed.build(guildId, null, {
+        title    : guild.name,
+        thumbnail: guild.iconURL({ dynamic: true, size: 256 }) || client.user.displayAvatarURL({ size: 256 }),
+        fields   : [
+          { name: 'Membres en vocal',   value: String(inVoice),   inline: true },
+          { name: 'Membres mute',     value: String(muted),     inline: true },
+          { name: 'Membres sourds',   value: String(deafened),  inline: true },
+          { name: 'Membres en vid\u00e9o', value: String(inVideo),   inline: true },
+          { name: 'Membres en stream', value: String(streaming), inline: true },
+          { name: 'Salon le plus actif', value: busiestText,    inline: true },
+        ],
+        timestamp: false,
+      });
+      sent = await message.channel.send({
+        embeds         : [e],
+        allowedMentions: { repliedUser: false },
+      }).catch(() => null);
+    }
 
     if (sent && deleteReply) {
       embed.scheduleDelete(sent, deleteDelay);

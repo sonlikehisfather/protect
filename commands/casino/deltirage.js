@@ -72,7 +72,7 @@ exports.run = async (client, message, args) => {
     ],
   });
 
-  if (V2_AVAILABLE) {
+  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
     const after = db.getCasinoUser(guildId, target.id);
     const capNote = effective < amount ? `\n⚑ Demande : ${embed.fmtCoins(amount)} ・ plafonne au solde` : '';
     const container = new ContainerBuilder().addTextDisplayComponents(new TextDisplayBuilder().setContent(

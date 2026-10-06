@@ -316,25 +316,27 @@ async function handleAchievementInteraction(interaction, id) {
     const userId = interaction.user.id;
     if (!guildId) return interaction.deferUpdate().catch(() => {});
 
+    const _w = (p) => embed.wrapPayload(guildId, p, 'casino');
+
     if (id === 'cs_ach_home') {
-      return interaction.update({ flags: COMPONENTS_V2_FLAG, components: [buildAchHomePanel(guildId, userId)] }).catch(() => {});
+      return interaction.update(_w({ flags: COMPONENTS_V2_FLAG, components: [buildAchHomePanel(guildId, userId)] })).catch(() => {});
     }
     if (id === 'cs_ach_owned') {
-      return interaction.update({ flags: COMPONENTS_V2_FLAG, components: [buildAchOwnedPanel(guildId, userId)] }).catch(() => {});
+      return interaction.update(_w({ flags: COMPONENTS_V2_FLAG, components: [buildAchOwnedPanel(guildId, userId)] })).catch(() => {});
     }
     if (id === 'cs_ach_owned_catsel' && interaction.isStringSelectMenu()) {
       const cat = interaction.values[0];
-      return interaction.update({ flags: COMPONENTS_V2_FLAG, components: [buildAchOwnedCategoryPanel(guildId, userId, cat)] }).catch(() => {});
+      return interaction.update(_w({ flags: COMPONENTS_V2_FLAG, components: [buildAchOwnedCategoryPanel(guildId, userId, cat)] })).catch(() => {});
     }
     if (id === 'cs_ach_catsel' && interaction.isStringSelectMenu()) {
       const cat = interaction.values[0];
-      return interaction.update({ flags: COMPONENTS_V2_FLAG, components: [buildAchCategoryPanel(guildId, userId, cat, 0)] }).catch(() => {});
+      return interaction.update(_w({ flags: COMPONENTS_V2_FLAG, components: [buildAchCategoryPanel(guildId, userId, cat, 0)] })).catch(() => {});
     }
     if (id.startsWith('cs_ach_page:')) {
       const parts = id.split(':');
       const cat = parts[1];
       const page = parseInt(parts[2], 10);
-      return interaction.update({ flags: COMPONENTS_V2_FLAG, components: [buildAchCategoryPanel(guildId, userId, cat, page)] }).catch(() => {});
+      return interaction.update(_w({ flags: COMPONENTS_V2_FLAG, components: [buildAchCategoryPanel(guildId, userId, cat, page)] })).catch(() => {});
     }
     return interaction.deferUpdate().catch(() => {});
   } catch (err) {
@@ -530,7 +532,7 @@ async function publishCasinoPanel(message) {
     } catch {}
   }
 
-  const sent = await channel.send(buildCasinoHomePanel(guildId));
+  const sent = await channel.send(embed.wrapPayload(guildId, buildCasinoHomePanel(guildId), 'casino'));
   db.setCasinoConfig(guildId, { panelMessageId: sent.id, panelChannelId: channel.id });
   const reply = await embed.reply(message, `Panel casino envoye dans <#${channel.id}>.`);
   if (reply) embed.scheduleDelete(reply, 5);
@@ -936,15 +938,11 @@ async function handleInteraction(interaction, id) {
       } else {
         count = parseInt(rawCount) || 1;
         if (count > user.draws) {
-          return interaction.reply({
-            embeds: [embed.build(guildId, `Tu n\'as que **${user.draws}** tirage(s) restant(s).`, { title: '◈ Tirage' })],
-            components: [
+          return interaction.reply({ ...embed.buildPayload(guildId, `Tu n\'as que **${user.draws}** tirage(s) restant(s).`, { title: '◈ Tirage' , components: [
               new ActionRowBuilder().addComponents(
                 new ButtonBuilder().setCustomId('cs_panel_draw_run:all').setLabel(`All (${user.draws})`).setStyle(ButtonStyle.Secondary),
               ),
-            ],
-            flags: MessageFlags.Ephemeral,
-          }).catch(() => {});
+            ] }) });
         }
       }
 
@@ -987,19 +985,15 @@ async function handleInteraction(interaction, id) {
         ].filter(Boolean),
       });
 
-      return interaction.reply({
-        embeds: [embed.build(guildId, `${rewardText}\n\n◇ Solde : **${embed.fmtCoins(updated.coins)}** coins  •  **${updated.draws}** tirage(s) restant(s)`, { title: header })],
-        components: buildDrawRow(updated.draws < 1, updated.draws),
-        flags: MessageFlags.Ephemeral,
-      }).catch(() => {})
+      return interaction.reply({ ...embed.buildPayload(guildId, `${rewardText}\n\n◇ Solde : **${embed.fmtCoins(updated.coins)}** coins  •  **${updated.draws}** tirage(s) restant(s)`, { title: header }) })
     }
 
     if (id === 'cs_panel_achievements') {
-      return interaction.reply({ flags: COMPONENTS_V2_FLAG | MessageFlags.Ephemeral, components: [buildAchHomePanel(guildId, userId)] }).catch(() => {});
+      return interaction.reply(embed.wrapPayload(guildId, { flags: COMPONENTS_V2_FLAG | MessageFlags.Ephemeral, components: [buildAchHomePanel(guildId, userId)] }, 'casino')).catch(() => {});
     }
 
     if (id === 'cs_panel_inventory') {
-      return interaction.reply({ flags: COMPONENTS_V2_FLAG | MessageFlags.Ephemeral, components: [_buildInventoryPage(guildId, userId)] }).catch(() => {});
+      return interaction.reply(embed.wrapPayload(guildId, { flags: COMPONENTS_V2_FLAG | MessageFlags.Ephemeral, components: [_buildInventoryPage(guildId, userId)] }, 'casino')).catch(() => {});
     }
 
     if (id === 'cs_panel_profile') {
@@ -1103,11 +1097,7 @@ async function handleShopCategory(interaction) {
     lines.push(`Tu as actuellement **${userShields}** bouclier(s).`);
     lines.push('1 bouclier = 1 vol bloqué.');
     const shieldsRow = buildShopShieldsRow(guildId);
-    return interaction.reply({
-      embeds: [embed.build(guildId, `${lines.join('\n')}\n\nChoisis un lot à acheter :`, { title: '◊ Boucliers anti-vol' })],
-      components: [shieldsRow],
-      flags: MessageFlags.Ephemeral,
-    }).catch(() => {});
+    return interaction.reply({ ...embed.buildPayload(guildId, `${lines.join('\n')}\n\nChoisis un lot à acheter :`, { title: '◊ Boucliers anti-vol' , components: [shieldsRow] }) });
   }
 
   // Handle category items
@@ -1118,11 +1108,7 @@ async function handleShopCategory(interaction) {
 
   const lines = items.slice(0, 15).map(item => `**${item.name}** ・ ${embed.fmtCoins(item.price)} coins`);
   const itemsRow = buildShopItemsRow(guildId, userId, category);
-  return interaction.reply({
-    embeds: [embed.build(guildId, `${lines.join('\n')}\n\nChoisis un item à acheter :`, { title: `◈ ${categoryLabels[category] || category}` })],
-    components: itemsRow ? [itemsRow] : [],
-    flags: MessageFlags.Ephemeral,
-  }).catch(() => {});
+  return interaction.reply({ ...embed.buildPayload(guildId, `${lines.join('\n')}\n\nChoisis un item à acheter :`, { title: `◈ ${categoryLabels[category] || category}`, components: itemsRow ? [itemsRow] : [] }) });
 }
 
 async function handleShopShieldSelect(interaction) {
@@ -1503,10 +1489,10 @@ async function sendConfigPanel(message) {
 
   const container = buildConfigPanel(message.guild);
 
-  const panel = await message.reply({
+  const panel = await message.reply(embed.wrapPayload(message.guild?.id, {
     flags: COMPONENTS_V2_FLAG,
     components: [container],
-  }).catch(() => null);
+  }, 'casino')).catch(() => null);
 
   // Register panel for later editing
   if (panel) {
@@ -1561,11 +1547,7 @@ async function handleInventoryCategory(interaction) {
       description: `x${item.quantity}`,
     })));
 
-  return interaction.reply({
-    embeds: [embed.build(guildId, `${lines.join('\n')}\n\nChoisis un item :`, { title: `◈ ${categoryLabels[category] || category}` })],
-    components: [new ActionRowBuilder().addComponents(select)],
-    flags: MessageFlags.Ephemeral,
-  }).catch(() => {});
+  return interaction.reply({ ...embed.buildPayload(guildId, `${lines.join('\n')}\n\nChoisis un item :`, { title: `◈ ${categoryLabels[category] || category}` , components: [new ActionRowBuilder().addComponents(select)] }) });
 }
 
 async function handleInventorySelect(interaction) {
@@ -1596,11 +1578,7 @@ async function handleInventorySelect(interaction) {
       new ButtonBuilder().setCustomId(`cs_inv_use_xp:${itemId}`).setLabel('Utiliser').setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId(`cs_inv_remove:${itemId}`).setLabel('Clear').setStyle(ButtonStyle.Danger),
     );
-    return interaction.reply({
-      embeds: [embed.build(guildId, `**${item.name}** x${item.quantity}\n\nChoisis une action :`, { title: 'XP' })],
-      components: [buttons],
-      flags: MessageFlags.Ephemeral,
-    }).catch(() => {});
+    return interaction.reply({ ...embed.buildPayload(guildId, `**${item.name}** x${item.quantity}\n\nChoisis une action :`, { title: 'XP' , components: [buttons] }) });
   }
 
   if (['role', 'color', 'badge', 'decor'].includes(category)) {
@@ -1610,11 +1588,7 @@ async function handleInventorySelect(interaction) {
       new ButtonBuilder().setCustomId(`cs_inv_toggle_role:${itemId}`).setLabel(hasRole ? 'Retirer du profil' : 'Ajouter au profil').setStyle(hasRole ? ButtonStyle.Danger : ButtonStyle.Success),
       new ButtonBuilder().setCustomId(`cs_inv_remove:${itemId}`).setLabel('Clear').setStyle(ButtonStyle.Danger),
     );
-    return interaction.reply({
-      embeds: [embed.build(guildId, `**${item.name}** x${item.quantity}\n\n${hasRole ? '✓ Actuellement équipé' : 'Non équipé'}\n\nChoisis une action :`, { title: category === 'color' ? 'Couleur' : category === 'badge' ? 'Badge' : category === 'decor' ? 'Décoration' : 'Rôle' })],
-      components: [buttons],
-      flags: MessageFlags.Ephemeral,
-    }).catch(() => {});
+    return interaction.reply({ ...embed.buildPayload(guildId, `**${item.name}** x${item.quantity}\n\n${hasRole ? '✓ Actuellement équipé' : 'Non équipé'}\n\nChoisis une action :`, { title: category === 'color' ? 'Couleur' : category === 'badge' ? 'Badge' : category === 'decor' ? 'Décoration' : 'Rôle' , components: [buttons] }) });
   }
 
   if (category === 'title') {
@@ -1624,21 +1598,13 @@ async function handleInventorySelect(interaction) {
       new ButtonBuilder().setCustomId(`cs_inv_toggle_title:${itemId}`).setLabel(isActive ? 'Retirer du profil' : 'Afficher sur profil').setStyle(isActive ? ButtonStyle.Danger : ButtonStyle.Success),
       new ButtonBuilder().setCustomId(`cs_inv_remove:${itemId}`).setLabel('Clear').setStyle(ButtonStyle.Danger),
     );
-    return interaction.reply({
-      embeds: [embed.build(guildId, `**${item.name}** x${item.quantity}\n\n${isActive ? '✓ Actuellement affiché' : 'Non affiché'}\n\nChoisis une action :`, { title: 'Titre' })],
-      components: [buttons],
-      flags: MessageFlags.Ephemeral,
-    }).catch(() => {});
+    return interaction.reply({ ...embed.buildPayload(guildId, `**${item.name}** x${item.quantity}\n\n${isActive ? '✓ Actuellement affiché' : 'Non affiché'}\n\nChoisis une action :`, { title: 'Titre' , components: [buttons] }) });
   }
 
   const buttons = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId(`cs_inv_remove:${itemId}`).setLabel('Clear').setStyle(ButtonStyle.Danger),
   );
-  return interaction.reply({
-    embeds: [embed.build(guildId, `**${item.name}** x${item.quantity}`, { title: 'Item' })],
-    components: [buttons],
-    flags: MessageFlags.Ephemeral,
-  }).catch(() => {});
+  return interaction.reply({ ...embed.buildPayload(guildId, `**${item.name}** x${item.quantity}`, { title: 'Item' , components: [buttons] }) });
 }
 
 async function handleInventoryAction(interaction, id) {
@@ -1693,10 +1659,7 @@ async function handleInventoryAction(interaction, id) {
         new ButtonBuilder().setCustomId(`cs_inv_toggle_role:${itemId}`).setLabel(newHasRole ? 'Retirer du profil' : 'Ajouter au profil').setStyle(newHasRole ? ButtonStyle.Danger : ButtonStyle.Success),
         new ButtonBuilder().setCustomId(`cs_inv_remove:${itemId}`).setLabel('Clear').setStyle(ButtonStyle.Danger),
       );
-      return interaction.update({
-        embeds: [embed.build(guildId, `**${item.name}** x${item.quantity}\n\n${newHasRole ? '✓ Actuellement équipé' : 'Non équipé'}\n\nChoisis une action :`, { title: item.type === 'color' ? 'Couleur' : item.type === 'badge' ? 'Badge' : item.type === 'decor' ? 'Décoration' : 'Rôle' })],
-        components: [buttons],
-      }).catch(() => {});
+      return interaction.update({ ...embed.buildPayload(guildId, `**${item.name}** x${item.quantity}\n\n${newHasRole ? '✓ Actuellement équipé' : 'Non équipé'}\n\nChoisis une action :`, { title: item.type === 'color' ? 'Couleur' : item.type === 'badge' ? 'Badge' : item.type === 'decor' ? 'Décoration' : 'Rôle' , components: [buttons] }) });
     } catch (e) {
       console.error('[INV-ACTION] role toggle failed:', e);
       return interaction.reply({ content: `Impossible de modifier le rôle : ${e.message}`, flags: 64 }).catch(() => {});
@@ -1715,10 +1678,7 @@ async function handleInventoryAction(interaction, id) {
       new ButtonBuilder().setCustomId(`cs_inv_toggle_title:${itemId}`).setLabel(isActive ? 'Retirer du profil' : 'Afficher sur profil').setStyle(isActive ? ButtonStyle.Danger : ButtonStyle.Success),
       new ButtonBuilder().setCustomId(`cs_inv_remove:${itemId}`).setLabel('Clear').setStyle(ButtonStyle.Danger),
     );
-    return interaction.update({
-      embeds: [embed.build(guildId, `**${item.name}** x${item.quantity}\n\n${isActive ? '✓ Actuellement affiché' : 'Non affiché'}\n\nChoisis une action :`, { title: 'Titre' })],
-      components: [buttons],
-    }).catch(() => {});
+    return interaction.update({ ...embed.buildPayload(guildId, `**${item.name}** x${item.quantity}\n\n${isActive ? '✓ Actuellement affiché' : 'Non affiché'}\n\nChoisis une action :`, { title: 'Titre' , components: [buttons] }) });
   }
 
   if (id.startsWith('cs_inv_remove:')) {
@@ -1769,11 +1729,11 @@ function sendCasinoLog(guild, cfg, channelType, opts) {
   const container = new ContainerBuilder();
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent(parts.join('\n')));
 
-  logCh.send({
+  logCh.send(embed.wrapPayload(logCh.guild?.id, {
     components      : [container],
     flags           : COMPONENTS_V2_FLAG,
     allowedMentions : { parse: [] },
-  }).catch(() => {});
+  }, 'casino')).catch(() => {});
 }
 
 exports.sendCasinoLog = sendCasinoLog;
@@ -1807,11 +1767,11 @@ async function sendRulesPanel(message) {
     }
   }
 
-  await message.channel.send({
+  await message.channel.send(embed.wrapPayload(message.guild?.id, {
     components: [container],
     flags: COMPONENTS_V2_FLAG,
     allowedMentions: { parse: [] },
-  }).catch(() => {});
+  }, 'casino')).catch(() => {});
 }
 
 // ============ INTERACTION HANDLERS ============
@@ -2266,17 +2226,17 @@ async function handlePanelNav(interaction) {
       await interaction.followUp({ files: [attachment], flags: MessageFlags.Ephemeral }).catch(() => {});
     } catch (cardErr) {
       console.error('[PROFILE-CARD] Nav error:', cardErr?.message);
-      await interaction.update({ flags: COMPONENTS_V2_FLAG, components: [_buildProfilePage(guildId, userId)] }).catch(() => {});
+      await interaction.update(embed.wrapPayload(guildId, { flags: COMPONENTS_V2_FLAG, components: [_buildProfilePage(guildId, userId)] }, 'casino')).catch(() => {});
     }
     return;
   }
 
   const builder = _PANEL_PAGES[page];
   if (!builder) {
-    await interaction.update({ flags: COMPONENTS_V2_FLAG, components: [_buildHomePage(guildId, userId, interaction.member)] }).catch(() => {});
+    await interaction.update(embed.wrapPayload(guildId, { flags: COMPONENTS_V2_FLAG, components: [_buildHomePage(guildId, userId, interaction.member)] }, 'casino')).catch(() => {});
     return;
   }
-  await interaction.update({ flags: COMPONENTS_V2_FLAG, components: [builder(guildId, userId, interaction.member)] }).catch((err) => {
+  await interaction.update(embed.wrapPayload(guildId, { flags: COMPONENTS_V2_FLAG, components: [builder(guildId, userId, interaction.member)] }, 'casino')).catch((err) => {
     console.log(`[CASINO-NAV] Update failed: ${err?.message}`);
   });
 }
@@ -2285,7 +2245,7 @@ async function handlePanelDraw(interaction, id) {
   const guildId = interaction.guild.id;
   const userId = interaction.user.id;
   const count = parseInt(id.split(':')[1]) || 1;
-  await interaction.update({ flags: COMPONENTS_V2_FLAG, components: [_executeDraw(guildId, userId, count, interaction.guild)] }).catch((err) => {
+  await interaction.update(embed.wrapPayload(guildId, { flags: COMPONENTS_V2_FLAG, components: [_executeDraw(guildId, userId, count, interaction.guild)] }, 'casino')).catch((err) => {
     console.log(`[CASINO-DRAW] Update failed: ${err?.message}`);
   });
 }

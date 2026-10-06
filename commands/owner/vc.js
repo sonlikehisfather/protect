@@ -371,7 +371,7 @@ async function _openConfigPanel(client, message, guildConfig, prefix, deleteRepl
     embed.clearPrivateInteraction(panel);
     if (reason === 'closed') return;
 
-    if (V2_AVAILABLE) {
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
       try {
         const ro = _buildReadOnlyV2(state);
         await panel.edit(ro).catch(() => {});
@@ -390,7 +390,7 @@ async function _openConfigPanel(client, message, guildConfig, prefix, deleteRepl
 
 
 function _buildPanelPayload(client, guild, guildId, state) {
-  if (V2_AVAILABLE) {
+  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
     try {
       const payload = _buildV2(client, guild, guildId, state);
       if (payload) return payload;
@@ -401,7 +401,7 @@ function _buildPanelPayload(client, guild, guildId, state) {
 
 function _buildV2(client, guild, guildId, state) {
   const accent    = _hexToInt(state.color || embed.getGuildColor(guildId) || '#2f3136');
-  const container = new ContainerBuilder().setAccentColor(accent);
+  const container = new ContainerBuilder();
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent('## Configuration VC'),
@@ -468,7 +468,7 @@ function _buildV2(client, guild, guildId, state) {
 
 function _buildReadOnlyV2(state) {
   const accent    = _hexToInt(state.color || '#2f3136');
-  const container = new ContainerBuilder().setAccentColor(accent);
+  const container = new ContainerBuilder();
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent('## Configuration VC'),

@@ -120,16 +120,7 @@ async function _runUnlockAll(message, guild, guildId, deleteReply, deleteDelay) 
     await _wait(300);
   }
 
-  const sent = await message.channel.send({
-    embeds: [
-      embed.build(
-        guildId,
-        `**${unlockedCount}** salon(s) ont été déverrouillé(s).`,
-        { timestamp: false }
-      )
-    ],
-    allowedMentions: { repliedUser: false },
-  }).catch(() => null);
+  const sent = await embed.sendEmbed(message.channel, guildId, `**${unlockedCount}** salon(s) ont été déverrouillé(s).`, { timestamp: false , allowedMentions: { repliedUser: false } });
 
   if (sent && deleteReply) {
     embed.scheduleDelete(sent, deleteDelay);

@@ -301,18 +301,14 @@ exports.run = async (client, message, args) => {
 
   const sent = V2_AVAILABLE
     ? await message.reply(_buildV2Question()).catch(() => null)
-    : await message.reply({
-        embeds: [embed.build(guildId, null, {
+    : await message.reply({ ...embed.buildPayload(guildId, null, {
           title : `❓ Question 1/5`,
           fields: [
             { name: '📜 Question',    value: `**${questions[0].q}**`,                            inline: false },
             { name: '🎯 Score',       value: `${score}/${current}`,                              inline: true  },
           ],
           color: '#9B59B6', timestamp: false,
-        })],
-        components: [_btnRow],
-        allowedMentions: { parse: [] },
-      }).catch(() => null);
+          components: [_btnRow] }) });
 
   if (!sent) return;
 
@@ -332,7 +328,7 @@ exports.run = async (client, message, args) => {
     if (isCorrect) score++;
     current++;
 
-    if (V2_AVAILABLE) {
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
       const feedbackBody = isCorrect
         ? `✔ **Bonne réponse !**\n> **${q.q}** est bien **${answer}** !`
         : `✖ **Mauvaise réponse !**\n> La réponse était **${answer}**.`;
@@ -347,20 +343,18 @@ exports.run = async (client, message, args) => {
       return;
     }
 
-    if (V2_AVAILABLE) {
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
       await sent.edit(_buildV2Question()).catch(() => {});
     } else {
       const q2 = questions[current];
-      await sent.edit({
-        embeds: [embed.build(guildId, null, {
+      await embed.editEmbed(sent, guildId, null, {
           title : `❓ Question ${current + 1}/5`,
           fields: [
             { name: '📜 Question', value: `**${q2.q}**`,      inline: false },
             { name: '🎯 Score',    value: `${score}/${current}`, inline: true  },
           ],
           color: '#9B59B6', timestamp: false,
-        })],
-      }).catch(() => {});
+        });
     }
   });
 
@@ -375,15 +369,12 @@ exports.run = async (client, message, args) => {
     db.addXp(guildId, message.author.id, xpGain);
     desc += `\n\n✨ **+${xpGain} XP** gagnés !`;
 
-    if (V2_AVAILABLE) {
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
       const container = new ContainerBuilder()
         .addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${emoji} ${title}\n\n${desc}`));
       await sent.edit({ components: [container], flags: COMPONENTS_V2_FLAG }).catch(() => {});
     } else {
-      await sent.edit({
-        embeds: [embed.build(guildId, desc, { title: `${emoji} ${title}`, timestamp: false })],
-        components: [],
-      }).catch(() => {});
+      await sent.edit({ ...embed.buildPayload(guildId, desc, { title: `${emoji} ${title}`, timestamp: false , components: [] }) });
     }
   });
 

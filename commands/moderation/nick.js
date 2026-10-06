@@ -156,18 +156,9 @@ module.exports = {
       return;
     }
 
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          newNick
+    const sent = await embed.sendEmbed(message.channel, guildId, newNick
             ? `Le pseudo de <@${target.id}> a été modifié en **${newNick}**.`
-            : `Le pseudo de <@${target.id}> a été réinitialisé.`,
-          { timestamp: false }
-        )
-      ],
-      allowedMentions: { repliedUser: false },
-    }).catch(() => null);
+            : `Le pseudo de <@${target.id}> a été réinitialisé.`, { timestamp: false , allowedMentions: { repliedUser: false } });
 
     if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
   },

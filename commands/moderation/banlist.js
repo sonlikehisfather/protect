@@ -65,14 +65,9 @@ module.exports = {
     const bans = await _fetchAllBans(guild);
 
     if (!bans || !bans.size) {
-      const sent = await message.channel.send({
-        embeds: [
-          embed.build(guildId, 'Aucun membre n’est actuellement banni.', {
+      const sent = await embed.sendEmbed(message.channel, guildId, 'Aucun membre n’est actuellement banni.', {
             timestamp: false,
-          }),
-        ],
-        allowedMentions: { parse: [], repliedUser: false },
-      }).catch(() => null);
+          allowedMentions: { parse: [], repliedUser: false } });
 
       if (sent && deleteReply) {
         embed.scheduleDelete(sent, deleteDelay);

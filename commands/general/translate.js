@@ -136,7 +136,7 @@ module.exports = {
       };
     };
 
-    if (!V2_AVAILABLE) {
+    if (!embed.shouldUseV2(guildId, module.exports.help.name)) {
       const s = await embed.replyError(message, 'Components V2 non disponible sur cette version du bot.', { timestamp: false }).catch(() => null);
       if (s && deleteReply) embed.scheduleDelete(s, deleteDelay);
       return;

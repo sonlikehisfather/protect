@@ -508,7 +508,7 @@ function _buildComponentsV2Payload(custom, message, guildId, target) {
   const accent = _v2Accent(guildId);
   const container = new ContainerBuilder();
   if (accent != null) {
-    try { container.setAccentColor(accent); } catch {}
+    try { container; } catch {}
   }
 
   let totalCount = 1;

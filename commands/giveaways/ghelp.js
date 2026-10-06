@@ -17,7 +17,7 @@ exports.run = async (client, message, args) => {
     prefix = db.getGuildConfig(guildId)?.prefix ?? prefix;
   } catch {}
 
-  const e = embed.build(guildId, null, {
+  return embed.sendEmbed(message.channel, guildId, null, {
     title : 'Aide - Giveaways',
     fields: [
       {
@@ -41,9 +41,8 @@ exports.run = async (client, message, args) => {
         inline: false,
       },
     ],
-    footer   : 'L\'ID correspond à l\'ID du message du giveaway.',
-    timestamp: false,
+    footer          : 'L\'ID correspond à l\'ID du message du giveaway.',
+    timestamp       : false,
+    allowedMentions : { repliedUser: false },
   });
-
-  return message.reply({ embeds: [e], allowedMentions: { repliedUser: false } });
 };

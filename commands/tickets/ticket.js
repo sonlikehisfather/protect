@@ -434,7 +434,7 @@ async function _openPanelConfig(client, message, panelId, existingSent = null) {
   const buildClosedPayload = (text, isError = false) => {
     if (state.isV2) {
       const c = new ContainerBuilder()
-        .setAccentColor(isError ? 0xED4245 : accentColor)
+        
         .addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
       return { flags: COMPONENTS_V2_FLAG, components: [c] };
     }
@@ -1536,10 +1536,10 @@ function _buildAdvancedSelectOptions(panel) {
 }
 
 function _buildPanelV2Payload(panel, options, viewState, guild, accentColor) {
-  if (!V2_AVAILABLE) return null;
+  if (!embed.shouldUseV2(guildId, module.exports.help.name)) return null;
 
   try {
-    const container = new ContainerBuilder().setAccentColor(accentColor);
+    const container = new ContainerBuilder();
 
     if (viewState === 'advanced') {
       _appendAdvancedV2(container, panel);
@@ -2500,9 +2500,9 @@ function _buildOptionConfigRows() {
 
 
 function _buildOptionV2Payload(option, panel, guild, accentColor) {
-  if (!V2_AVAILABLE) return null;
+  if (!embed.shouldUseV2(guildId, module.exports.help.name)) return null;
   try {
-    const container = new ContainerBuilder().setAccentColor(accentColor);
+    const container = new ContainerBuilder();
     _appendOptionV2(container, option, panel, guild);
     return {
       flags           : COMPONENTS_V2_FLAG,

@@ -110,19 +110,10 @@ module.exports = {
 
     db.addSanction(guildId, target.id, message.author.id, 'kick', reason);
 
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          `**${target.user.tag}** a été expulsé.`,
-          {
+    const sent = await embed.sendEmbed(message.channel, guildId, `**${target.user.tag}** a été expulsé.`, {
             fields   : [{ name: 'Raison', value: reason, inline: false }],
             timestamp: false,
-          }
-        )
-      ],
-      allowedMentions: { repliedUser: false },
-    }).catch(() => null);
+          allowedMentions: { repliedUser: false } });
 
     if (sent && deleteReply) {
       embed.scheduleDelete(sent, deleteDelay);

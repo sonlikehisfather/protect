@@ -76,17 +76,7 @@ module.exports = {
         .setStyle(ButtonStyle.Secondary)
     );
 
-    const confirmMsg = await message.reply({
-      embeds: [
-        embed.build(
-          guildId,
-          `Supprimer **${count}** custom command(s) ? Cette action est irréversible.`,
-          { timestamp: false }
-        ),
-      ],
-      components      : [confirmRow],
-      allowedMentions : { repliedUser: false, parse: [] },
-    }).catch(() => null);
+    const confirmMsg = await message.reply({ ...embed.buildPayload(guildId, `Supprimer **${count}** custom command(s) ? Cette action est irréversible.`, { timestamp: false , components: [confirmRow] }) });
 
     if (!confirmMsg) return;
 
@@ -152,17 +142,7 @@ async function _handleEmpty(message, guildId, deleteReply, deleteDelay) {
       .setStyle(ButtonStyle.Secondary)
   );
 
-  const confirmMsg = await message.reply({
-    embeds: [
-      embed.build(
-        guildId,
-        `**${empties.length}** custom command(s) vide(s) trouvée(s) :\n${listing}\n\nSupprimer ?`,
-        { timestamp: false }
-      ),
-    ],
-    components      : [confirmRow],
-    allowedMentions : { repliedUser: false, parse: [] },
-  }).catch(() => null);
+  const confirmMsg = await message.reply({ ...embed.buildPayload(guildId, `**${empties.length}** custom command(s) vide(s) trouvée(s) :\n${listing}\n\nSupprimer ?`, { timestamp: false , components: [confirmRow] }) });
 
   if (!confirmMsg) return;
 

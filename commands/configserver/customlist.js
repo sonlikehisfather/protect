@@ -88,8 +88,7 @@ module.exports = {
 
     if (totalPages <= 1) {
       const sent = await message.reply({
-        embeds          : [buildEmbed()],
-        allowedMentions : { repliedUser: false, parse: [] },
+        ...embed.embedToPayload(guildId, buildEmbed(), { allowedMentions: { repliedUser: false, parse: [] } }),
       }).catch(() => null);
 
       if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
@@ -119,9 +118,7 @@ module.exports = {
     ];
 
     const msg = await message.reply({
-      embeds          : [buildEmbed()],
-      components      : buildRows(false),
-      allowedMentions : { repliedUser: false, parse: [] },
+      ...embed.embedToPayload(guildId, buildEmbed(), { components: buildRows(false), allowedMentions: { repliedUser: false, parse: [] } }),
     }).catch(() => null);
 
     if (!msg) return;
@@ -147,8 +144,7 @@ module.exports = {
         if (interaction.customId === 'local:cclist:next' && page < totalPages - 1) page++;
 
         return interaction.update({
-          embeds     : [buildEmbed()],
-          components : buildRows(false),
+          ...embed.embedToPayload(guildId, buildEmbed(), { components: buildRows(false) }),
         });
       } catch (err) {
         if (err?.code !== 10062 && err?.code !== 40060) {

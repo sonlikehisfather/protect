@@ -218,19 +218,10 @@ async function _handleList(message, guildId, deleteReply, deleteDelay) {
     lines.join('\n') +
     (rows.length > 25 ? `\n\nEt \`${rows.length - 25}\` autre(s).` : '');
 
-  const sent = await message.channel.send({
-    embeds: [
-      embed.build(
-        guildId,
-        text,
-        {
+  const sent = await embed.sendEmbed(message.channel, guildId, text, {
           title     : 'Autoreact',
           timestamp : false,
-        }
-      ),
-    ],
-    allowedMentions: { repliedUser: false },
-  }).catch(() => null);
+          allowedMentions: { repliedUser: false } });
 
   if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
 }

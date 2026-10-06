@@ -5,6 +5,7 @@
 
 # Dépendances
 node_modules/
+.local-node/
 
 # Logs
 npm-debug.log*

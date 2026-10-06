@@ -926,9 +926,9 @@ module.exports = {
         );
 
         let confirmPayload;
-        if (V2_AVAILABLE) {
+        if (embed.shouldUseV2(guildId, module.exports.help.name)) {
           try {
-            const c = new ContainerBuilder().setAccentColor(0xED4245);
+            const c = new ContainerBuilder();
             c.addTextDisplayComponents(
               new TextDisplayBuilder().setContent(
                 `## Supprimer ce rolemenu ?\n${_truncate(state.title, 60) || 'Sans titre'} - Salon : ${chan} - Options : ${count}\n\nCette action est irreversible.`
@@ -1146,10 +1146,10 @@ function _buildPanelPayload(guildId, state) {
       (state.options.length > 15 ? `\n> ...et ${state.options.length - 15} autre(s).` : '')
     : '> Aucune option configuree';
 
-  if (V2_AVAILABLE) {
+  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
     try {
       const accent    = _hexToInt(state.baseColor);
-      const container = new ContainerBuilder().setAccentColor(accent);
+      const container = new ContainerBuilder();
 
       container.addTextDisplayComponents(
         new TextDisplayBuilder().setContent('## Rolemenu'),
@@ -1932,10 +1932,10 @@ async function _handleList(client, message, guildId, deleteReply, deleteDelay) {
   );
 
   const buildPayload = () => {
-    if (V2_AVAILABLE) {
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
       try {
         const accent    = _hexToInt(embed.getGuildColor(guildId));
-        const container = new ContainerBuilder().setAccentColor(accent);
+        const container = new ContainerBuilder();
         container.addTextDisplayComponents(
           new TextDisplayBuilder().setContent(
             `## Rolemenus (${menus.length}) - Page ${page + 1}/${pages.length}`
@@ -2051,10 +2051,10 @@ async function _handleList(client, message, guildId, deleteReply, deleteDelay) {
         .setStyle(ButtonStyle.Secondary),
     );
 
-    if (V2_AVAILABLE) {
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
       try {
         const accent    = _hexToInt(embed.getGuildColor(guildId));
-        const container = new ContainerBuilder().setAccentColor(accent);
+        const container = new ContainerBuilder();
         container.addTextDisplayComponents(
           new TextDisplayBuilder().setContent('## Outils'),
         );
@@ -2399,9 +2399,7 @@ async function _handleCleanFromList(message, guildId, listPanel, deleteReply, de
   const total = emptyOrphans.length + staleEmpty.length + staleDraft.length;
 
   if (!total) {
-    const sent = await message.channel.send({
-      embeds: [embed.build(guildId, 'Aucun rolemenu vide ou message supprim\u00e9 \u00e0 nettoyer.\nLes brouillons avec options sont conserv\u00e9s.', { timestamp: false })],
-    }).catch(() => null);
+    const sent = await embed.sendEmbed(message.channel, guildId, 'Aucun rolemenu vide ou message supprim\u00e9 \u00e0 nettoyer.\nLes brouillons avec options sont conserv\u00e9s.', { timestamp: false });
 
     if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
     return;
@@ -2485,9 +2483,7 @@ async function _handleDeleteDrafts(message, guildId, deleteReply, deleteDelay) {
   });
 
   if (!drafts.length) {
-    const sent = await message.channel.send({
-      embeds: [embed.build(guildId, 'Aucun brouillon avec options.', { timestamp: false })],
-    }).catch(() => null);
+    const sent = await embed.sendEmbed(message.channel, guildId, 'Aucun brouillon avec options.', { timestamp: false });
 
     if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
     return;

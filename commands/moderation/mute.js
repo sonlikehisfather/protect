@@ -346,21 +346,12 @@ module.exports = {
       });
     }
 
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          durationStr
+    const sent = await embed.sendEmbed(message.channel, guildId, durationStr
             ? `<@${member.id}> a été mute pendant **${durationStr}**.`
-            : `<@${member.id}> a été mute.`,
-          {
+            : `<@${member.id}> a été mute.`, {
             fields    : successFields,
             timestamp : false,
-          }
-        )
-      ],
-      allowedMentions: { parse: [] },
-    }).catch(() => null);
+          allowedMentions: { parse: [] } });
 
     if (sent && deleteReply)
       embed.scheduleDelete(sent, deleteDelay);

@@ -57,9 +57,9 @@ exports.run = async (client, message, args) => {
   }
 
   const _v2Panel = (text, disabled = false) => {
-    if (V2_AVAILABLE) {
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
       try {
-        const container = new ContainerBuilder().setAccentColor(0x57F287);
+        const container = new ContainerBuilder();
         container.addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
         container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
         container.addActionRowComponents(_buildConfirmRow(disabled));
@@ -134,9 +134,9 @@ exports.run = async (client, message, args) => {
     `**Débanni de** › ${unbanned} serveur(s)\n\n` +
     `-# <t:${Math.floor(Date.now() / 1000)}:f>`;
 
-  if (V2_AVAILABLE) {
+  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
     try {
-      const container = new ContainerBuilder().setAccentColor(0x57F287);
+      const container = new ContainerBuilder();
       container.addTextDisplayComponents(new TextDisplayBuilder().setContent(doneText));
       await panel.edit({ embeds: [], components: [container], flags: COMPONENTS_V2_FLAG, allowedMentions: { parse: [] } }).catch(() => {});
       return;

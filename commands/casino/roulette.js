@@ -263,7 +263,7 @@ exports.run = async (client, message, args) => {
   }
 
   if (imageBuffer) {
-    if (V2_AVAILABLE) {
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
       const container = new ContainerBuilder();
       container.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL('attachment://roulette_result.png')));
       return message.reply({
@@ -319,7 +319,7 @@ exports.run = async (client, message, args) => {
     });
   }
 
-  if (V2_AVAILABLE) {
+  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
     const container = new ContainerBuilder();
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
       `## ◉ Roulette\n\n` +

@@ -52,10 +52,7 @@ module.exports = {
       return;
     }
 
-    const thinking = await message.channel.send({
-      embeds: [embed.build(guildId, 'Conversion en cours...', { timestamp: false })],
-      allowedMentions: { parse: [] },
-    }).catch(() => null);
+    const thinking = await embed.sendEmbed(message.channel, guildId, 'Conversion en cours...', { timestamp: false, allowedMentions: { parse: [] } }).catch(() => null);
 
     let gifBuffer;
     try {

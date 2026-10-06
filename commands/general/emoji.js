@@ -1,6 +1,18 @@
 'use strict';
 
 
+const {
+  ContainerBuilder,
+  TextDisplayBuilder,
+  MediaGalleryBuilder,
+  MediaGalleryItemBuilder,
+  MessageFlags,
+} = require('discord.js');
+
+const COMPONENTS_V2_FLAG = MessageFlags?.IsComponentsV2 ?? (1 << 15);
+const V2_AVAILABLE       = typeof ContainerBuilder === 'function' &&
+                           typeof TextDisplayBuilder === 'function';
+
 const db    = require('../../core/database');
 const embed = require('../../utils/embed');
 
@@ -51,60 +63,67 @@ module.exports = {
       size   : 1024,
     });
 
-    const fields = [
-      {
-        name  : 'Émoji',
-        value : `${emoji}`,
-        inline: true,
-      },
-      {
-        name  : 'Nom',
-        value : emoji.name ?? 'Inconnu',
-        inline: true,
-      },
-      {
-        name  : 'ID',
-        value : emoji.id,
-        inline: true,
-      },
-      {
-        name  : 'Animé',
-        value : emoji.animated ? 'Oui' : 'Non',
-        inline: true,
-      },
-      {
-        name  : 'Disponible',
-        value : emoji.available ? 'Oui' : 'Non',
-        inline: true,
-      },
+    const lines = [
+      `## Informations \u00e9moji`,
+      `> ${emoji}`,
+      '',
+      `**Nom** \u203a ${emoji.name ?? 'Inconnu'}`,
+      `ID \u203a \`${emoji.id}\``,
+      `Anim\u00e9 \u203a ${emoji.animated ? 'Oui' : 'Non'}`,
+      `Disponible \u203a ${emoji.available ? 'Oui' : 'Non'}`,
     ];
 
     if (createdAt) {
-      fields.push({
-        name  : 'Créé le',
-        value : `<t:${createdAt}:F>\n<t:${createdAt}:R>`,
-        inline: true,
-      });
+      lines.push(`Cr\u00e9\u00e9 le \u203a <t:${createdAt}:F> (<t:${createdAt}:R>)`);
     }
 
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          null,
-          {
-            title      : 'Informations émoji',
-            authorName : emoji.name ?? 'Émoji',
+    const text = lines.join('\n');
+
+    let sent = null;
+
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
+      try {
+        const container = new ContainerBuilder();
+        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
+        container.addMediaGalleryComponents(
+          new MediaGalleryBuilder().addItems(
+            new MediaGalleryItemBuilder().setURL(imageURL)
+          )
+        );
+        sent = await message.channel.send({
+          components      : [container],
+          flags           : COMPONENTS_V2_FLAG,
+          allowedMentions : { repliedUser: false },
+        }).catch(() => null);
+      } catch {}
+    }
+
+    if (!sent) {
+      const fields = [
+        { name: '\u00c9moji', value: `${emoji}`, inline: true },
+        { name: 'Nom', value: emoji.name ?? 'Inconnu', inline: true },
+        { name: 'ID', value: emoji.id, inline: true },
+        { name: 'Anim\u00e9', value: emoji.animated ? 'Oui' : 'Non', inline: true },
+        { name: 'Disponible', value: emoji.available ? 'Oui' : 'Non', inline: true },
+      ];
+
+      if (createdAt) {
+        fields.push({ name: 'Cr\u00e9\u00e9 le', value: `<t:${createdAt}:F>\n<t:${createdAt}:R>`, inline: true });
+      }
+
+      sent = await message.channel.send({
+        embeds: [
+          embed.build(guildId, null, {
+            title      : 'Informations \u00e9moji',
+            authorName : emoji.name ?? '\u00c9moji',
             image      : imageURL,
             fields,
             timestamp  : false,
-          }
-        )
-      ],
-      allowedMentions: {
-        repliedUser: false,
-      },
-    }).catch(() => null);
+          })
+        ],
+        allowedMentions: { repliedUser: false },
+      }).catch(() => null);
+    }
 
     if (sent && deleteReply) {
       embed.scheduleDelete(sent, deleteDelay);

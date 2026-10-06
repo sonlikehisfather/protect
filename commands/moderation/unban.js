@@ -105,7 +105,7 @@ module.exports = {
     db.addSanction(guildId, userId, message.author.id, 'unban', reason);
 
     let sentPayload;
-    if (V2_AVAILABLE) {
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
       try {
         const body =
           `## Débanni
@@ -119,7 +119,7 @@ module.exports = {
 
 ` +
           `-# <t:${Math.floor(Date.now() / 1000)}:f>`;
-        const container = new ContainerBuilder().setAccentColor(0x57F287);
+        const container = new ContainerBuilder();
         container.addTextDisplayComponents(new TextDisplayBuilder().setContent(body));
         sentPayload = { embeds: [], components: [container], flags: COMPONENTS_V2_FLAG, allowedMentions: { parse: [] } };
       } catch {}

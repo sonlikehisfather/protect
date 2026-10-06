@@ -143,7 +143,8 @@ exports.run = async (client, message, args) => {
     page: 0,
   };
 
-  const payload = V2_AVAILABLE
+  const useV2 = embed.shouldUseV2(guildId, module.exports.help.name);
+  const payload = useV2
     ? _buildV2Doc(state, guildId)
     : _buildClassicDoc(state, guildId);
 
@@ -177,7 +178,7 @@ exports.run = async (client, message, args) => {
       await interaction.deferUpdate().catch(() => {});
       await msg
         .edit(
-          V2_AVAILABLE
+          useV2
             ? _buildV2Doc(state, guildId)
             : _buildClassicDoc(state, guildId)
         )
@@ -190,7 +191,7 @@ exports.run = async (client, message, args) => {
       await interaction.deferUpdate().catch(() => {});
       await msg
         .edit(
-          V2_AVAILABLE
+          useV2
             ? _buildV2Doc(state, guildId)
             : _buildClassicDoc(state, guildId)
         )
@@ -207,7 +208,7 @@ exports.run = async (client, message, args) => {
       await interaction.deferUpdate().catch(() => {});
       await msg
         .edit(
-          V2_AVAILABLE
+          useV2
             ? _buildV2Doc(state, guildId)
             : _buildClassicDoc(state, guildId)
         )
@@ -236,7 +237,7 @@ function _buildV2Doc(state, guildId) {
   );
 
   const accent = 0x2f3136;
-  const container = new ContainerBuilder().setAccentColor(accent);
+  const container = new ContainerBuilder();
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent('## 📚 Documentation des Logs'),

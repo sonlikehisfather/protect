@@ -1738,10 +1738,10 @@ async function _openPanel(client, message, guildId, custom, deleteReply, deleteD
 
 
 function _buildPanelPayload(guildId, custom, guild) {
-  if (V2_AVAILABLE) {
+  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
     try {
       const accent = _hexToInt(embed.getGuildColor(guildId));
-      const container = new ContainerBuilder().setAccentColor(accent);
+      const container = new ContainerBuilder();
       _appendMainV2(container, custom, guild);
       return {
         flags           : COMPONENTS_V2_FLAG,
@@ -2017,9 +2017,9 @@ function _buildModulesSummary(custom) {
 
 
 function _buildButtonsPayload(guildId, custom) {
-  if (V2_AVAILABLE) {
+  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
     try {
-      const container = new ContainerBuilder().setAccentColor(_hexToInt(embed.getGuildColor(guildId)));
+      const container = new ContainerBuilder();
       _appendButtonsV2(container, custom);
       return {
         flags           : COMPONENTS_V2_FLAG,
@@ -2092,9 +2092,9 @@ function _appendButtonsV2(container, custom) {
 
 
 function _buildSelectsPayload(guildId, custom) {
-  if (V2_AVAILABLE) {
+  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
     try {
-      const container = new ContainerBuilder().setAccentColor(_hexToInt(embed.getGuildColor(guildId)));
+      const container = new ContainerBuilder();
       _appendSelectsV2(container, custom);
       return {
         flags           : COMPONENTS_V2_FLAG,
@@ -2162,10 +2162,10 @@ function _appendSelectsV2(container, custom) {
 
 
 function _buildClosedPayload(guildId, text, isError = false) {
-  if (V2_AVAILABLE) {
+  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
     try {
       const accent = isError ? 0xED4245 : _hexToInt(embed.getGuildColor(guildId));
-      const c = new ContainerBuilder().setAccentColor(accent);
+      const c = new ContainerBuilder();
       c.addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
       return {
         flags           : COMPONENTS_V2_FLAG,
@@ -2195,10 +2195,10 @@ function _buildConfirmDeletePayload(guildId, name) {
       .setStyle(ButtonStyle.Secondary),
   );
 
-  if (V2_AVAILABLE) {
+  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
     try {
       const accent = _hexToInt(embed.getGuildColor(guildId));
-      const c = new ContainerBuilder().setAccentColor(accent);
+      const c = new ContainerBuilder();
       c.addTextDisplayComponents(
         new TextDisplayBuilder().setContent(`## Supprimer la custom command\n\`+${name}\` sera retirée définitivement.`),
       );

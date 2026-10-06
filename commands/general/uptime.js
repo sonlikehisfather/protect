@@ -1,6 +1,16 @@
 'use strict';
 
 
+const {
+  ContainerBuilder,
+  TextDisplayBuilder,
+  MessageFlags,
+} = require('discord.js');
+
+const COMPONENTS_V2_FLAG = MessageFlags?.IsComponentsV2 ?? (1 << 15);
+const V2_AVAILABLE       = typeof ContainerBuilder === 'function' &&
+                           typeof TextDisplayBuilder === 'function';
+
 const db    = require('../../core/database');
 const embed = require('../../utils/embed');
 
@@ -40,26 +50,36 @@ module.exports = {
       `${minutes} minute${minutes !== 1 ? 's' : ''}, ` +
       `${seconds} seconde${seconds !== 1 ? 's' : ''}`;
 
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          null,
-          {
+    const text = `## Temps en ligne\n\nUptime \u203a ${formatted}`;
+
+    let sent = null;
+
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
+      try {
+        const container = new ContainerBuilder();
+        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
+        sent = await message.channel.send({
+          components      : [container],
+          flags           : COMPONENTS_V2_FLAG,
+          allowedMentions : { parse: [] },
+        }).catch(() => null);
+      } catch {}
+    }
+
+    if (!sent) {
+      sent = await message.channel.send({
+        embeds: [
+          embed.build(guildId, null, {
             title : 'Temps en ligne',
             fields: [
-              {
-                name  : 'Uptime',
-                value : `\`${formatted}\``,
-                inline: false,
-              },
+              { name: 'Uptime', value: `\`${formatted}\``, inline: false },
             ],
             timestamp : false,
-          }
-        ),
-      ],
-      allowedMentions: { parse: [] },
-    }).catch(() => null);
+          }),
+        ],
+        allowedMentions: { parse: [] },
+      }).catch(() => null);
+    }
 
     if (sent && deleteReply) {
       embed.scheduleDelete(sent, deleteDelay);

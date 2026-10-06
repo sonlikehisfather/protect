@@ -34,16 +34,7 @@ exports.run = async (client, message, args) => {
   const creationLimit  = Number(antiraid.creationLimit) || 0;
 
   if (!sub) {
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          `Âge minimum du compte requis : **${creationLimit > 0 ? formatDuration(creationLimit, { unit: 's', format: 'fr-long' }) : 'Désactivé'}**.`,
-          { timestamp: false }
-        )
-      ],
-      allowedMentions: { repliedUser: false },
-    }).catch(() => null);
+    const sent = await embed.sendEmbed(message.channel, guildId, `Âge minimum du compte requis : **${creationLimit > 0 ? formatDuration(creationLimit, { unit: 's', format: 'fr-long' }) : 'Désactivé'}**.`, { timestamp: false , allowedMentions: { repliedUser: false } });
 
     if (sent && deleteReply) {
       embed.scheduleDelete(sent, deleteDelay);
@@ -64,16 +55,7 @@ exports.run = async (client, message, args) => {
 
     db.setAntiraidConfig(guildId, 'creationLimit', 0);
 
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          'La limite de création de compte a été désactivée.',
-          { timestamp: false }
-        )
-      ],
-      allowedMentions: { repliedUser: false },
-    }).catch(() => null);
+    const sent = await embed.sendEmbed(message.channel, guildId, 'La limite de création de compte a été désactivée.', { timestamp: false , allowedMentions: { repliedUser: false } });
 
     if (sent && deleteReply) {
       embed.scheduleDelete(sent, deleteDelay);
@@ -124,16 +106,7 @@ exports.run = async (client, message, args) => {
   db.setGuildConfig(guildId, 'antiraidEnabled', 1);
   db.setAntiraidConfig(guildId, 'creationLimit', seconds);
 
-  const sent = await message.channel.send({
-    embeds: [
-      embed.build(
-        guildId,
-        `L’âge minimum du compte requis est maintenant de **${formatDuration(seconds, { unit: 's', format: 'fr-long' })}**.`,
-        { timestamp: false }
-      )
-    ],
-    allowedMentions: { repliedUser: false },
-  }).catch(() => null);
+  const sent = await embed.sendEmbed(message.channel, guildId, `L’âge minimum du compte requis est maintenant de **${formatDuration(seconds, { unit: 's', format: 'fr-long' })}**.`, { timestamp: false , allowedMentions: { repliedUser: false } });
 
   if (sent && deleteReply) {
     embed.scheduleDelete(sent, deleteDelay);

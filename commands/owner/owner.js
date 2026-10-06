@@ -90,20 +90,11 @@ async function _list(message, guildId) {
 
   ];
 
-  return message.reply({
-    embeds: [
-      embed.build(
-        message.guild.id,
-        null,
-        {
+  return embed.sendEmbed(message.channel, message.guild.id, null, {
           title    : 'Owner list',
           fields,
           timestamp: false,
-        }
-      ),
-    ],
-    allowedMentions: { repliedUser: false },
-  });
+        });
 
 }
 

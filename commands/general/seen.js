@@ -52,7 +52,7 @@ module.exports = {
 
     let sent;
 
-    if (V2_AVAILABLE) {
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
       const container = new ContainerBuilder();
 
       container.addTextDisplayComponents(
@@ -89,15 +89,12 @@ module.exports = {
         if (row.lastMessage) desc += `\n\n**Dernier message**\n> ${row.lastMessage}`;
       }
 
-      sent = await message.channel.send({
-        embeds: [embed.build(guildId, desc, {
+      sent = await embed.sendEmbed(message.channel, guildId, desc, {
           title      : 'Dernière activité',
           authorName : displayName,
           authorIcon : avatarURL,
           timestamp  : false,
-        })],
-        allowedMentions: { parse: [] },
-      }).catch(() => null);
+        });
     }
 
     if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);

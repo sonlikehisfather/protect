@@ -337,16 +337,7 @@ async function _showSteps(message, guildId, prefix) {
   const steps = _readSteps(antiraidConfig?.punishSteps);
 
   if (!steps.length) {
-    return message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          `Aucun palier configuré.\nUtilisez \`${prefix}punish add <strikes> <durée> <sanction> [durée_sanction]\` ou \`${prefix}punish setup\`.`,
-          { timestamp: false }
-        ),
-      ],
-      allowedMentions: { repliedUser: false },
-    });
+    return embed.sendEmbed(message.channel, guildId, `Aucun palier configuré.\nUtilisez \`${prefix}punish add <strikes> <durée> <sanction> [durée_sanction]\` ou \`${prefix}punish setup\`.`, { timestamp: false });
   }
 
   const lines = steps.map((step, index) =>
@@ -401,20 +392,11 @@ async function _showSteps(message, guildId, prefix) {
     inline : false,
   });
 
-  return message.channel.send({
-    embeds: [
-      embed.build(
-        guildId,
-        null,
-        {
+  return embed.sendEmbed(message.channel, guildId, null, {
           title  : 'Paliers de punition automod',
           fields,
           timestamp: false,
-        }
-      ),
-    ],
-    allowedMentions: { repliedUser: false },
-  });
+        });
 }
 
 function _readSteps(raw) {

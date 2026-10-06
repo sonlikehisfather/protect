@@ -1,5 +1,15 @@
 'use strict';
 
+const {
+  ContainerBuilder,
+  TextDisplayBuilder,
+  MessageFlags,
+} = require('discord.js');
+
+const COMPONENTS_V2_FLAG = MessageFlags?.IsComponentsV2 ?? (1 << 15);
+const V2_AVAILABLE       = typeof ContainerBuilder === 'function' &&
+                           typeof TextDisplayBuilder === 'function';
+
 const db    = require('../../core/database');
 const embed = require('../../utils/embed');
 const perms = require('../../utils/permissions');
@@ -49,16 +59,30 @@ module.exports = {
     const stats  = db.getInviteStats(guildId, target.id);
 
     const text =
-      `**Invitations de ${target}**\n\n` +
-      `**Total** : \`${stats.total}\`\n` +
-      `**Présent(s)** : \`${stats.regular}\`\n` +
-      `**Bonus** : \`${stats.bonus}\`\n` +
-      `**Parti(s)** : \`${stats.left}\``;
+      `## Invitations\n\n` +
+      `> ${target}\n\n` +
+      `**Total** \u203a ${stats.total}\n` +
+      `Pr\u00e9sent(s) \u203a ${stats.regular}\n` +
+      `Bonus \u203a ${stats.bonus}\n` +
+      `Parti(s) \u203a ${stats.left}`;
 
-    const sent = await message.channel.send({
-      embeds: [embed.build(guildId, text, { timestamp: false })],
-      allowedMentions: { parse: [] },
-    }).catch(() => null);
+    let sent = null;
+
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
+      try {
+        const container = new ContainerBuilder();
+        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
+        sent = await message.channel.send({
+          components      : [container],
+          flags           : COMPONENTS_V2_FLAG,
+          allowedMentions : { parse: [] },
+        }).catch(() => null);
+      } catch {}
+    }
+
+    if (!sent) {
+      sent = await embed.sendEmbed(message.channel, guildId, text.replace(/^##[^\n]*\n\n/, '').replace(/^> [^\n]*\n\n/, ''), { timestamp: false });
+    }
 
     if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
   },

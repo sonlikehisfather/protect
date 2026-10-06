@@ -129,10 +129,7 @@ async function _handleAddModal(client, message, target, deleteReply, deleteDelay
       .setStyle(ButtonStyle.Secondary)
   );
 
-  const panel = await message.channel.send({
-    embeds: [embed.build(message.guild.id, 'Cliquez sur le bouton pour configurer le nouveau bouton lien.', { timestamp: false })],
-    components: [promptRow],
-  }).catch(() => null);
+  const panel = await message.channel.send({ ...embed.buildPayload(message.guild.id, 'Cliquez sur le bouton pour configurer le nouveau bouton lien.', { timestamp: false , components: [promptRow] }) });
 
   if (!panel) return;
 
@@ -279,10 +276,7 @@ async function _handleDelSelect(client, message, target, deleteReply, deleteDela
       .setStyle(ButtonStyle.Secondary)
   );
 
-  const panel = await message.channel.send({
-    embeds: [embed.build(message.guild.id, 'Selectionnez le bouton a supprimer.', { timestamp: false })],
-    components: [selectRow, cancelRow],
-  }).catch(() => null);
+  const panel = await message.channel.send({ ...embed.buildPayload(message.guild.id, 'Selectionnez le bouton a supprimer.', { timestamp: false , components: [selectRow, cancelRow] }) });
 
   if (!panel) return;
 

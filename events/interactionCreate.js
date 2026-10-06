@@ -302,7 +302,7 @@ async function _handleButton(client, interaction) {
 
 
   if (id.startsWith('vc:') || id.startsWith('tv:') || id.startsWith('sc:')) {
-    return embed.replyExpiredPanel(interaction);
+    return;
   }
 
 
@@ -489,7 +489,14 @@ async function _handleButton(client, interaction) {
     id.startsWith('tm:') ||
     id.startsWith('pn:') ||
     id.startsWith('sr:') ||
-    id.startsWith('rl:')
+    id.startsWith('rl:') ||
+    id.startsWith('v2:') ||
+    id.startsWith('bd:') ||
+    id.startsWith('st:') ||
+    id.startsWith('em:') ||
+    id.startsWith('counters:') ||
+    id.startsWith('logs:') ||
+    id.startsWith('logsdoc:')
   ) {
     return;
   }
@@ -614,6 +621,18 @@ async function _handleSelectMenu(client, interaction) {
   }
 
   if (id.startsWith('bp:')) {
+    return;
+  }
+
+  if (
+    id.startsWith('v2:') ||
+    id.startsWith('bd:') ||
+    id.startsWith('st:') ||
+    id.startsWith('em:') ||
+    id.startsWith('counters:') ||
+    id.startsWith('logs:') ||
+    id.startsWith('logsdoc:')
+  ) {
     return;
   }
 
@@ -812,6 +831,10 @@ async function _handleSelectMenu(client, interaction) {
     return embed.replyExpiredPanel(interaction);
   }
 
+  if (id.startsWith('vc:') || id.startsWith('tv:') || id.startsWith('sc:')) {
+    return;
+  }
+
 
   if (id.startsWith('ccsel:')) {
     return _handleCustomSelect(client, interaction);
@@ -965,7 +988,8 @@ async function _handleModal(client, interaction) {
     }
     if (cmd === 'plinko') db.setCasinoConfig(guildId, { limitPlinkoMin: min, limitPlinkoMax: max });
     if (cmd === 'tower')  db.setCasinoConfig(guildId, { limitTowerMin: min, limitTowerMax: max });
-    const labelMap = { bj: 'Blackjack', cf: 'Coinflip', rl: 'Roulette', russian: 'Russian', mine: 'Mine', plinko: 'Plinko', tower: 'Tower' };
+    if (cmd === 'dice')   db.setCasinoConfig(guildId, { limitDiceMin: min, limitDiceMax: max });
+    const labelMap = { bj: 'Blackjack', cf: 'Coinflip', rl: 'Roulette', russian: 'Russian', mine: 'Mine', plinko: 'Plinko', tower: 'Tower', dice: 'Dice' };
     const label = labelMap[cmd] || cmd;
     await interaction.reply({ content: `✓ Mises ${label} ・ min: ${min || 'aucune'} / max: ${max || 'illimité'}`, flags: MessageFlags.Ephemeral }).catch(() => {});
     await _refreshCasinoConfigPanel(interaction);
@@ -982,8 +1006,8 @@ async function _handleModal(client, interaction) {
       return Math.max(0, Math.round(parseFloat(m[1]) * mult));
     };
     const secs = parseDur(interaction.fields.getTextInputValue('duration'));
-    const cdMap = { bj: 'cooldownBj', cf: 'cooldownCf', rl: 'cooldownRl', collect: 'cooldownCollect', vol: 'cooldownVol', gift: 'cooldownGift', russian: 'cooldownRussian', mine: 'cooldownMine', plinko: 'cooldownPlinko', tower: 'cooldownTower', withdraw: 'cooldownWithdraw' };
-    const labelMap = { bj: 'Blackjack', cf: 'Coinflip', rl: 'Roulette', collect: 'Collect', vol: 'Vol', gift: 'Gift', russian: 'Russian', mine: 'Mine', plinko: 'Plinko', tower: 'Tower', withdraw: 'Withdraw' };
+    const cdMap = { bj: 'cooldownBj', cf: 'cooldownCf', rl: 'cooldownRl', collect: 'cooldownCollect', vol: 'cooldownVol', gift: 'cooldownGift', russian: 'cooldownRussian', mine: 'cooldownMine', plinko: 'cooldownPlinko', tower: 'cooldownTower', dice: 'cooldownDice', withdraw: 'cooldownWithdraw' };
+    const labelMap = { bj: 'Blackjack', cf: 'Coinflip', rl: 'Roulette', collect: 'Collect', vol: 'Vol', gift: 'Gift', russian: 'Russian', mine: 'Mine', plinko: 'Plinko', tower: 'Tower', dice: 'Dice', withdraw: 'Withdraw' };
     if (cdMap[cmd]) db.setCasinoConfig(guildId, { [cdMap[cmd]]: secs });
     const fmtCd = s => s > 0 ? (s % 86400 === 0 ? `${s/86400}j` : s % 3600 === 0 ? `${s/3600}h` : s % 60 === 0 ? `${s/60}m` : `${s}s`) : 'aucun';
     await interaction.reply({ content: `✓ Cooldown ${labelMap[cmd]} : ${fmtCd(secs)}`, flags: MessageFlags.Ephemeral }).catch(() => {});

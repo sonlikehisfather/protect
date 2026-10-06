@@ -152,12 +152,7 @@ module.exports = {
       moderator: message.member ?? message.author,
     });
 
-    const sent = await channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          `<@${member.id}> a été mute dans ce salon pendant **${durationStr}**.`,
-          {
+    const sent = await embed.sendEmbed(channel, guildId, `<@${member.id}> a été mute dans ce salon pendant **${durationStr}**.`, {
             fields: [
               {
                 name  : 'Raison',
@@ -166,11 +161,7 @@ module.exports = {
               },
             ],
             timestamp: false,
-          }
-        )
-      ],
-      allowedMentions: { repliedUser: false },
-    }).catch(() => null);
+          allowedMentions: { repliedUser: false } });
 
     if (sent && deleteReply)
       embed.scheduleDelete(sent, deleteDelay);

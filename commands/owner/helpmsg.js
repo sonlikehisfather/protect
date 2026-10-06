@@ -131,9 +131,7 @@ async function _show(message, helpMessage, deleteReply, deleteDelay) {
   let current = 0;
 
   const panel = await message.channel.send({
-    embeds          : [pages[current]],
-    components      : [_buildRow(current, pages.length, false)],
-    allowedMentions : { parse: [] },
+    ...embed.embedToPayload(guildId, pages[current], { components: [_buildRow(current, pages.length, false)], allowedMentions: { parse: [] } }),
   }).catch(() => null);
 
   if (!panel) return;
@@ -166,8 +164,7 @@ async function _show(message, helpMessage, deleteReply, deleteDelay) {
       }
 
       await i.update({
-        embeds     : [pages[current]],
-        components : [_buildRow(current, pages.length, false)],
+        ...embed.embedToPayload(guildId, pages[current], { components: [_buildRow(current, pages.length, false)] }),
       }).catch(() => {});
     } catch {}
   });

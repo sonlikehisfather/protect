@@ -116,16 +116,7 @@ async function _runUnhideAll(message, guild, guildId, deleteReply, deleteDelay) 
     await _wait(300);
   }
 
-  const sent = await message.channel.send({
-    embeds: [
-      embed.build(
-        guildId,
-        `**${unhiddenCount}** salon(s) ont été affiché(s).`,
-        { timestamp: false }
-      )
-    ],
-    allowedMentions: { repliedUser: false },
-  }).catch(() => null);
+  const sent = await embed.sendEmbed(message.channel, guildId, `**${unhiddenCount}** salon(s) ont été affiché(s).`, { timestamp: false , allowedMentions: { repliedUser: false } });
 
   if (sent && deleteReply) {
     embed.scheduleDelete(sent, deleteDelay);

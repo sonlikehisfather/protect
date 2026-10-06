@@ -64,7 +64,9 @@ module.exports = {
         .setStyle(ButtonStyle.Secondary),
     );
 
-    const confirmPayload = V2_AVAILABLE
+    const useV2 = embed.shouldUseV2(guildId, module.exports.help.name);
+
+    const confirmPayload = useV2
       ? {
           flags      : COMPONENTS_V2_FLAG,
           components : [
@@ -109,7 +111,7 @@ module.exports = {
       if (interaction.customId === 'cpn:confirm') {
         db.clearPrevNames(target.id, guildId);
 
-        const donePayload = V2_AVAILABLE
+        const donePayload = useV2
           ? {
               flags      : COMPONENTS_V2_FLAG,
               components : [
@@ -127,7 +129,7 @@ module.exports = {
 
         await confirmMsg.edit(donePayload).catch(() => {});
       } else {
-        const cancelPayload = V2_AVAILABLE
+        const cancelPayload = useV2
           ? {
               flags      : COMPONENTS_V2_FLAG,
               components : [

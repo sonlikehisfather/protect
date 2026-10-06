@@ -79,7 +79,7 @@ module.exports = {
     const nameA = memberA.displayName;
     const nameB = memberB.displayName;
 
-    const sent = V2_AVAILABLE
+    const sent = embed.shouldUseV2(guildId, module.exports.help.name)
       ? await _sendV2(message, guildId, nameA, nameB, [...shared.values()], deleteReply, deleteDelay)
       : await _sendEmbed(message, guildId, nameA, nameB, [...shared.values()]);
 
@@ -126,12 +126,12 @@ function _buildNavRow(pageIdx, totalPages, disabled = false) {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('sr:prev')
-      .setLabel('◀')
+      .setLabel('←')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(disabled || pageIdx === 0),
     new ButtonBuilder()
       .setCustomId('sr:next')
-      .setLabel('▶')
+      .setLabel('→')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(disabled || pageIdx >= totalPages - 1),
     new ButtonBuilder()
@@ -190,13 +190,10 @@ async function _sendV2(message, guildId, nameA, nameB, roles, deleteReply, delet
 
 async function _sendEmbed(message, guildId, nameA, nameB, roles) {
   if (!roles.length) {
-    return message.channel.send({
-      embeds: [embed.build(guildId, 'Aucun rôle en commun.', {
+    return embed.sendEmbed(message.channel, guildId, 'Aucun rôle en commun.', {
         title     : `Rôles en commun · ${nameA} & ${nameB}`,
         timestamp : false,
-      })],
-      allowedMentions: { parse: [] },
-    }).catch(() => null);
+      });
   }
 
   const chunks = _buildPages(roles);
@@ -209,8 +206,8 @@ async function _sendEmbed(message, guildId, nameA, nameB, roles) {
   });
 
   const row = (disabled = false) => new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('sr:prev').setLabel('◀').setStyle(ButtonStyle.Secondary).setDisabled(disabled || current === 0),
-    new ButtonBuilder().setCustomId('sr:next').setLabel('▶').setStyle(ButtonStyle.Secondary).setDisabled(disabled || current >= chunks.length - 1),
+    new ButtonBuilder().setCustomId('sr:prev').setLabel('←').setStyle(ButtonStyle.Secondary).setDisabled(disabled || current === 0),
+    new ButtonBuilder().setCustomId('sr:next').setLabel('→').setStyle(ButtonStyle.Secondary).setDisabled(disabled || current >= chunks.length - 1),
     new ButtonBuilder().setCustomId('sr:close').setLabel('✖').setStyle(ButtonStyle.Danger).setDisabled(disabled),
   );
 

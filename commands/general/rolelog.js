@@ -57,7 +57,7 @@ module.exports = {
       ? `${fetchedUser.globalName} (@${fetchedUser.username})`
       : `@${fetchedUser.username}`;
 
-    const sent = V2_AVAILABLE
+    const sent = embed.shouldUseV2(guildId, module.exports.help.name)
       ? await _sendV2(message, guildId, displayName, history)
       : await _sendEmbed(message, guildId, fetchedUser, displayName, history);
 
@@ -108,12 +108,12 @@ function _buildNavRow(pageIdx, totalPages, disabled = false) {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('rl:prev')
-      .setLabel('◀')
+      .setLabel('←')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(disabled || pageIdx === 0),
     new ButtonBuilder()
       .setCustomId('rl:next')
-      .setLabel('▶')
+      .setLabel('→')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(disabled || pageIdx >= totalPages - 1),
     new ButtonBuilder()
@@ -174,15 +174,12 @@ async function _sendEmbed(message, guildId, fetchedUser, displayName, history) {
   const avatarURL = fetchedUser.displayAvatarURL({ dynamic: true, size: 256 });
 
   if (!history.length) {
-    return message.channel.send({
-      embeds: [embed.build(guildId, 'Aucun changement de rôle enregistré pour ce membre.', {
+    return embed.sendEmbed(message.channel, guildId, 'Aucun changement de rôle enregistré pour ce membre.', {
         title      : 'Historique des rôles',
         authorName : displayName,
         authorIcon : avatarURL,
         timestamp  : false,
-      })],
-      allowedMentions: { parse: [] },
-    }).catch(() => null);
+      });
   }
 
   const pages  = _buildPages(history);
@@ -197,8 +194,8 @@ async function _sendEmbed(message, guildId, fetchedUser, displayName, history) {
   });
 
   const navRow = (disabled = false) => new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('rl:prev').setLabel('◀').setStyle(ButtonStyle.Secondary).setDisabled(disabled || current === 0),
-    new ButtonBuilder().setCustomId('rl:next').setLabel('▶').setStyle(ButtonStyle.Secondary).setDisabled(disabled || current >= pages.length - 1),
+    new ButtonBuilder().setCustomId('rl:prev').setLabel('←').setStyle(ButtonStyle.Secondary).setDisabled(disabled || current === 0),
+    new ButtonBuilder().setCustomId('rl:next').setLabel('→').setStyle(ButtonStyle.Secondary).setDisabled(disabled || current >= pages.length - 1),
     new ButtonBuilder().setCustomId('rl:close').setLabel('✖').setStyle(ButtonStyle.Danger).setDisabled(disabled),
   );
 

@@ -82,7 +82,7 @@ async function _list(message, guildId) {
     `## ◆ Gérants Casino\n\n` +
     `**Gérants** (${managers.length})\n${lines}`;
 
-  if (V2_AVAILABLE) {
+  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
     try {
       const container = new ContainerBuilder();
       container.addTextDisplayComponents(new TextDisplayBuilder().setContent(content));

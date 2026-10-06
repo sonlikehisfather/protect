@@ -76,7 +76,8 @@ module.exports = {
       };
     };
 
-    const sent = await message.reply(buildPayload()).catch(() => null);
+    const _w = (p) => embed.wrapPayload(guildId, p, 'streak');
+    const sent = await message.reply(_w(buildPayload())).catch(() => null);
     if (!sent) return;
 
     embed.registerPrivateInteraction(sent, message.author.id);
@@ -99,7 +100,7 @@ module.exports = {
 
         if (interaction.customId === 'st:refresh') {
           await interaction.deferUpdate().catch(() => {});
-          return sent.edit(buildPayload()).catch(() => {});
+          return sent.edit(_w(buildPayload())).catch(() => {});
         }
       } catch (err) {
         if (err?.code !== 10062 && err?.code !== 40060) {
@@ -111,7 +112,7 @@ module.exports = {
     collector.on('end', (_, reason) => {
       embed.clearPrivateInteraction(sent);
       if (reason === 'closed') return;
-      sent.edit(buildPayload(true)).catch(() => {});
+      sent.edit(_w(buildPayload(true))).catch(() => {});
     });
 
     if (deleteReply) {

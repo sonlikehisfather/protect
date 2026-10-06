@@ -92,10 +92,10 @@ module.exports = {
           .setStyle(ButtonStyle.Danger),
       );
 
-      if (V2_AVAILABLE) {
+      if (embed.shouldUseV2(guildId, module.exports.help.name)) {
         try {
           const accent    = _hexToInt(embed.getGuildColor(guildId));
-          const container = new ContainerBuilder().setAccentColor(accent);
+          const container = new ContainerBuilder();
 
           container.addTextDisplayComponents(
             new TextDisplayBuilder().setContent(

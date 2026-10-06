@@ -45,7 +45,7 @@ exports.run = async (client, message, args) => {
   const user = db.getCasinoUser(guildId, userId);
   const pctLabel = `${(penalty * 100).toFixed(0)}%`;
 
-  if (V2_AVAILABLE) {
+  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
     const container = new ContainerBuilder().addTextDisplayComponents(new TextDisplayBuilder().setContent(
       `## Retrait d'investissement\n\n` +
       `Capital retiré : **${embed.fmtCoins(invest.amount)}** coins\n` +

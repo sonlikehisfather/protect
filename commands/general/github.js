@@ -1,5 +1,17 @@
 'use strict';
 
+const {
+  ContainerBuilder,
+  TextDisplayBuilder,
+  MediaGalleryBuilder,
+  MediaGalleryItemBuilder,
+  MessageFlags,
+} = require('discord.js');
+
+const COMPONENTS_V2_FLAG = MessageFlags?.IsComponentsV2 ?? (1 << 15);
+const V2_AVAILABLE       = typeof ContainerBuilder === 'function' &&
+                           typeof TextDisplayBuilder === 'function';
+
 const db    = require('../../core/database');
 const embed = require('../../utils/embed');
 
@@ -89,18 +101,64 @@ module.exports = {
       fields.push({ name: 'Twitter', value: `[@${data.twitter_username}](https://twitter.com/${data.twitter_username})`, inline: true });
     }
 
-    const sent = await message.reply({
-      embeds: [
-        embed.build(guildId, data.bio || null, {
-          title     : data.name ? `${data.name} (${data.login})` : data.login,
-          url       : data.html_url,
-          thumbnail : data.avatar_url,
-          fields,
-          timestamp : false,
-        }),
-      ],
-      allowedMentions: { parse: [] },
-    }).catch(() => null);
+    const lines = [
+      `## ${data.name ? `${data.name} (${data.login})` : data.login}`,
+      data.bio ? `> ${data.bio}` : '',
+      '',
+      `Pseudo \u203a [\`${data.login}\`](${data.html_url})`,
+      `**Type** \u203a ${data.type === 'Organization' ? 'Organisation' : 'Utilisateur'}`,
+      `Repos \u203a ${data.public_repos ?? 0}`,
+      `Followers \u203a ${data.followers ?? 0}`,
+      `Following \u203a ${data.following ?? 0}`,
+      `Gists \u203a ${data.public_gists ?? 0}`,
+      `Cr\u00e9\u00e9 le \u203a ${createdAt}`,
+      `Mis \u00e0 jour \u203a ${updatedAt}`,
+    ];
+
+    if (data.company)  lines.push(`Entreprise \u203a ${data.company}`);
+    if (data.location) lines.push(`Localisation \u203a ${data.location}`);
+    if (data.blog)     lines.push(`Site \u203a ${data.blog}`);
+    if (data.twitter_username) {
+      lines.push(`Twitter \u203a [@${data.twitter_username}](https://twitter.com/${data.twitter_username})`);
+    }
+
+    const text = lines.filter(l => l !== '').join('\n');
+
+    let sent = null;
+
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
+      try {
+        const container = new ContainerBuilder();
+        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
+        if (data.avatar_url) {
+          container.addMediaGalleryComponents(
+            new MediaGalleryBuilder().addItems(
+              new MediaGalleryItemBuilder().setURL(data.avatar_url)
+            )
+          );
+        }
+        sent = await message.reply({
+          components      : [container],
+          flags           : COMPONENTS_V2_FLAG,
+          allowedMentions : { parse: [] },
+        }).catch(() => null);
+      } catch {}
+    }
+
+    if (!sent) {
+      sent = await message.reply({
+        embeds: [
+          embed.build(guildId, data.bio || null, {
+            title     : data.name ? `${data.name} (${data.login})` : data.login,
+            url       : data.html_url,
+            thumbnail : data.avatar_url,
+            fields,
+            timestamp : false,
+          }),
+        ],
+        allowedMentions: { parse: [] },
+      }).catch(() => null);
+    }
 
     if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
   },

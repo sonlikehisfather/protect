@@ -341,8 +341,7 @@ async function _sendPaginated(message, guildId, opts) {
 
   if (total <= 1) {
     return message.reply({
-      embeds         : [buildEmbed(0)],
-      allowedMentions: { parse: [] },
+      ...embed.embedToPayload(guildId, buildEmbed(0), { allowedMentions: { parse: [] } }),
     });
   }
 
@@ -366,9 +365,7 @@ async function _sendPaginated(message, guildId, opts) {
   );
 
   const panel = await message.reply({
-    embeds         : [buildEmbed(current)],
-    components     : [buildRow(current)],
-    allowedMentions: { parse: [] },
+    ...embed.embedToPayload(guildId, buildEmbed(current), { components: [buildRow(current)], allowedMentions: { parse: [] } }),
   }).catch(() => null);
 
   if (!panel) return;
@@ -401,8 +398,7 @@ async function _sendPaginated(message, guildId, opts) {
       }
 
       await i.update({
-        embeds    : [buildEmbed(current)],
-        components: [buildRow(current)],
+        ...embed.embedToPayload(guildId, buildEmbed(current), { components: [buildRow(current)] }),
       }).catch(() => {});
     } catch {}
   });

@@ -240,7 +240,7 @@ exports.run = async (client, message, args) => {
 
   const buildSelect = (dk) => {
     const d = DIFFS[dk];
-    if (V2_AVAILABLE) {
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
       const c = new ContainerBuilder();
       c.addTextDisplayComponents(new TextDisplayBuilder().setContent(
         `## ~ Chicken Crossing\n\n` +
@@ -337,7 +337,7 @@ exports.run = async (client, message, args) => {
             `Solde : **${embed.fmtCoins(finalCoins)}** coins`,
           ],
         });
-        if (V2_AVAILABLE) {
+        if (embed.shouldUseV2(guildId, module.exports.help.name)) {
           const c = new ContainerBuilder();
           c.addTextDisplayComponents(new TextDisplayBuilder().setContent(
             `## ~ Chicken Crossing\n\n> Mise : **${embed.fmtCoins(amount)}** coins ・ Annule\n> Solde : **${embed.fmtCoins(finalCoins)}** coins`
@@ -411,7 +411,7 @@ exports.run = async (client, message, args) => {
             `Solde : **${embed.fmtCoins(finalCoins)}** coins`,
           ],
         });
-        if (V2_AVAILABLE) {
+        if (embed.shouldUseV2(guildId, module.exports.help.name)) {
           const c = new ContainerBuilder();
           c.addTextDisplayComponents(new TextDisplayBuilder().setContent(
             `## ~ Chicken Crossing\n\n> Mise : **${embed.fmtCoins(amount)}** coins ・ **Expiré**\n> Remboursement : **${embed.fmtCoins(amount)}** coins\n> Solde : **${embed.fmtCoins(finalCoins)}** coins`

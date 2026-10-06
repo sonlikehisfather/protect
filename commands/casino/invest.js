@@ -77,7 +77,7 @@ exports.run = async (client, message, args) => {
   const claimHours = claimCooldown / 3600;
   const claimLabel = claimHours >= 24 ? `${Math.floor(claimHours / 24)}j` : `${Math.floor(claimHours)}h`;
 
-  if (V2_AVAILABLE) {
+  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
     const container = new ContainerBuilder().addTextDisplayComponents(new TextDisplayBuilder().setContent(
       `## Investissement
 

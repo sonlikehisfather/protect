@@ -148,19 +148,10 @@ async function _show(message, guildId, config, deleteReply, deleteDelay) {
     `Rôles auto :\n${autorolesText}\n\n` +
     `Variables : \`{user}\`, \`{username}\`, \`{tag}\`, \`{server}\`, \`{membercount}\``;
 
-  const sent = await message.channel.send({
-    embeds: [
-      embed.build(
-        guildId,
-        text,
-        {
+  const sent = await embed.sendEmbed(message.channel, guildId, text, {
           title    : 'Join settings',
           timestamp: false,
-        }
-      ),
-    ],
-    allowedMentions: { parse: [] },
-  }).catch(() => null);
+          allowedMentions: { parse: [] } });
 
   if (sent && deleteReply) {
     embed.scheduleDelete(sent, deleteDelay);
@@ -420,19 +411,10 @@ async function _listAutoroles(message, guildId, deleteReply, deleteDelay) {
     return `\`${index + 1}.\` <@&${role.id}>`;
   });
 
-  const sent = await message.channel.send({
-    embeds: [
-      embed.build(
-        guildId,
-        lines.join('\n'),
-        {
+  const sent = await embed.sendEmbed(message.channel, guildId, lines.join('\n'), {
           title    : 'Rôles automatiques',
           timestamp: false,
-        }
-      ),
-    ],
-    allowedMentions: { parse: [] },
-  }).catch(() => null);
+          allowedMentions: { parse: [] } });
 
   if (sent && deleteReply) {
     embed.scheduleDelete(sent, deleteDelay);

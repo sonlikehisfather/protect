@@ -42,7 +42,7 @@ exports.run = async (client, message, args) => {
   const user = db.getCasinoUser(guildId, target.id);
   const shields = db.getShields(guildId, target.id);
 
-  if (V2_AVAILABLE) {
+  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
     const container = new ContainerBuilder();
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
       `## Inventaire de <@${target.id}>\n` +

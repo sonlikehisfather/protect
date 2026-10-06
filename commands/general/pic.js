@@ -2,6 +2,18 @@
 
 
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+
+const {
+  ContainerBuilder,
+  TextDisplayBuilder,
+  MediaGalleryBuilder,
+  MediaGalleryItemBuilder,
+  MessageFlags,
+} = require('discord.js');
+
+const COMPONENTS_V2_FLAG = MessageFlags?.IsComponentsV2 ?? (1 << 15);
+const V2_AVAILABLE       = typeof ContainerBuilder === 'function' &&
+                           typeof TextDisplayBuilder === 'function';
 const db    = require('../../core/database');
 const embed = require('../../utils/embed');
 
@@ -94,11 +106,46 @@ module.exports = {
           .setDisabled(active === 'server'),
       );
 
-    const sent = await message.channel.send({
-      embeds    : [buildEmbed(globalAvatar, 'global')],
-      components: hasDiff ? [buildRow('global')] : [],
-      allowedMentions: { repliedUser: false },
-    }).catch(() => null);
+    const buildPayload = (url, type, disabled = false) => {
+      const navRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId('pic_global')
+          .setLabel('Avatar global')
+          .setStyle(ButtonStyle.Secondary)
+          .setDisabled(disabled || type === 'global'),
+        new ButtonBuilder()
+          .setCustomId('pic_server')
+          .setLabel('Avatar serveur')
+          .setStyle(ButtonStyle.Secondary)
+          .setDisabled(disabled || type === 'server'),
+      );
+
+      if (embed.shouldUseV2(guildId, module.exports.help.name)) {
+        try {
+          const container = new ContainerBuilder();
+          container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
+            '## ' + displayName + (hasDiff ? '\n' + (type === 'global' ? 'Avatar global' : 'Avatar serveur') : '')
+          ));
+          container.addMediaGalleryComponents(
+            new MediaGalleryBuilder().addItems(
+              new MediaGalleryItemBuilder().setURL(url)
+            )
+          );
+          if (hasDiff) container.addActionRowComponents(navRow);
+          return { embeds: [], components: [container], flags: COMPONENTS_V2_FLAG, allowedMentions: { repliedUser: false } };
+        } catch {}
+      }
+
+      const options = { title: displayName, image: url, timestamp: false };
+      if (hasDiff) options.footer = type === 'global' ? 'Avatar global' : 'Avatar serveur';
+      return {
+        embeds: [embed.build(guildId, null, options)],
+        components: hasDiff ? [navRow] : [],
+        allowedMentions: { repliedUser: false },
+      };
+    };
+
+    const sent = await message.channel.send(buildPayload(globalAvatar, 'global')).catch(() => null);
 
     if (!sent) return;
 
@@ -123,10 +170,7 @@ if (!hasDiff) return;
       const url      = isGlobal ? globalAvatar : serverAvatar;
       const type     = isGlobal ? 'global' : 'server';
 
-      await i.update({
-        embeds    : [buildEmbed(url, type)],
-        components: [buildRow(type)],
-      }).catch(err => {
+      await i.update(buildPayload(url, type)).catch(err => {
         if (err?.code !== 10062 && err?.code !== 40060) {
           console.error('[pic] update error:', err.message);
         }
@@ -135,7 +179,7 @@ if (!hasDiff) return;
 
     collector.on('end', () => {
       embed.clearPrivateInteraction(sent);
-      sent.edit({ components: [] }).catch(() => {});
+      sent.edit(buildPayload(globalAvatar, 'global', true)).catch(() => {});
     });
 
   },

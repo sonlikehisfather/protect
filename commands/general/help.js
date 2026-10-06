@@ -10,6 +10,7 @@ const {
   TextDisplayBuilder,
   SeparatorBuilder,
   MessageFlags,
+  EmbedBuilder,
 } = require('discord.js');
 
 const embed  = require('../../utils/embed');
@@ -149,6 +150,33 @@ function _buildPageContainer(pageData, actionRows = []) {
   }
 
   return container;
+}
+
+
+function _buildPageEmbed(pageData) {
+  const e = new EmbedBuilder();
+  if (pageData?.title) e.setTitle(pageData.title);
+  if (pageData?.intro) e.setDescription(pageData.intro);
+  if (pageData?.fields) {
+    for (const field of pageData.fields) {
+      e.addFields({ name: field.name, value: field.value, inline: field.inline ?? false });
+    }
+  }
+  if (pageData?.footer) e.setFooter({ text: pageData.footer });
+  return e;
+}
+
+
+function _buildHelpPayload(guildId, pageData, actionRows = []) {
+  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
+    return {
+      components : [_buildPageContainer(pageData, actionRows)],
+      flags      : COMPONENTS_V2_FLAG,
+    };
+  }
+  const payload = { embeds: [_buildPageEmbed(pageData)] };
+  if (actionRows && actionRows.length) payload.components = actionRows;
+  return payload;
 }
 
 module.exports = {
@@ -309,7 +337,7 @@ async function _handleSelectMenu(client, message, guildId, prefix, deleteReply, 
 
         new ButtonBuilder()
           .setCustomId('help:next_cat')
-          .setLabel('\u2190')
+          .setLabel('\u2192')
           .setStyle(ButtonStyle.Secondary)
           .setDisabled(disabled || currentPage >= maxPage),
 
@@ -329,8 +357,7 @@ async function _handleSelectMenu(client, message, guildId, prefix, deleteReply, 
   };
 
   const msg = await message.reply({
-    components      : [_buildPageContainer((categoryPages[currentCategory] ?? [])[0], buildRows())],
-    flags           : COMPONENTS_V2_FLAG,
+    ..._buildHelpPayload(guildId, (categoryPages[currentCategory] ?? [])[0], buildRows()),
     allowedMentions : { parse: [] },
   }).catch(() => null);
 
@@ -378,8 +405,7 @@ async function _handleSelectMenu(client, message, guildId, prefix, deleteReply, 
       currentPage   = Math.max(0, Math.min(currentPage, maxPage));
 
       await i.update({
-        components : [_buildPageContainer(pages[currentPage], buildRows())],
-        flags      : COMPONENTS_V2_FLAG,
+        ..._buildHelpPayload(guildId, pages[currentPage], buildRows()),
       });
 
     } catch (err) {
@@ -475,8 +501,7 @@ async function _handleSelectOnlyMenu(client, message, guildId, prefix, deleteRep
   };
 
   const msg = await message.reply({
-    components      : [_buildPageContainer((categoryPages[currentCategory] ?? [])[0], buildRows())],
-    flags           : COMPONENTS_V2_FLAG,
+    ..._buildHelpPayload(guildId, (categoryPages[currentCategory] ?? [])[0], buildRows()),
     allowedMentions : { parse: [] },
   }).catch(() => null);
 
@@ -519,8 +544,7 @@ async function _handleSelectOnlyMenu(client, message, guildId, prefix, deleteRep
       currentPage = Math.max(0, Math.min(currentPage, maxPage));
 
       return i.update({
-        components : [_buildPageContainer(pages[currentPage], buildRows())],
-        flags      : COMPONENTS_V2_FLAG,
+        ..._buildHelpPayload(guildId, pages[currentPage], buildRows()),
       });
     } catch (err) {
       if (err?.code !== 10062 && err?.code !== 40060) {
@@ -584,7 +608,7 @@ async function _handleButtonMenu(client, message, guildId, prefix, deleteReply, 
 
         new ButtonBuilder()
           .setCustomId('help:btnnext')
-          .setLabel('\u2190')
+          .setLabel('\u2192')
           .setStyle(ButtonStyle.Secondary)
           .setDisabled(disabled || currentPage >= maxPage),
 
@@ -604,8 +628,7 @@ async function _handleButtonMenu(client, message, guildId, prefix, deleteReply, 
   };
 
   const msg = await message.reply({
-    components      : [_buildPageContainer((categoryPages[currentCategory] ?? [])[0], buildRows())],
-    flags           : COMPONENTS_V2_FLAG,
+    ..._buildHelpPayload(guildId, (categoryPages[currentCategory] ?? [])[0], buildRows()),
     allowedMentions : { parse: [] },
   }).catch(() => null);
 
@@ -654,8 +677,7 @@ async function _handleButtonMenu(client, message, guildId, prefix, deleteReply, 
       currentPage = Math.max(0, Math.min(currentPage, maxPage));
 
       return i.update({
-        components : [_buildPageContainer(pages[currentPage], buildRows())],
-        flags      : COMPONENTS_V2_FLAG,
+        ..._buildHelpPayload(guildId, pages[currentPage], buildRows()),
       });
     } catch (err) {
       if (err?.code !== 10062 && err?.code !== 40060) {
@@ -755,7 +777,7 @@ async function _handlePagination(client, message, guildId, prefix, deleteReply, 
 
       new ButtonBuilder()
         .setCustomId('help:perm:next')
-        .setLabel('\u2190')
+        .setLabel('\u2192')
         .setStyle(ButtonStyle.Secondary)
         .setDisabled(disabled || current >= pages.length - 1),
 
@@ -770,8 +792,7 @@ async function _handlePagination(client, message, guildId, prefix, deleteReply, 
   };
 
   const msg = await message.reply({
-    components      : [_buildPageContainer(pages[current], buildRows())],
-    flags           : COMPONENTS_V2_FLAG,
+    ..._buildHelpPayload(guildId, pages[current], buildRows()),
     allowedMentions : { parse: [] },
   }).catch(() => null);
 
@@ -806,8 +827,7 @@ async function _handlePagination(client, message, guildId, prefix, deleteReply, 
       if (i.customId === 'help:perm:next' && current < pages.length - 1) current++;
 
       await i.update({
-        components : [_buildPageContainer(pages[current], buildRows())],
-        flags      : COMPONENTS_V2_FLAG,
+        ..._buildHelpPayload(guildId, pages[current], buildRows()),
       });
 
     } catch (err) {
@@ -975,7 +995,7 @@ async function _handleSingleCategory(client, message, guildId, prefix, category,
 
       new ButtonBuilder()
         .setCustomId('help:next_single')
-        .setLabel('\u2190')
+        .setLabel('\u2192')
         .setStyle(ButtonStyle.Secondary)
         .setDisabled(disabled || current >= pages.length - 1),
 
@@ -994,8 +1014,7 @@ async function _handleSingleCategory(client, message, guildId, prefix, category,
   ];
 
   const msg = await message.reply({
-    components      : [_buildPageContainer(pages[current], buildRows())],
-    flags           : COMPONENTS_V2_FLAG,
+    ..._buildHelpPayload(guildId, pages[current], buildRows()),
     allowedMentions : { parse: [] },
   }).catch(() => null);
 
@@ -1023,8 +1042,7 @@ async function _handleSingleCategory(client, message, guildId, prefix, category,
       if (i.customId === 'help:next_single' && current < pages.length - 1) current++;
 
       await i.update({
-        components : [_buildPageContainer(pages[current], buildRows())],
-        flags      : COMPONENTS_V2_FLAG,
+        ..._buildHelpPayload(guildId, pages[current], buildRows()),
       });
 
     } catch (err) {
@@ -1057,8 +1075,7 @@ async function _handleCommandLookup(client, message, input, guildId, prefix, del
       : null;
 
     const sent = await message.reply({
-      components: [
-        _buildPageContainer({
+      ..._buildHelpPayload(guildId, {
           title  : `Commande • ${virtualCommand.name}`,
           intro  : vIntro,
           fields : [
@@ -1080,8 +1097,6 @@ async function _handleCommandLookup(client, message, input, guildId, prefix, del
             },
           ],
         }),
-      ],
-      flags           : COMPONENTS_V2_FLAG,
       allowedMentions : { parse: [] },
     }).catch(() => null);
 
@@ -1138,8 +1153,7 @@ async function _handleCommandLookup(client, message, input, guildId, prefix, del
     : null;
 
   const sent = await message.reply({
-    components: [
-      _buildPageContainer({
+    ..._buildHelpPayload(guildId, {
         title  : `Commande • ${h.name}`,
         intro  : intro,
         fields : [
@@ -1167,8 +1181,6 @@ async function _handleCommandLookup(client, message, input, guildId, prefix, del
           },
         ],
       }),
-    ],
-    flags           : COMPONENTS_V2_FLAG,
     allowedMentions : { parse: [] },
   }).catch(() => null);
 

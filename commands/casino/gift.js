@@ -62,7 +62,7 @@ exports.run = async (client, message, args) => {
   const giftText = `**<@${message.author.id}>** lance un cadeau mystere ・ **1 bouton sur 3** cache une recompense !`;
 
   let msg;
-  if (V2_AVAILABLE) {
+  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
     const container = new ContainerBuilder();
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(giftText));
     container.addActionRowComponents(makeRow());
@@ -101,7 +101,7 @@ exports.run = async (client, message, args) => {
           `Gagne **+${embed.fmtCoins(prize)}** coins`,
         ],
       });
-      if (V2_AVAILABLE) {
+      if (embed.shouldUseV2(guildId, module.exports.help.name)) {
         const winContainer = new ContainerBuilder();
         winContainer.addTextDisplayComponents(new TextDisplayBuilder().setContent(
           `## Cadeau trouve !\n\n> **<@${i.user.id}>** a trouve le cadeau ・ **+${embed.fmtCoins(prize)} coins** !`
@@ -114,7 +114,7 @@ exports.run = async (client, message, args) => {
       }
       collector.stop('won');
     } else {
-      if (V2_AVAILABLE) {
+      if (embed.shouldUseV2(guildId, module.exports.help.name)) {
         const loseContainer = new ContainerBuilder();
         loseContainer.addTextDisplayComponents(new TextDisplayBuilder().setContent(
           `> **<@${i.user.id}>** a rate ・ ce bouton etait vide.`
@@ -131,7 +131,7 @@ exports.run = async (client, message, args) => {
 
   collector.on('end', async (_, reason) => {
     const expired = reason === 'time';
-    if (V2_AVAILABLE) {
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
       const endText = expired
         ? `Le cadeau a expire ・ personne n'a trouve ! *(+${embed.fmtCoins(prize)} coins perdus)*`
         : giftText;

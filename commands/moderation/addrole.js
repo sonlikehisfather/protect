@@ -176,16 +176,7 @@ module.exports = {
       return;
     }
 
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          `${role} a été ajouté à <@${member.id}>.`,
-          { timestamp: false }
-        )
-      ],
-      allowedMentions: { repliedUser: false },
-    }).catch(() => null);
+    const sent = await embed.sendEmbed(message.channel, guildId, `${role} a été ajouté à <@${member.id}>.`, { timestamp: false , allowedMentions: { repliedUser: false } });
 
     if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
 

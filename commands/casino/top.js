@@ -45,7 +45,7 @@ exports.run = async (client, message, args) => {
     description += `${prefix} **${name}** ・ ${embed.fmtCoins(coins)} coins${draws > 0 ? ` ◆ ${draws}T` : ''}${vip}\n`;
   }
 
-  if (V2_AVAILABLE) {
+  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
     const container = new ContainerBuilder().addTextDisplayComponents(new TextDisplayBuilder().setContent(
       `## ★ Top Coins\n\n${description}`
     ));

@@ -2,6 +2,18 @@
 
 
 const { PermissionFlagsBits } = require('discord.js');
+
+const {
+  ContainerBuilder,
+  TextDisplayBuilder,
+  MediaGalleryBuilder,
+  MediaGalleryItemBuilder,
+  MessageFlags,
+} = require('discord.js');
+
+const COMPONENTS_V2_FLAG = MessageFlags?.IsComponentsV2 ?? (1 << 15);
+const V2_AVAILABLE       = typeof ContainerBuilder === 'function' &&
+                           typeof TextDisplayBuilder === 'function';
 const db    = require('../../core/database');
 const embed = require('../../utils/embed');
 
@@ -186,28 +198,72 @@ module.exports = {
       inline: false,
     });
 
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          null,
-          {
+    const lines = [
+      '## Informations membre',
+      '> ' + displayName,
+      '',
+      'Membre › <@' + user.id + '>',
+      'ID › `' + user.id + '`',
+      '**Bot** › ' + (user.bot ? 'Oui' : 'Non'),
+      '**Nom affiché** › ' + (member.displayName ?? 'Aucun'),
+      'Nom utilisateur › @' + user.username,
+      '**Rôle principal** › ' + topRole,
+      'Compte créé le › <t:' + createdAt + ':F> (<t:' + createdAt + ':R>)',
+      '**A rejoint le serveur** › ' + (joinedAt ? '<t:' + joinedAt + ':F> (<t:' + joinedAt + ':R>)' : 'Inconnu'),
+      '**Boost** › ' + (premiumSince ? 'Depuis <t:' + premiumSince + ':F>' : 'Non'),
+    ];
+
+    if (timeoutUntil) {
+      lines.push('Timeout › Jusqu\'au <t:' + timeoutUntil + ':F> (<t:' + timeoutUntil + ':R>)');
+    }
+
+    lines.push('Avatar › [Avatar global](' + avatarURL + ')');
+    if (guildAvatarURL) lines.push('Avatar serveur › [Avatar serveur](' + guildAvatarURL + ')');
+    if (bannerURL) lines.push('Bannière › [Bannière globale](' + bannerURL + ')');
+    if (guildBannerURL) lines.push('Bannière serveur › [Bannière serveur](' + guildBannerURL + ')');
+    if (permsValue) lines.push('Permissions clés › ' + permsValue);
+    lines.push('Rôles › ' + buildRoleField(roleList));
+
+    const text = lines.join('\n');
+    const displayBanner = guildBannerURL ?? bannerURL ?? null;
+
+    let sent = null;
+
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
+      try {
+        const container = new ContainerBuilder();
+        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
+        if (displayBanner) {
+          container.addMediaGalleryComponents(
+            new MediaGalleryBuilder().addItems(
+              new MediaGalleryItemBuilder().setURL(displayBanner)
+            )
+          );
+        }
+        sent = await message.channel.send({
+          components      : [container],
+          flags           : COMPONENTS_V2_FLAG,
+          allowedMentions : { repliedUser: false },
+        }).catch(() => null);
+      } catch {}
+    }
+
+    if (!sent) {
+      sent = await message.channel.send({
+        embeds: [
+          embed.build(guildId, null, {
             title      : 'Informations membre',
             authorName : displayName,
-
             authorIcon : guildAvatarURL ?? avatarURL,
             thumbnail  : guildAvatarURL ?? avatarURL,
-
             image      : guildBannerURL ?? bannerURL ?? undefined,
             fields,
             timestamp  : false,
-          }
-        ),
-      ],
-      allowedMentions: {
-        repliedUser: false,
-      },
-    }).catch(() => null);
+          }),
+        ],
+        allowedMentions: { repliedUser: false },
+      }).catch(() => null);
+    }
 
     if (sent && deleteReply) {
       embed.scheduleDelete(sent, deleteDelay);

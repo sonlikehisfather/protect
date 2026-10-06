@@ -1073,7 +1073,7 @@ async function _modalAdd(interaction, modalBaseId, title, inputs, toData, valida
 
 function _buildPanelPayload(guildId, items, currentPage = 'main', manageMode = false) {
   const accent = _hexToInt(embed.getGuildColor(guildId));
-  const container = new ContainerBuilder().setAccentColor(accent);
+  const container = new ContainerBuilder();
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent('## Components avancés'),
@@ -1940,7 +1940,7 @@ async function _handlePreview(interaction, guildId, items, channel) {
 
 function _buildPreviewPayload(guildId, items) {
   const accent = _hexToInt(embed.getGuildColor(guildId));
-  const container = new ContainerBuilder().setAccentColor(accent);
+  const container = new ContainerBuilder();
 
   let pendingActionables = [];
 
@@ -2190,7 +2190,7 @@ function _buildClosedPayload(guildId, content) {
     };
   }
   const accent = _hexToInt(embed.getGuildColor(guildId));
-  const container = new ContainerBuilder().setAccentColor(accent);
+  const container = new ContainerBuilder();
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent(content));
   return {
     flags           : COMPONENTS_V2_FLAG,
@@ -2299,7 +2299,7 @@ function _buildDocPayload(guildId, docPage) {
   const total = _DOC_PAGES.length;
   const p = Math.max(0, Math.min(total - 1, docPage));
   const accent = _hexToInt(embed.getGuildColor(guildId));
-  const container = new ContainerBuilder().setAccentColor(accent);
+  const container = new ContainerBuilder();
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent('## Documentation components'),

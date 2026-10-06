@@ -216,7 +216,7 @@ exports.run = async (client, message, args) => {
           `Solde : **${embed.fmtCoins(finalCoins)}** coins`,
         ],
       });
-      if (V2_AVAILABLE) {
+      if (embed.shouldUseV2(guildId, module.exports.help.name)) {
         const c = new ContainerBuilder();
         c.addTextDisplayComponents(new TextDisplayBuilder().setContent(
           `## 🎰 Blackjack\n\n> Mise : **${embed.fmtCoins(amount)}** coins ・ **Expiré**\n> Remboursement : **${embed.fmtCoins(amount)}** coins\n> Solde : **${embed.fmtCoins(finalCoins)}** coins`
@@ -312,7 +312,7 @@ exports.run = async (client, message, args) => {
     }
 
     if (resultImage) {
-      if (V2_AVAILABLE) {
+      if (embed.shouldUseV2(guildId, module.exports.help.name)) {
         const container = new ContainerBuilder();
         container.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL('attachment://bj_result.png')));
         await sent.edit({
@@ -321,20 +321,16 @@ exports.run = async (client, message, args) => {
           files: [new AttachmentBuilder(resultImage, { name: 'bj_result.png' })],
         }).catch(() => {});
       } else {
-        await sent.edit({
-          embeds: [embed.build(guildId, null, {
+        await sent.edit({ ...embed.buildPayload(guildId, null, {
             title: `${emoji} ${title}`, description: desc,
             image: 'attachment://bj_result.png',
             fields: [
               { name: '💰 Solde', value: `**${embed.fmtCoins(finalCoins)}** coins`, inline: false },
             ],
             timestamp: false,
-          })],
-          files: [new AttachmentBuilder(resultImage, { name: 'bj_result.png' })],
-          components: [],
-        }).catch(() => {});
+            components: [] }) });
       }
-    } else if (V2_AVAILABLE) {
+    } else if (embed.shouldUseV2(guildId, module.exports.help.name)) {
       const body = [
         `## ${emoji} ${title}`,
         ``,
@@ -349,8 +345,7 @@ exports.run = async (client, message, args) => {
         .addTextDisplayComponents(new TextDisplayBuilder().setContent(body));
       await sent.edit({ components: [container], flags: COMPONENTS_V2_FLAG }).catch(() => {});
     } else {
-      await sent.edit({
-        embeds: [embed.build(guildId, null, {
+      await sent.edit({ ...embed.buildPayload(guildId, null, {
           title: `${emoji} ${title}`, description: desc,
           fields: [
             { name: '🎮 Toi', value: `${formatHand(playerHand)}`, inline: true },
@@ -358,9 +353,7 @@ exports.run = async (client, message, args) => {
             { name: '💰 Solde', value: `**${embed.fmtCoins(finalCoins)}** coins`, inline: false },
           ],
           timestamp: false,
-        })],
-        components: [],
-      }).catch(() => {});
+          components: [] }) });
     }
     } catch (endErr) {
       console.error('[BJ] End handler error:', endErr?.message);

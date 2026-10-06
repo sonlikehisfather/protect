@@ -307,8 +307,10 @@ async function _handleSetup(client, message, deleteReply, deleteDelay) {
     config   : config || {},
   };
 
+  const useV2 = embed.shouldUseV2(guildId, module.exports.help.name);
+
   const panel = await message.channel.send(
-    V2_AVAILABLE ? _buildV2Panel(state, client) : _buildPanel(state)
+    useV2 ? _buildV2Panel(state, client) : _buildPanel(state)
   ).catch(() => null);
 
   if (!panel) {
@@ -355,14 +357,14 @@ async function _handleSetup(client, message, deleteReply, deleteDelay) {
         state.page     = 0;
         state.config   = db.getGuildConfig(guildId) || {};
       }
-      await panel.edit(V2_AVAILABLE ? _buildV2Panel(state, client) : _buildPanel(state)).catch(() => {});
+      await panel.edit(useV2 ? _buildV2Panel(state, client) : _buildPanel(state)).catch(() => {});
       return;
     }
 
     if (id === 'logs:page:prev') {
       state.config = db.getGuildConfig(guildId) || {};
       state.page   = Math.max(0, Number(state.page || 0) - 1);
-      await panel.edit(V2_AVAILABLE ? _buildV2Panel(state, client) : _buildPanel(state)).catch(() => {});
+      await panel.edit(useV2 ? _buildV2Panel(state, client) : _buildPanel(state)).catch(() => {});
       return;
     }
 
@@ -370,11 +372,11 @@ async function _handleSetup(client, message, deleteReply, deleteDelay) {
       const currentFields = [
         ...SETUP_CHANNELS.filter(r => r.id.startsWith(state.category === 'general' ? 'gen:' : state.category === 'members' ? 'mem:' : 'str:'))
       ];
-      const perPage = V2_AVAILABLE && (state.category === 'members' || state.category === 'general' || state.category === 'structure') ? 4 : 2;
+      const perPage = useV2 && (state.category === 'members' || state.category === 'general' || state.category === 'structure') ? 4 : 2;
       const maxPage = Math.max(0, Math.ceil(currentFields.length / perPage) - 1);
       state.config = db.getGuildConfig(guildId) || {};
       state.page   = Math.min(maxPage, Number(state.page || 0) + 1);
-      await panel.edit(V2_AVAILABLE ? _buildV2Panel(state, client) : _buildPanel(state)).catch(() => {});
+      await panel.edit(useV2 ? _buildV2Panel(state, client) : _buildPanel(state)).catch(() => {});
       return;
     }
 
@@ -390,7 +392,7 @@ async function _handleSetup(client, message, deleteReply, deleteDelay) {
       db.setGuildConfig(guildId, mapping.configKey, channelId);
 
       state.config = db.getGuildConfig(guildId) || {};
-      await panel.edit(V2_AVAILABLE ? _buildV2Panel(state, client) : _buildPanel(state)).catch(() => {});
+      await panel.edit(useV2 ? _buildV2Panel(state, client) : _buildPanel(state)).catch(() => {});
       return;
     }
 
@@ -405,7 +407,7 @@ async function _handleSetup(client, message, deleteReply, deleteDelay) {
       db.setGuildConfig(guildId, mapping.configKey, null);
 
       state.config = db.getGuildConfig(guildId) || {};
-      await panel.edit(V2_AVAILABLE ? _buildV2Panel(state, client) : _buildPanel(state)).catch(() => {});
+      await panel.edit(useV2 ? _buildV2Panel(state, client) : _buildPanel(state)).catch(() => {});
       return;
     }
   });
@@ -473,7 +475,7 @@ function _buildV2Panel(state, client) {
 
   try {
     const accent = _hexToInt(embed.getGuildColor(guildId));
-    const container = new ContainerBuilder().setAccentColor(accent);
+    const container = new ContainerBuilder();
 
     container.addTextDisplayComponents(
       new TextDisplayBuilder().setContent('## Configuration des Logs'),

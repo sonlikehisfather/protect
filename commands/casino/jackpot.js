@@ -65,7 +65,7 @@ exports.run = async (client, message, args) => {
       ],
     });
 
-    if (V2_AVAILABLE) {
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
       const container = new ContainerBuilder();
       container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
         `## Jackpot Gagné !  !\n\n` +
@@ -96,7 +96,7 @@ exports.run = async (client, message, args) => {
     ],
   });
 
-  if (V2_AVAILABLE) {
+  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
     const container = new ContainerBuilder();
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
       `## Jackpot rate\n\n` +

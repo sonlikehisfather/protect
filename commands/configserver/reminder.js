@@ -519,9 +519,7 @@ async function _editChannel(interaction, guild, guildId, row, panel) {
 async function _confirmDelete(interaction, guildId, row, panel, collector, ownerId) {
   await interaction.deferUpdate().catch(() => {});
 
-  await panel.edit({
-    embeds: [embed.build(guildId, `Supprimer le reminder \`${row.id}\` ?`, { color: '#ED4245', timestamp: false })],
-    components: [
+  await panel.edit({ ...embed.buildPayload(guildId, `Supprimer le reminder \`${row.id}\` ?`, { color: '#ED4245', timestamp: false , components: [
       new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId('local:reminder:confirmdelete')
@@ -532,8 +530,7 @@ async function _confirmDelete(interaction, guildId, row, panel, collector, owner
           .setLabel('Annuler')
           .setStyle(ButtonStyle.Secondary)
       ),
-    ],
-  }).catch(() => {});
+    ] }) });
 
   const btn = await panel.awaitMessageComponent({
     componentType : ComponentType.Button,
@@ -575,7 +572,7 @@ async function _handleList(message, guildId, deleteReply, deleteDelay) {
   const config = db.getGuildConfig(guildId);
 
 
-  if (!V2_AVAILABLE) {
+  if (!embed.shouldUseV2(guildId, module.exports.help.name)) {
     return _handleListFallback(message, guildId, rows, deleteReply, deleteDelay);
   }
 
@@ -720,7 +717,7 @@ async function _handleList(message, guildId, deleteReply, deleteDelay) {
 
 function _buildListV2Empty(config) {
   const accent    = _hexToInt(config?.color);
-  const container = new ContainerBuilder().setAccentColor(accent);
+  const container = new ContainerBuilder();
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent('## Reminders actifs'),
@@ -738,7 +735,7 @@ function _buildListV2Empty(config) {
 
 function _buildListV2ReadOnly(config, text) {
   const accent    = _hexToInt(config?.color);
-  const container = new ContainerBuilder().setAccentColor(accent);
+  const container = new ContainerBuilder();
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent('## Reminders actifs'),
@@ -756,7 +753,7 @@ function _buildListV2ReadOnly(config, text) {
 
 function _buildListV2(config, rows, page) {
   const accent     = _hexToInt(config?.color);
-  const container  = new ContainerBuilder().setAccentColor(accent);
+  const container  = new ContainerBuilder();
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const start      = page * PAGE_SIZE;
   const slice      = rows.slice(start, start + PAGE_SIZE);
@@ -809,7 +806,7 @@ function _buildListV2(config, rows, page) {
       new ButtonBuilder()
         .setCustomId(`local:reminder:list_prev:${page - 1}`)
         .setLabel('Precedent')
-        .setEmoji('\u2192')
+        .setEmoji('\u2190')
         .setStyle(ButtonStyle.Secondary)
         .setDisabled(page <= 0),
     );
@@ -817,7 +814,7 @@ function _buildListV2(config, rows, page) {
       new ButtonBuilder()
         .setCustomId(`local:reminder:list_next:${page + 1}`)
         .setLabel('Suivant')
-        .setEmoji('\u25B6')
+        .setEmoji('\u2192')
         .setStyle(ButtonStyle.Secondary)
         .setDisabled(page >= totalPages - 1),
     );

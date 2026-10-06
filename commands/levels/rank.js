@@ -60,7 +60,7 @@ exports.run = async (client, message, args) => {
   else if (level >= 5) rankColor = '#5865F2';  
   else rankColor = '#95A5A6';                   
 
-  const rankEmbed = embed.build(guildId, null, {
+  return embed.sendEmbed(message.channel, guildId, null, {
     title: `${member.displayName}`,
     description: `Level **${level}** ・ ${position}`,
     color: rankColor,
@@ -87,12 +87,8 @@ exports.run = async (client, message, args) => {
         inline: true 
       },
     ],
-    timestamp: false,
-  });
-
-  return message.reply({
-    embeds: [rankEmbed],
-    allowedMentions: { repliedUser: false },
+    timestamp       : false,
+    allowedMentions : { repliedUser: false },
   });
 };
 

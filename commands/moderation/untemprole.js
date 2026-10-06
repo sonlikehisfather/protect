@@ -121,16 +121,7 @@ module.exports = {
 
     db.deleteTempRole(guildId, target.id, role.id);
 
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          `Le rôle **${role.name}** a été retiré à **${target.user.username}**.`,
-          { timestamp: false }
-        ),
-      ],
-      allowedMentions: { repliedUser: false },
-    }).catch(() => null);
+    const sent = await embed.sendEmbed(message.channel, guildId, `Le rôle **${role.name}** a été retiré à **${target.user.username}**.`, { timestamp: false , allowedMentions: { repliedUser: false } });
 
     if (sent && deleteReply) {
       embed.scheduleDelete(sent, deleteDelay);

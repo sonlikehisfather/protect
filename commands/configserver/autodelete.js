@@ -251,19 +251,10 @@ async function _show(message, guildId, deleteReply, deleteDelay) {
     `Aide : \`${message.prefix || '+'}autodelete help\``,
   ];
 
-  const sent = await message.channel.send({
-    embeds: [
-      embed.build(
-        guildId,
-        lines.join('\n'),
-        {
+  const sent = await embed.sendEmbed(message.channel, guildId, lines.join('\n'), {
           title    : 'Autodelete',
           timestamp: false,
-        }
-      ),
-    ],
-    allowedMentions: { parse: [] },
-  }).catch(() => null);
+          allowedMentions: { parse: [] } });
 
   if (sent && deleteReply) {
     embed.scheduleDelete(sent, deleteDelay);
@@ -296,19 +287,10 @@ async function _help(message, guildId, deleteReply, deleteDelay) {
     `\`${message.prefix || '+'}autodelete reset\``,
   ];
 
-  const sent = await message.channel.send({
-    embeds: [
-      embed.build(
-        guildId,
-        lines.join('\n'),
-        {
+  const sent = await embed.sendEmbed(message.channel, guildId, lines.join('\n'), {
           title    : 'Autodelete - aide',
           timestamp: false,
-        }
-      ),
-    ],
-    allowedMentions: { parse: [] },
-  }).catch(() => null);
+          allowedMentions: { parse: [] } });
 
   if (sent && deleteReply) {
     embed.scheduleDelete(sent, deleteDelay);

@@ -108,12 +108,7 @@ function _formatDuration(seconds) {
 }
 
 async function _replyInfo(message, guildId, content, deleteReply, deleteDelay) {
-  const sent = await message.channel.send({
-    embeds: [
-      embed.build(guildId, content, { timestamp: false }),
-    ],
-    allowedMentions: { repliedUser: false },
-  }).catch(() => null);
+  const sent = await embed.sendEmbed(message.channel, guildId, content, { timestamp: false });
 
   if (sent && deleteReply) {
     embed.scheduleDelete(sent, deleteDelay);

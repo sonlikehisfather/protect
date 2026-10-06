@@ -180,19 +180,10 @@ async function handleList(message, guildId, deleteReply, deleteDelay) {
     `**Salons image uniquement**\n` +
     channels.map((channel, index) => `\`${index + 1}.\` ${channel}`).join('\n');
 
-  const sent = await message.channel.send({
-    embeds: [
-      embed.build(
-        guildId,
-        text,
-        {
+  const sent = await embed.sendEmbed(message.channel, guildId, text, {
           title     : 'Piconly',
           timestamp : false,
-        }
-      ),
-    ],
-    allowedMentions: { parse: [] },
-  }).catch(() => null);
+        });
 
   if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
 }
@@ -251,16 +242,7 @@ async function handleExempt(message, guild, guildId, args, deleteReply, deleteDe
       })
       .join('\n');
 
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          `**Rôles exemptés dans ${channel}**\n${lines}`,
-          { title: 'Piconly exempt', timestamp: false }
-        ),
-      ],
-      allowedMentions: { parse: [] },
-    }).catch(() => null);
+    const sent = await embed.sendEmbed(message.channel, guildId, `**Rôles exemptés dans ${channel}**\n${lines}`, { title: 'Piconly exempt', timestamp: false });
 
     if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
     return;
@@ -384,26 +366,17 @@ function isTextChannel(channel) {
 }
 
 async function sendUsage(message, guildId, deleteReply, deleteDelay) {
-  const sent = await message.channel.send({
-    embeds: [
-      embed.build(
-        guildId,
-        [
+  const sent = await embed.sendEmbed(message.channel, guildId, [
           `\`${message.prefix || '+'}piconly add [salon]\``,
           `\`${message.prefix || '+'}piconly del [salon]\``,
           `\`${message.prefix || '+'}piconly list\``,
           `\`${message.prefix || '+'}piconly exempt add <#salon> @role\``,
           `\`${message.prefix || '+'}piconly exempt del <#salon> @role\``,
           `\`${message.prefix || '+'}piconly exempt list <#salon>\``,
-        ].join('\n'),
-        {
+        ].join('\n'), {
           title     : 'Configuration piconly',
           timestamp : false,
-        }
-      ),
-    ],
-    allowedMentions: { parse: [] },
-  }).catch(() => null);
+        });
 
   if (sent && deleteReply) {
     embed.scheduleDelete(sent, deleteDelay);

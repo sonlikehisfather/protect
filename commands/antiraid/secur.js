@@ -49,16 +49,7 @@ exports.run = async (client, message, args) => {
 
     _setProfile(guildId, 'off');
 
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          'La sécurité antiraid a été désactivée.',
-          { timestamp: false }
-        )
-      ],
-      allowedMentions: { repliedUser: false },
-    }).catch(() => null);
+    const sent = await embed.sendEmbed(message.channel, guildId, 'La sécurité antiraid a été désactivée.', { timestamp: false , allowedMentions: { repliedUser: false } });
 
     if (sent && deleteReply) {
       embed.scheduleDelete(sent, deleteDelay);
@@ -79,16 +70,7 @@ exports.run = async (client, message, args) => {
 
     _setProfile(guildId, 'base');
 
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          'La sécurité antiraid a été activée avec les modules de base.',
-          { timestamp: false }
-        )
-      ],
-      allowedMentions: { repliedUser: false },
-    }).catch(() => null);
+    const sent = await embed.sendEmbed(message.channel, guildId, 'La sécurité antiraid a été activée avec les modules de base.', { timestamp: false , allowedMentions: { repliedUser: false } });
 
     if (sent && deleteReply) {
       embed.scheduleDelete(sent, deleteDelay);
@@ -113,16 +95,7 @@ exports.run = async (client, message, args) => {
 
     _setProfile(guildId, 'max');
 
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          'La sécurité antiraid a été activée en mode maximal.',
-          { timestamp: false }
-        )
-      ],
-      allowedMentions: { repliedUser: false },
-    }).catch(() => null);
+    const sent = await embed.sendEmbed(message.channel, guildId, 'La sécurité antiraid a été activée en mode maximal.', { timestamp: false , allowedMentions: { repliedUser: false } });
 
     if (sent && deleteReply) {
       embed.scheduleDelete(sent, deleteDelay);
@@ -225,9 +198,7 @@ async function _showConfig(message, guildId) {
 
   const status = (value) => value ? 'Activé' : 'Désactivé';
 
-  return message.channel.send({
-    embeds: [
-      embed.build(guildId, null, {
+  return embed.sendEmbed(message.channel, guildId, null, {
         title : 'Configuration antiraid',
         fields: [
 
@@ -352,10 +323,7 @@ async function _showConfig(message, guildId) {
         ],
         footer    : 'secur on | secur max | secur off | secur invite <on/off>',
         timestamp : false,
-      })
-    ],
-    allowedMentions: { repliedUser: false },
-  });
+          allowedMentions: { repliedUser: false } });
 }
 
 async function _handleInvite(message, args, deleteReply, deleteDelay) {
@@ -374,16 +342,7 @@ async function _handleInvite(message, args, deleteReply, deleteDelay) {
 
   if (!value) {
     const current = db.getBotSetting('securInvite') === '1';
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          `Secur invite est actuellement **${current ? 'activé' : 'désactivé'}** (global).`,
-          { timestamp: false }
-        )
-      ],
-      allowedMentions: { repliedUser: false },
-    }).catch(() => null);
+    const sent = await embed.sendEmbed(message.channel, guildId, `Secur invite est actuellement **${current ? 'activé' : 'désactivé'}** (global).`, { timestamp: false , allowedMentions: { repliedUser: false } });
 
     if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
     return;
@@ -402,16 +361,7 @@ async function _handleInvite(message, args, deleteReply, deleteDelay) {
 
     db.setBotSetting('securInvite', '1');
 
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          'Secur invite **activé**. Le bot quittera automatiquement les serveurs non autorisés.',
-          { timestamp: false }
-        )
-      ],
-      allowedMentions: { repliedUser: false },
-    }).catch(() => null);
+    const sent = await embed.sendEmbed(message.channel, guildId, 'Secur invite **activé**. Le bot quittera automatiquement les serveurs non autorisés.', { timestamp: false , allowedMentions: { repliedUser: false } });
 
     if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
     return;
@@ -430,16 +380,7 @@ async function _handleInvite(message, args, deleteReply, deleteDelay) {
 
     db.setBotSetting('securInvite', '0');
 
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          'Secur invite **désactivé**.',
-          { timestamp: false }
-        )
-      ],
-      allowedMentions: { repliedUser: false },
-    }).catch(() => null);
+    const sent = await embed.sendEmbed(message.channel, guildId, 'Secur invite **désactivé**.', { timestamp: false , allowedMentions: { repliedUser: false } });
 
     if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
     return;

@@ -600,9 +600,7 @@ module.exports = {
 async function _openSettingsPanel(message, guildId, me) {
   const guild = message.guild;
   const panel = await message.channel.send({
-    embeds          : [_buildSettingsEmbed(guildId)],
-    components      : _buildSettingsRows(),
-    allowedMentions : { parse: [] },
+    ...embed.embedToPayload(guildId, _buildSettingsEmbed(guildId), { components: _buildSettingsRows(), allowedMentions: { parse: [] } }),
   }).catch(() => null);
 
   if (!panel) return;
@@ -634,8 +632,7 @@ async function _openSettingsPanel(message, guildId, me) {
 
       if (!current && (!config?.modmailChannel || !config?.modmailCategory)) {
         return interaction.reply({
-          embeds : [embed.build(guildId, 'Configurez d\u2019abord le salon principal et la cat\u00e9gorie modmail.', { color: '#ED4245', timestamp: false })],
-          flags  : MessageFlags.Ephemeral,
+          ...embed.embedToPayload(guildId, embed.build(guildId, 'Configurez d\u2019abord le salon principal et la cat\u00e9gorie modmail.', { color: '#ED4245', timestamp: false }), { flags: MessageFlags.Ephemeral }),
         }).catch(() => {});
       }
 
@@ -680,8 +677,7 @@ async function _openSettingsPanel(message, guildId, me) {
 
     if (result.error) {
       await submit.reply({
-        embeds : [embed.build(guildId, result.error, { color: '#ED4245', timestamp: false })],
-        flags  : MessageFlags.Ephemeral,
+        ...embed.embedToPayload(guildId, embed.build(guildId, result.error, { color: '#ED4245', timestamp: false }), { flags: MessageFlags.Ephemeral }),
       }).catch(() => {});
       busy = false;
       return _refreshPanel(panel, guildId);
@@ -704,9 +700,7 @@ async function _openSettingsPanel(message, guildId, me) {
 
 function _refreshPanel(panel, guildId) {
   return panel.edit({
-    embeds          : [_buildSettingsEmbed(guildId)],
-    components      : _buildSettingsRows(),
-    allowedMentions : { parse: [] },
+    ...embed.embedToPayload(guildId, _buildSettingsEmbed(guildId), { components: _buildSettingsRows(), allowedMentions: { parse: [] } }),
   }).catch(() => {});
 }
 

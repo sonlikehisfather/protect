@@ -97,12 +97,7 @@ const extra = choices.length > 15
 
 list = _truncate(`${list}${extra}`, 1024);
 
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          `Choix sélectionné : **${selected}**`,
-          {
+    const sent = await embed.sendEmbed(message.channel, guildId, `Choix sélectionné : **${selected}**`, {
             title: 'Tirage au sort',
             fields: [
               {
@@ -112,11 +107,7 @@ list = _truncate(`${list}${extra}`, 1024);
               },
             ],
             timestamp: false,
-          }
-        ),
-      ],
-      allowedMentions: { parse: [] },
-    }).catch(() => null);
+          allowedMentions: { parse: [] } });
 
     if (sent && deleteReply) {
       embed.scheduleDelete(sent, deleteDelay);

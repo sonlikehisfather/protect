@@ -42,16 +42,7 @@ exports.run = async (client, message, args) => {
 
     const antispam = db.getAntiraidConfig(guildId);
 
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          `Antispam activé.\nSeuil actuel : **${antispam.antispamThreshold}** messages en **${antispam.antispamWindow}** secondes.`,
-          { timestamp: false }
-        )
-      ],
-      allowedMentions: { repliedUser: false },
-    }).catch(() => null);
+    const sent = await embed.sendEmbed(message.channel, guildId, `Antispam activé.\nSeuil actuel : **${antispam.antispamThreshold}** messages en **${antispam.antispamWindow}** secondes.`, { timestamp: false });
 
     if (sent && deleteReply) {
       embed.scheduleDelete(sent, deleteDelay);
@@ -75,16 +66,7 @@ exports.run = async (client, message, args) => {
 
     const antispam = db.getAntiraidConfig(guildId);
 
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          `Antispam désactivé.\nSeuil actuel : **${antispam.antispamThreshold}** messages en **${antispam.antispamWindow}** secondes.`,
-          { timestamp: false }
-        )
-      ],
-      allowedMentions: { repliedUser: false },
-    }).catch(() => null);
+    const sent = await embed.sendEmbed(message.channel, guildId, `Antispam désactivé.\nSeuil actuel : **${antispam.antispamThreshold}** messages en **${antispam.antispamWindow}** secondes.`, { timestamp: false });
 
     if (sent && deleteReply) {
       embed.scheduleDelete(sent, deleteDelay);
@@ -139,16 +121,7 @@ exports.run = async (client, message, args) => {
 
     const antispam = db.getAntiraidConfig(guildId);
 
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          `Antispam configuré : **${antispam.antispamEnabled ? 'Activé' : 'Désactivé'}** - **${msgs}** messages en **${secs}** secondes.`,
-          { timestamp: false }
-        )
-      ],
-      allowedMentions: { repliedUser: false },
-    }).catch(() => null);
+    const sent = await embed.sendEmbed(message.channel, guildId, `Antispam configuré : **${antispam.antispamEnabled ? 'Activé' : 'Désactivé'}** - **${msgs}** messages en **${secs}** secondes.`, { timestamp: false });
 
     if (sent && deleteReply) {
       embed.scheduleDelete(sent, deleteDelay);
@@ -158,16 +131,7 @@ exports.run = async (client, message, args) => {
 
   const antispam = db.getAntiraidConfig(guildId);
 
-  const sent = await message.channel.send({
-    embeds: [
-      embed.build(
-        guildId,
-        `Antispam : **${antispam.antispamEnabled ? 'Activé' : 'Désactivé'}** - **${antispam.antispamThreshold}** messages en **${antispam.antispamWindow}** secondes.`,
-        { timestamp: false }
-      )
-    ],
-    allowedMentions: { repliedUser: false },
-  }).catch(() => null);
+  const sent = await embed.sendEmbed(message.channel, guildId, `Antispam : **${antispam.antispamEnabled ? 'Activé' : 'Désactivé'}** - **${antispam.antispamThreshold}** messages en **${antispam.antispamWindow}** secondes.`, { timestamp: false });
 
   if (sent && deleteReply) {
     embed.scheduleDelete(sent, deleteDelay);

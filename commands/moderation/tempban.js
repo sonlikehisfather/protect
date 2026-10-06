@@ -218,12 +218,7 @@ module.exports = {
       durationSeconds
     );
 
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          `**${target.user.tag}** a été banni temporairement pendant **${durationStr}**.`,
-          {
+    const sent = await embed.sendEmbed(message.channel, guildId, `**${target.user.tag}** a été banni temporairement pendant **${durationStr}**.`, {
             fields: [
               {
                 name  : 'Raison',
@@ -232,11 +227,7 @@ module.exports = {
               }
             ],
             timestamp: false,
-          }
-        )
-      ],
-      allowedMentions: { parse: [] },
-    }).catch(() => null);
+          allowedMentions: { parse: [] } });
 
     if (sent && deleteReply)
       embed.scheduleDelete(sent, deleteDelay);

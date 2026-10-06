@@ -42,23 +42,16 @@ exports.run = async (client, message, args) => {
 
   const originalMsg = await target.messages.fetch(messageId).catch(() => null);
 
-  const e = embed.build(guildId, null, {
+  const desc = null;
+  const opts = {
     title : `🎉 Nouveau tirage - ${result.prize}`,
     fields: [{ name: 'Gagnant(s)', value: result.winners.map(id => `<@${id}>`).join(', ') }],
-  });
+  };
 
   if (originalMsg) {
-    await originalMsg.reply({
-      embeds         : [e],
-      allowedMentions: { parse: [], repliedUser: false },
-    }).catch(() => target.send({
-      embeds         : [e],
-      allowedMentions: { parse: [] },
-    }));
+    await embed.sendEmbed(originalMsg, guildId, desc, { ...opts, allowedMentions: { parse: [], repliedUser: false } })
+      .catch(() => embed.sendEmbed(target, guildId, desc, { ...opts, allowedMentions: { parse: [] } }));
   } else {
-    await target.send({
-      embeds         : [e],
-      allowedMentions: { parse: [] },
-    });
+    await embed.sendEmbed(target, guildId, desc, { ...opts, allowedMentions: { parse: [] } });
   }
 };

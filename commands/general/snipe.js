@@ -1,6 +1,18 @@
 'use strict';
 
 
+const {
+  ContainerBuilder,
+  TextDisplayBuilder,
+  MediaGalleryBuilder,
+  MediaGalleryItemBuilder,
+  MessageFlags,
+} = require('discord.js');
+
+const COMPONENTS_V2_FLAG = MessageFlags?.IsComponentsV2 ?? (1 << 15);
+const V2_AVAILABLE       = typeof ContainerBuilder === 'function' &&
+                           typeof TextDisplayBuilder === 'function';
+
 const db    = require('../../core/database');
 const embed = require('../../utils/embed');
 
@@ -73,47 +85,77 @@ module.exports = {
       a?.url && a.url !== imageAttachment?.url
     );
 
-    const fields = [];
+    const lines = [
+      `## Snipe`,
+      `> <@${snipe.authorId}> (${snipe.authorTag || 'Inconnu'})`,
+      '',
+      content.slice(0, 4000),
+    ];
 
     if (otherAttachments.length) {
-      fields.push({
-        name  : 'Pièces jointes',
-        value : otherAttachments
-          .slice(0, 5)
-          .map(a => `[${a.name || 'fichier'}](${a.url})`)
-          .join('\n')
-          .slice(0, 1024),
-        inline: false,
-      });
+      lines.push('', `Pi\u00e8ces jointes \u203a ${otherAttachments.slice(0, 5).map(a => `[${a.name || 'fichier'}](${a.url})`).join(' \u2022 ')}`);
     }
 
-    if (snipe.authorId) {
-      fields.unshift({
-        name  : 'Auteur',
-        value : `<@${snipe.authorId}> (${snipe.authorTag || 'Inconnu'}) \`${snipe.authorId}\``,
-        inline: false,
-      });
+    if (snipe.deletedTimestamp) {
+      lines.push('', `-# Supprim\u00e9 <t:${Math.floor(snipe.deletedTimestamp / 1000)}:R>`);
     }
 
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          content.slice(0, 4000),
-          {
+    const text = lines.join('\n');
+
+    let sent = null;
+
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
+      try {
+        const container = new ContainerBuilder();
+        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
+        if (imageAttachment?.url) {
+          container.addMediaGalleryComponents(
+            new MediaGalleryBuilder().addItems(
+              new MediaGalleryItemBuilder().setURL(imageAttachment.url)
+            )
+          );
+        }
+        sent = await message.channel.send({
+          components      : [container],
+          flags           : COMPONENTS_V2_FLAG,
+          allowedMentions : { repliedUser: false },
+        }).catch(() => null);
+      } catch {}
+    }
+
+    if (!sent) {
+      const fields = [];
+
+      if (otherAttachments.length) {
+        fields.push({
+          name  : 'Pi\u00e8ces jointes',
+          value : otherAttachments.slice(0, 5).map(a => `[${a.name || 'fichier'}](${a.url})`).join('\n').slice(0, 1024),
+          inline: false,
+        });
+      }
+
+      if (snipe.authorId) {
+        fields.unshift({
+          name  : 'Auteur',
+          value : `<@${snipe.authorId}> (${snipe.authorTag || 'Inconnu'}) \`${snipe.authorId}\``,
+          inline: false,
+        });
+      }
+
+      sent = await message.channel.send({
+        embeds: [
+          embed.build(guildId, content.slice(0, 4000), {
             authorName : snipe.authorTag || 'Inconnu',
             authorIcon : snipe.authorAvatar || null,
             image      : imageAttachment?.url ?? undefined,
             fields,
-            footer     : `Supprimé`,
+            footer     : `Supprim\u00e9`,
             timestamp  : snipe.deletedTimestamp ?? Date.now(),
-          }
-        )
-      ],
-      allowedMentions: {
-        repliedUser: false,
-      },
-    }).catch(() => null);
+          }),
+        ],
+        allowedMentions: { repliedUser: false },
+      }).catch(() => null);
+    }
 
     if (sent && deleteReply) {
       embed.scheduleDelete(sent, autoDeleteDelay);

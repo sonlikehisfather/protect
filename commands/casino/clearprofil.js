@@ -63,7 +63,7 @@ exports.run = async (client, message, args) => {
     ],
   });
 
-  if (V2_AVAILABLE) {
+  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
     const container = new ContainerBuilder().addTextDisplayComponents(new TextDisplayBuilder().setContent(
       `## × Clear Profil\n\n× Profil de <@${target.id}> remis a zero.\n` +
       `> Coins: ~~${embed.fmtCoins(coins)}~~ → **0**\n` +

@@ -113,11 +113,7 @@ exports.run = async (client, message, args) => {
 
   const sent = V2_AVAILABLE
     ? await message.reply(_buildV2('pick')).catch(() => null)
-    : await message.reply({
-        embeds: [embed.build(guildId, null, { title: '🪙 Pile ou Face', description: 'Choisis ton côté :', timestamp: false })],
-        components: [btnRow],
-        allowedMentions: { parse: [] },
-      }).catch(() => null);
+    : await message.reply({ ...embed.buildPayload(guildId, null, { title: '🪙 Pile ou Face', description: 'Choisis ton côté :', timestamp: false , components: [btnRow] }) });
 
   if (!sent) return;
 
@@ -189,7 +185,7 @@ exports.run = async (client, message, args) => {
     }
 
     if (cfImage) {
-      if (V2_AVAILABLE) {
+      if (embed.shouldUseV2(guildId, module.exports.help.name)) {
         const container = new ContainerBuilder();
         container.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL('attachment://cf_result.png')));
         await sent.edit({
@@ -198,26 +194,21 @@ exports.run = async (client, message, args) => {
           files: [new AttachmentBuilder(cfImage, { name: 'cf_result.png' })],
         }).catch(() => {});
       } else {
-        await sent.edit({
-          embeds: [embed.build(guildId, null, {
+        await sent.edit({ ...embed.buildPayload(guildId, null, {
             title: 'Pile ou Face',
             image: 'attachment://cf_result.png',
             description: `${choice.toUpperCase()} vs ${result.toUpperCase()} ・ ${win ? 'Gagne' : 'Perdu'} \nSolde : ${embed.fmtCoins(finalCoins)} coins`,
             timestamp: false,
-          })],
-          files: [new AttachmentBuilder(cfImage, { name: 'cf_result.png' })],
-          components: [],
-        }).catch(() => {});
+          components: [] }) });
       }
-    } else if (V2_AVAILABLE) {
+    } else if (embed.shouldUseV2(guildId, module.exports.help.name)) {
       await sent.edit(_buildV2('result', { choice, result, win, xpGain, finalCoins, cote, bonuses })).catch(() => {});
     } else {
       const emoji    = result === 'pile' ? '👤' : '⚡';
       const winEmoji = win ? '✔' : '×';
       const netGain = win ? Math.floor(amount * cote) - amount : 0;
       const resultText = win ? `Gagné ! (+${embed.fmtCoins(netGain)} coins)${bonuses.length ? ` [x${cote.toFixed(2)} ・ ${bonuses.join(', ')}]` : ''}` : `Perdu... (-${embed.fmtCoins(amount)} coins)`;
-      await sent.edit({
-        embeds: [embed.build(guildId, null, {
+      await sent.edit({ ...embed.buildPayload(guildId, null, {
           title: '🪙 Pile ou Face',
           fields: [
             { name: 'Ton choix', value: choice.toUpperCase(), inline: true },
@@ -226,9 +217,7 @@ exports.run = async (client, message, args) => {
             { name: 'Solde',     value: `${embed.fmtCoins(finalCoins)} coins`, inline: false },
           ],
           timestamp: false,
-        })],
-        components: [],
-      }).catch(() => {});
+          components: [] }) });
     }
   });
 
@@ -248,7 +237,7 @@ exports.run = async (client, message, args) => {
         `Solde : **${embed.fmtCoins(finalCoins)}** coins`,
       ],
     });
-    if (V2_AVAILABLE) {
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
       const c = new ContainerBuilder();
       c.addTextDisplayComponents(new TextDisplayBuilder().setContent(
         `## 🪙 Pile ou Face\n\n> Mise : **${embed.fmtCoins(amount)}** coins ・ **Expiré**\n> Remboursement : **${embed.fmtCoins(amount)}** coins\n> Solde : **${embed.fmtCoins(finalCoins)}** coins`

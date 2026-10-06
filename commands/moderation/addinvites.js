@@ -55,14 +55,7 @@ module.exports = {
 
     const newBonus = db.addInviteBonus(guildId, target.id, amount);
 
-    const sent = await message.channel.send({
-      embeds: [embed.build(
-        guildId,
-        `**+${amount}** invitation(s) ajoutée(s) à ${target}.\nBonus total : \`${newBonus}\``,
-        { timestamp: false }
-      )],
-      allowedMentions: { parse: [] },
-    }).catch(() => null);
+    const sent = await embed.sendEmbed(message.channel, guildId, `**+${amount}** invitation(s) ajoutée(s) à ${target}.\nBonus total : \`${newBonus}\``, { timestamp: false , allowedMentions: { parse: [] } });
 
     if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
   },

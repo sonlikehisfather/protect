@@ -88,7 +88,7 @@ exports.run = async (client, message) => {
 
   let sent;
 
-  if (V2_AVAILABLE) {
+  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
     const container = new ContainerBuilder();
     container.addTextDisplayComponents(
       new TextDisplayBuilder().setContent('# Invitation du bot'),

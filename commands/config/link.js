@@ -154,16 +154,11 @@ async function _list(message, guildId, deleteReply, deleteDelay) {
     });
   }
 
-  const sent = await message.channel.send({
-    embeds: [
-      embed.build(guildId, null, {
+  const sent = await embed.sendEmbed(message.channel, guildId, null, {
         title     : 'Antilink - configuration par salon',
         fields,
         timestamp : false,
-      }),
-    ],
-    allowedMentions: { parse: [] },
-  }).catch(() => null);
+      });
 
   if (sent && deleteReply) {
     embed.scheduleDelete(sent, deleteDelay);
@@ -202,12 +197,7 @@ function _withGlobalNote(text, guildId) {
 }
 
 async function _replyOk(message, guildId, text, deleteReply, deleteDelay) {
-  const sent = await message.channel.send({
-    embeds: [
-      embed.build(guildId, text, { timestamp: false }),
-    ],
-    allowedMentions: { parse: [] },
-  }).catch(() => null);
+  const sent = await embed.sendEmbed(message.channel, guildId, text, { timestamp: false });
 
   if (sent && deleteReply) {
     embed.scheduleDelete(sent, deleteDelay);

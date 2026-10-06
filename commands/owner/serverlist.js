@@ -89,8 +89,8 @@ module.exports = {
       const navBtns = [];
       if (totalPages > 1) {
         navBtns.push(
-          new ButtonBuilder().setCustomId('local:sl:prev').setLabel('◀').setStyle(ButtonStyle.Secondary).setDisabled(disabled || page === 0),
-          new ButtonBuilder().setCustomId('local:sl:next').setLabel('▶').setStyle(ButtonStyle.Secondary).setDisabled(disabled || page >= totalPages - 1),
+          new ButtonBuilder().setCustomId('local:sl:prev').setLabel('←').setStyle(ButtonStyle.Secondary).setDisabled(disabled || page === 0),
+          new ButtonBuilder().setCustomId('local:sl:next').setLabel('→').setStyle(ButtonStyle.Secondary).setDisabled(disabled || page >= totalPages - 1),
         );
       }
 
@@ -104,7 +104,7 @@ module.exports = {
       if (navBtns.length) rows.push(new ActionRowBuilder().addComponents(...navBtns));
       rows.push(new ActionRowBuilder().addComponents(...actionBtns));
 
-      if (V2_AVAILABLE) {
+      if (embed.shouldUseV2(guildId, module.exports.help.name)) {
         try {
           const container = new ContainerBuilder();
           container.addTextDisplayComponents(new TextDisplayBuilder().setContent(headerText));

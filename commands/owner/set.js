@@ -562,10 +562,10 @@ function _buildServerProfilePayload(client, guildId, me, state) {
     `> Bannière locale : \`Non supportée par Discord\`\n` +
     `> Bio locale : \`Non supportée par Discord\``;
 
-  if (V2_AVAILABLE) {
+  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
     try {
       const accent    = _hexToInt(embed.getGuildColor(guildId));
-      const container = new ContainerBuilder().setAccentColor(accent);
+      const container = new ContainerBuilder();
 
       container.addTextDisplayComponents(
         new TextDisplayBuilder().setContent('## Profil serveur'),
@@ -1114,10 +1114,10 @@ function _buildProfilePayload(client, guildId, state) {
     : null;
   const rows = isTools ? _buildProfileToolsRows(false) : _buildProfileMainRows(false);
 
-  if (V2_AVAILABLE) {
+  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
     try {
       const accent    = _hexToInt(embed.getGuildColor(guildId));
-      const container = new ContainerBuilder().setAccentColor(accent);
+      const container = new ContainerBuilder();
 
       container.addTextDisplayComponents(
         new TextDisplayBuilder().setContent(title),

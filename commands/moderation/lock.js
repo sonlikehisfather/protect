@@ -83,16 +83,7 @@ module.exports = {
       return;
     }
 
-    const sent = await channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          `Le salon ${channel} a été verrouillé.`,
-          { timestamp: false }
-        )
-      ],
-      allowedMentions: { repliedUser: false },
-    }).catch(() => null);
+    const sent = await embed.sendEmbed(channel, guildId, `Le salon ${channel} a été verrouillé.`, { timestamp: false , allowedMentions: { repliedUser: false } });
 
     if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
   },

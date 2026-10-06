@@ -2,6 +2,16 @@
 
 
 const { PermissionFlagsBits } = require('discord.js');
+
+const {
+  ContainerBuilder,
+  TextDisplayBuilder,
+  MessageFlags,
+} = require('discord.js');
+
+const COMPONENTS_V2_FLAG = MessageFlags?.IsComponentsV2 ?? (1 << 15);
+const V2_AVAILABLE       = typeof ContainerBuilder === 'function' &&
+                           typeof TextDisplayBuilder === 'function';
 const db    = require('../../core/database');
 const embed = require('../../utils/embed');
 
@@ -119,23 +129,53 @@ module.exports = {
       });
     }
 
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          null,
-          {
+    const lines = [
+      '## ' + role.name,
+      '',
+      'Rôle › <@&' + role.id + '>',
+      'ID › `' + role.id + '`',
+      'Couleur › ' + (role.hexColor && role.hexColor !== '#000000' ? String.fromCharCode(96) + role.hexColor + String.fromCharCode(96) : 'Aucune'),
+      '**Position** › ' + role.position,
+      '**Membres** › ' + memberCount,
+      '**Mentionnable** › ' + (role.mentionable ? 'Oui' : 'Non'),
+      'Affiché séparément › ' + (role.hoist ? 'Oui' : 'Non'),
+      'Géré par une intégration › ' + (role.managed ? 'Oui' : 'Non'),
+      '**Créé le** › ' + (createdAt ? '<t:' + createdAt + ':F> (<t:' + createdAt + ':R>)' : 'Inconnu'),
+    ];
+
+    if (permsValue) {
+      lines.push('Permissions clés › ' + permsValue);
+    }
+
+    const text = lines.join('\n');
+
+    let sent = null;
+
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
+      try {
+        const container = new ContainerBuilder();
+        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
+        sent = await message.channel.send({
+          components      : [container],
+          flags           : COMPONENTS_V2_FLAG,
+          allowedMentions : { repliedUser: false },
+        }).catch(() => null);
+      } catch {}
+    }
+
+    if (!sent) {
+      sent = await message.channel.send({
+        embeds: [
+          embed.build(guildId, null, {
             title     : role.name,
             thumbnail : role.iconURL() ?? undefined,
             fields,
             timestamp : false,
-          }
-        )
-      ],
-      allowedMentions: {
-        repliedUser: false,
-      },
-    }).catch(() => null);
+          })
+        ],
+        allowedMentions: { repliedUser: false },
+      }).catch(() => null);
+    }
 
     if (sent && deleteReply) {
       embed.scheduleDelete(sent, deleteDelay);

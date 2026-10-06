@@ -89,9 +89,7 @@ module.exports = {
     const staffRow     = _buildStaffRow(suggestionId);
 
     const sentSuggestion = await pendingCh.send({
-      embeds          : [pendingEmbed],
-      components      : [staffRow],
-      allowedMentions : { parse: [] },
+      ...embed.embedToPayload(guildId, pendingEmbed, { components: [staffRow], allowedMentions: { parse: [] } }),
     }).catch(() => null);
 
     if (!sentSuggestion) {
@@ -193,8 +191,7 @@ function _log(guild, config, guildId, title, fields) {
   const logCh = guild.channels.cache.get(config.suggestionLogChannel);
   if (!logCh?.isTextBased()) return;
   logCh.send({
-    embeds          : [embed.log(guildId, title, fields)],
-    allowedMentions : { parse: [] },
+    ...embed.embedToPayload(guildId, embed.log(guildId, title, fields), { allowedMentions: { parse: [] } }),
   }).catch(() => {});
 }
 
@@ -222,23 +219,20 @@ async function handleButton(client, interaction) {
 
   if (!isStaff) {
     return interaction.reply({
-      embeds : [embed.build(guildId, 'Vous n\'avez pas la permission de gérer les suggestions.', { color: '#ED4245', timestamp: false })],
-      flags  : 64,
+      ...embed.embedToPayload(guildId, embed.build(guildId, 'Vous n\'avez pas la permission de gérer les suggestions.', { color: '#ED4245', timestamp: false }), { flags: 64 }),
     }).catch(() => {});
   }
 
   const suggestion = db.getSuggestion(suggestionId);
   if (!suggestion || suggestion.guildId !== guildId) {
     return interaction.reply({
-      embeds : [embed.build(guildId, 'Cette suggestion n\'existe plus.', { color: '#ED4245', timestamp: false })],
-      flags  : 64,
+      ...embed.embedToPayload(guildId, embed.build(guildId, 'Cette suggestion n\'existe plus.', { color: '#ED4245', timestamp: false }), { flags: 64 }),
     }).catch(() => {});
   }
 
   if (suggestion.status !== 'pending') {
     return interaction.reply({
-      embeds : [embed.build(guildId, 'Cette suggestion a déjà été traitée.', { color: '#ED4245', timestamp: false })],
-      flags  : 64,
+      ...embed.embedToPayload(guildId, embed.build(guildId, 'Cette suggestion a déjà été traitée.', { color: '#ED4245', timestamp: false }), { flags: 64 }),
     }).catch(() => {});
   }
 
@@ -286,9 +280,7 @@ async function handleButton(client, interaction) {
 
     await submit.deferUpdate().catch(() => {});
     await interaction.message.edit({
-      embeds          : [approvedPending],
-      components      : [],
-      allowedMentions : { parse: [] },
+      ...embed.embedToPayload(guildId, approvedPending, { components: [], allowedMentions: { parse: [] } }),
     }).catch(() => {});
 
     const validatedChId = config?.suggestionValidatedChannel;
@@ -300,9 +292,7 @@ async function handleButton(client, interaction) {
       const validatedEmbed = _buildApprovedEmbed(guildId, suggestionId, suggestion.content, author, reason, suggestion.userId);
 
       const validatedMsg = await validatedCh.send({
-        embeds          : [validatedEmbed],
-        components      : [],
-        allowedMentions : { parse: [] },
+        ...embed.embedToPayload(guildId, validatedEmbed, { components: [], allowedMentions: { parse: [] } }),
       }).catch(() => null);
 
       if (validatedMsg) {
@@ -359,9 +349,7 @@ async function handleButton(client, interaction) {
 
     await submit.deferUpdate().catch(() => {});
     await interaction.message.edit({
-      embeds          : [rejectedEmbed],
-      components      : [],
-      allowedMentions : { parse: [] },
+      ...embed.embedToPayload(guildId, rejectedEmbed, { components: [], allowedMentions: { parse: [] } }),
     }).catch(() => {});
 
     const thread = await interaction.message.startThread({
@@ -386,20 +374,21 @@ async function handleButton(client, interaction) {
 
   if (action === 'delete') {
     await interaction.reply({
-      embeds     : [embed.build(guildId, `Supprimer la suggestion **#${suggestionId}** ?`, { color: '#ED4245', timestamp: false })],
-      components : [
-        new ActionRowBuilder().addComponents(
-          new ButtonBuilder()
-            .setCustomId(`sug:confirm_del:${suggestionId}`)
-            .setLabel('Confirmer')
-            .setStyle(ButtonStyle.Danger),
-          new ButtonBuilder()
-            .setCustomId('sug:cancel_del')
-            .setLabel('Annuler')
-            .setStyle(ButtonStyle.Secondary),
-        ),
-      ],
-      flags: 64,
+      ...embed.embedToPayload(guildId, embed.build(guildId, `Supprimer la suggestion **#${suggestionId}** ?`, { color: '#ED4245', timestamp: false }), {
+        components: [
+          new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+              .setCustomId(`sug:confirm_del:${suggestionId}`)
+              .setLabel('Confirmer')
+              .setStyle(ButtonStyle.Danger),
+            new ButtonBuilder()
+              .setCustomId('sug:cancel_del')
+              .setLabel('Annuler')
+              .setStyle(ButtonStyle.Secondary),
+          ),
+        ],
+        flags: 64,
+      }),
     }).catch(() => {});
     return;
   }
@@ -413,8 +402,7 @@ async function handleDeleteConfirm(client, interaction) {
 
   if (id === 'sug:cancel_del') {
     return interaction.update({
-      embeds     : [embed.build(guildId, 'Suppression annulée.', { timestamp: false })],
-      components : [],
+      ...embed.embedToPayload(guildId, embed.build(guildId, 'Suppression annulée.', { timestamp: false }), { components: [] }),
     }).catch(() => {});
   }
 
@@ -425,8 +413,7 @@ async function handleDeleteConfirm(client, interaction) {
   const suggestion   = db.getSuggestion(suggestionId);
   if (!suggestion || suggestion.guildId !== guildId) {
     return interaction.update({
-      embeds     : [embed.build(guildId, 'Suggestion introuvable.', { color: '#ED4245', timestamp: false })],
-      components : [],
+      ...embed.embedToPayload(guildId, embed.build(guildId, 'Suggestion introuvable.', { color: '#ED4245', timestamp: false }), { components: [] }),
     }).catch(() => {});
   }
 
@@ -454,8 +441,7 @@ async function handleDeleteConfirm(client, interaction) {
   db.updateSuggestionStatus(suggestionId, 'refused', 'Supprimée par le staff', interaction.user.id);
 
   await interaction.update({
-    embeds     : [embed.build(guildId, `Suggestion **#${suggestionId}** supprimée.`, { color: COLOR_APPROVED, timestamp: false })],
-    components : [],
+    ...embed.embedToPayload(guildId, embed.build(guildId, `Suggestion **#${suggestionId}** supprimée.`, { color: COLOR_APPROVED, timestamp: false }), { components: [] }),
   }).catch(() => {});
 
   _log(interaction.guild, config, guildId, 'Suggestion supprimée', [

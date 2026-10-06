@@ -262,7 +262,8 @@ function buildConfigPayload(guildId, page = 0, status = null, disabled = false) 
 
 async function openConfigPanel(client, channel, author, guildId) {
   let page = 0;
-  const msg = await channel.send(buildConfigPayload(guildId, page)).catch(() => null);
+  const _w = (p) => embed.wrapPayload(guildId, p, 'confconfig');
+  const msg = await channel.send(_w(buildConfigPayload(guildId, page))).catch(() => null);
   if (!msg) return null;
 
   embed.registerPrivateInteraction(msg, author.id, TIMEOUT_MS);
@@ -272,7 +273,7 @@ async function openConfigPanel(client, channel, author, guildId) {
     time   : TIMEOUT_MS,
   });
 
-  const refresh = (status = null) => msg.edit(buildConfigPayload(guildId, page, status)).catch(() => {});
+  const refresh = (status = null) => msg.edit(_w(buildConfigPayload(guildId, page, status))).catch(() => {});
 
   collector.on('collect', async i => {
     try {
@@ -320,10 +321,10 @@ async function openConfigPanel(client, channel, author, guildId) {
       if (i.customId === 'cf:cancelsel') return refresh();
 
       if (i.customId === 'cf:setchannel')
-        return msg.edit(buildSelectChannelPayload(guildId, 'confession')).catch(() => {});
+        return msg.edit(_w(buildSelectChannelPayload(guildId, 'confession'))).catch(() => {});
 
       if (i.customId === 'cf:setreview')
-        return msg.edit(buildSelectChannelPayload(guildId, 'review')).catch(() => {});
+        return msg.edit(_w(buildSelectChannelPayload(guildId, 'review'))).catch(() => {});
 
       if (i.customId === 'cf:chansel:confession' || i.customId === 'cf:chansel:review') {
         const isReview = i.customId === 'cf:chansel:review';
@@ -334,7 +335,7 @@ async function openConfigPanel(client, channel, author, guildId) {
       }
 
       if (i.customId === 'cf:setcooldown')
-        return msg.edit(buildCooldownPayload(guildId)).catch(() => {});
+        return msg.edit(_w(buildCooldownPayload(guildId))).catch(() => {});
 
       if (i.customId.startsWith('cf:cd:')) {
         const val = Number(i.customId.split(':')[2]);
@@ -368,7 +369,7 @@ async function openConfigPanel(client, channel, author, guildId) {
   collector.on('end', (_, reason) => {
     embed.clearPrivateInteraction(msg);
     if (reason === 'closed') return;
-    msg.edit(buildConfigPayload(guildId, page, null, true)).catch(() => {});
+    msg.edit(_w(buildConfigPayload(guildId, page, null, true))).catch(() => {});
   });
 
   return msg;
@@ -383,41 +384,42 @@ async function handleModalSubmit(interaction) {
   await interaction.deferUpdate().catch((e) => console.error('[confconfig] deferUpdate error:', e.message));
 
   const msgId = parts[3];
+  const _wm = (p) => embed.wrapPayload(guildId, p, 'confconfig');
   const msg   = interaction.message ?? await interaction.channel?.messages?.fetch(msgId).catch(() => null);
 
   if (action === 'channel') {
     const raw = interaction.fields.getTextInputValue('channelId').trim().replace(/[<#>]/g, '');
     const ch  = interaction.guild?.channels?.cache?.get(raw);
     if (!ch || !ch.isTextBased()) {
-      return msg?.edit(buildConfigPayload(guildId, 'Salon introuvable ou invalide.')).catch(() => {});
+      return msg?.edit(_wm(buildConfigPayload(guildId, 'Salon introuvable ou invalide.'))).catch(() => {});
     }
     db.saveConfessionConfig(guildId, { channelId: ch.id });
-    return msg?.edit(buildConfigPayload(guildId, `Salon des confessions : <#${ch.id}>.`)).catch(() => {});
+    return msg?.edit(_wm(buildConfigPayload(guildId, `Salon des confessions : <#${ch.id}>.`))).catch(() => {});
   }
 
   if (action === 'reviewch') {
     const raw = interaction.fields.getTextInputValue('channelId').trim().replace(/[<#>]/g, '');
     const ch  = interaction.guild?.channels?.cache?.get(raw);
     if (!ch || !ch.isTextBased()) {
-      return msg?.edit(buildConfigPayload(guildId, 'Salon introuvable ou invalide.')).catch(() => {});
+      return msg?.edit(_wm(buildConfigPayload(guildId, 'Salon introuvable ou invalide.'))).catch(() => {});
     }
     db.saveConfessionConfig(guildId, { reviewChannelId: ch.id });
-    return msg?.edit(buildConfigPayload(guildId, `Salon de review : <#${ch.id}>.`)).catch(() => {});
+    return msg?.edit(_wm(buildConfigPayload(guildId, `Salon de review : <#${ch.id}>.`))).catch(() => {});
   }
 
   if (action === 'cooldown') {
     const val = parseInt(interaction.fields.getTextInputValue('cooldown').trim(), 10);
     if (isNaN(val) || val < 0) {
-      return msg?.edit(buildConfigPayload(guildId, 'Valeur invalide.')).catch(() => {});
+      return msg?.edit(_wm(buildConfigPayload(guildId, 'Valeur invalide.'))).catch(() => {});
     }
     db.saveConfessionConfig(guildId, { cooldownSeconds: val });
-    return msg?.edit(buildConfigPayload(guildId, `Cooldown : ${val === 0 ? 'desactive' : `${val}s`}.`)).catch(() => {});
+    return msg?.edit(_wm(buildConfigPayload(guildId, `Cooldown : ${val === 0 ? 'desactive' : `${val}s`}.`))).catch(() => {});
   }
 
   if (action === 'blacklist') {
     const val = interaction.fields.getTextInputValue('blacklist').trim();
     db.saveConfessionConfig(guildId, { blacklist: val });
-    return msg?.edit(buildConfigPayload(guildId, 'Blacklist mise a jour.')).catch(() => {});
+    return msg?.edit(_wm(buildConfigPayload(guildId, 'Blacklist mise a jour.'))).catch(() => {});
   }
 }
 

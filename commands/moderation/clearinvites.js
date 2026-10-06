@@ -57,11 +57,7 @@ module.exports = {
         .setStyle(ButtonStyle.Secondary),
     );
 
-    const confirmMsg = await message.channel.send({
-      embeds: [embed.build(guildId, `Réinitialiser les invitations de **${label}** ?`, { timestamp: false })],
-      components: [confirmRow],
-      allowedMentions: { parse: [] },
-    }).catch(() => null);
+    const confirmMsg = await message.channel.send({ ...embed.buildPayload(guildId, `Réinitialiser les invitations de **${label}** ?`, { timestamp: false , components: [confirmRow] }) });
 
     if (!confirmMsg) return;
 
@@ -87,15 +83,9 @@ module.exports = {
           db.clearInvites(guildId, target.id);
         }
 
-        await confirmMsg.edit({
-          embeds: [embed.build(guildId, `Invitations de **${label}** réinitialisées.`, { timestamp: false })],
-          components: [],
-        }).catch(() => {});
+        await confirmMsg.edit({ ...embed.buildPayload(guildId, `Invitations de **${label}** réinitialisées.`, { timestamp: false , components: [] }) });
       } else {
-        await confirmMsg.edit({
-          embeds: [embed.build(guildId, 'Annulé.', { timestamp: false })],
-          components: [],
-        }).catch(() => {});
+        await confirmMsg.edit({ ...embed.buildPayload(guildId, 'Annulé.', { timestamp: false , components: [] }) });
       }
     } catch {
       await confirmMsg.edit({ components: [] }).catch(() => {});

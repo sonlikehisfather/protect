@@ -54,11 +54,7 @@ module.exports = {
         .setStyle(ButtonStyle.Secondary)
     );
 
-    const confirmMsg = await message.reply({
-      embeds: [embed.build(message.guild.id, `Êtes-vous sûr de vouloir supprimer le salon **${targetChannel.name}** ?`, { timestamp: false })],
-      components: [confirmRow],
-      allowedMentions: { parse: [], repliedUser: false },
-    }).catch(() => null);
+    const confirmMsg = await message.reply({ ...embed.buildPayload(message.guild.id, `Êtes-vous sûr de vouloir supprimer le salon **${targetChannel.name}** ?`, { timestamp: false , components: [confirmRow] }) });
 
     if (!confirmMsg) return;
 

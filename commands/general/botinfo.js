@@ -2,6 +2,18 @@
 
 
 const os = require('os');
+const {
+  ContainerBuilder,
+  TextDisplayBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  MessageFlags,
+} = require('discord.js');
+
+const COMPONENTS_V2_FLAG = MessageFlags?.IsComponentsV2 ?? (1 << 15);
+const V2_AVAILABLE       = typeof ContainerBuilder === 'function' &&
+                           typeof TextDisplayBuilder === 'function';
+
 const db    = require('../../core/database');
 const embed = require('../../utils/embed');
 
@@ -46,85 +58,70 @@ module.exports = {
     const botCount   = guild.members.cache.filter(m => m.user.bot).size;
     const totalCount = guild.memberCount ?? (humanCount + botCount);
 
-    const fields = [
-      {
-        name  : 'Bot',
-        value : `<@${botUser.id}>`,
-        inline: true,
-      },
-      {
-        name  : 'ID',
-        value : botUser.id,
-        inline: true,
-      },
-      {
-        name  : 'Ping',
-        value : `${ping} ms`,
-        inline: true,
-      },
-      {
-        name  : 'Serveur',
-        value : guild.name,
-        inline: true,
-      },
-      {
-        name  : 'Membres',
-        value : `Total : **${formatNumber(totalCount)}**\nHumains : **${formatNumber(humanCount)}**\nBots : **${formatNumber(botCount)}**`,
-        inline: true,
-      },
-      {
-        name  : 'Uptime',
-        value : formatDuration(uptimeSeconds),
-        inline: true,
-      },
-      {
-        name  : 'Node.js',
-        value : process.version,
-        inline: true,
-      },
-      {
-        name  : 'Discord.js',
-        value : getDiscordJsVersion(),
-        inline: true,
-      },
-      {
-        name  : 'Plateforme',
-        value : `${os.platform()} ${os.arch()}`,
-        inline: true,
-      },
-      {
-        name  : 'Mémoire',
-        value : `${formatMemory(process.memoryUsage().rss)} RSS`,
-        inline: true,
-      },
-      {
-        name  : 'Créé le',
-        value : createdAt
-          ? `<t:${createdAt}:F>\n<t:${createdAt}:R>`
-          : 'Inconnu',
-        inline: true,
-      },
+    const lines = [
+      `## ${botUser.username}`,
+      `> <@${botUser.id}> • \`${botUser.id}\``,
+      '',
+      `Serveur › ${guild.name}`,
+      `Membres › Total : **${formatNumber(totalCount)}** • Humains : **${formatNumber(humanCount)}** • Bots : **${formatNumber(botCount)}**`,
+      `Ping › ${ping} ms`,
+      `Uptime › ${formatDuration(uptimeSeconds)}`,
+      '',
+      `Node.js › ${process.version}`,
+      `Discord.js › ${getDiscordJsVersion()}`,
+      `Plateforme › ${os.platform()} ${os.arch()}`,
+      `Mémoire › ${formatMemory(process.memoryUsage().rss)} RSS`,
     ];
 
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          null,
-          {
+    if (createdAt) {
+      lines.push(`Créé le › <t:${createdAt}:F> (<t:${createdAt}:R>)`);
+    }
+
+    const text = lines.join('\n');
+
+    let sent = null;
+
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
+      try {
+        const container = new ContainerBuilder();
+        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
+        sent = await message.channel.send({
+          components      : [container],
+          flags           : COMPONENTS_V2_FLAG,
+          allowedMentions : { parse: [], repliedUser: false },
+        }).catch(() => null);
+      } catch {}
+    }
+
+    if (!sent) {
+      const fields = [
+        { name: 'Bot', value: `<@${botUser.id}>`, inline: true },
+        { name: 'ID', value: botUser.id, inline: true },
+        { name: 'Ping', value: `${ping} ms`, inline: true },
+        { name: 'Serveur', value: guild.name, inline: true },
+        { name: 'Membres', value: `Total : **${formatNumber(totalCount)}**\nHumains : **${formatNumber(humanCount)}**\nBots : **${formatNumber(botCount)}**`, inline: true },
+        { name: 'Uptime', value: formatDuration(uptimeSeconds), inline: true },
+        { name: 'Node.js', value: process.version, inline: true },
+        { name: 'Discord.js', value: getDiscordJsVersion(), inline: true },
+        { name: 'Plateforme', value: `${os.platform()} ${os.arch()}`, inline: true },
+        { name: 'Mémoire', value: `${formatMemory(process.memoryUsage().rss)} RSS`, inline: true },
+        { name: 'Créé le', value: createdAt ? `<t:${createdAt}:F>\n<t:${createdAt}:R>` : 'Inconnu', inline: true },
+      ];
+
+      sent = await message.channel.send({
+        embeds: [
+          embed.build(guildId, null, {
             title      : 'Informations du bot',
             authorName : botUser.username,
             authorIcon : botUser.displayAvatarURL({ dynamic: true, size: 256 }),
             thumbnail  : botUser.displayAvatarURL({ dynamic: true, size: 512 }),
             fields,
             timestamp  : false,
-          }
-        )
-      ],
-      allowedMentions: {
-        repliedUser: false,
-      },
-    }).catch(() => null);
+          })
+        ],
+        allowedMentions: { repliedUser: false },
+      }).catch(() => null);
+    }
 
     if (sent && deleteReply) {
       embed.scheduleDelete(sent, deleteDelay);

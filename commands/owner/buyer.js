@@ -78,16 +78,11 @@ async function _list(message) {
 
   ];
 
-  return message.reply({
-    embeds: [
-      embed.build(message.guild.id, null, {
+  return embed.sendEmbed(message.channel, message.guild.id, null, {
         title    : 'Buyer list',
         fields,
         timestamp: false,
-      }),
-    ],
-    allowedMentions: { repliedUser: false },
-  });
+      });
 
 }
 

@@ -703,20 +703,12 @@ async function _handleUser(message, args, guildId, config, deleteReply, deleteDe
   } catch {
   }
 
-  const sent = await message.channel.send({
-    embeds: [
-      embed.build(
-        guildId,
-        null,
-        {
+  const sent = await embed.sendEmbed(message.channel, guildId, null, {
           title     : `Soutien - ${member.user.globalName ?? member.user.username}`,
           thumbnail : member.user.displayAvatarURL({ size: 128 }),
           fields,
           timestamp : false,
-        }
-      ),
-    ],
-  }).catch(() => null);
+        });
 
   if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
 }

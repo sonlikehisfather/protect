@@ -20,7 +20,11 @@
   },
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js",
+    "dev": ".\\.local-node\\node-v24.18.0-win-x64\\node.exe .\\node_modules\\nodemon\\bin\\nodemon.js index.js",
+    "start:portable": ".\\.local-node\\node-v24.18.0-win-x64\\node.exe index.js",
+    "dev:portable": ".\\.local-node\\node-v24.18.0-win-x64\\node.exe .\\node_modules\\nodemon\\bin\\nodemon.js index.js",
+    "dev:system": "nodemon index.js",
+    "rebuild:native:portable": "set PATH=.\\.local-node\\node-v24.18.0-win-x64;%PATH%&& .\\.local-node\\node-v24.18.0-win-x64\\npm.cmd rebuild better-sqlite3 sharp skia-canvas --foreground-scripts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
@@ -39,5 +43,10 @@
     "@eslint/js": "^10.0.1",
     "eslint": "^10.2.1",
     "nodemon": "^3.0.4"
+  },
+  "allowScripts": {
+    "better-sqlite3@12.8.0": true,
+    "sharp@0.34.5": true,
+    "skia-canvas@3.0.8": true
   }
 }

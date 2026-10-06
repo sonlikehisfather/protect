@@ -341,7 +341,7 @@ exports.run = async (client, message, args) => {
       if (inviteCode) {
         const isOwn = await _isOwnGuildInvite(client, message.guild, inviteCode);
         if (isOwn) {
-          const sent = await message.channel.send({ embeds: [embed.build(guildId, 'Cette invitation appartient déjà au serveur actuel, elle est donc autorisée automatiquement.', { timestamp: false })], allowedMentions: { parse: [] } }).catch(() => null);
+          const sent = await embed.sendEmbed(message.channel, guildId, 'Cette invitation appartient déjà au serveur actuel, elle est donc autorisée automatiquement.');
           if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
           return;
         }
@@ -355,7 +355,7 @@ exports.run = async (client, message, args) => {
 
       list.push(domain);
       db.setAntiraidConfig(guildId, 'antilinkMediaWhitelist', JSON.stringify(list));
-      const sent = await message.channel.send({ embeds: [embed.build(guildId, `\`${domain}\` ajouté à la whitelist média (autorisé dans salons/catégories média).`, { timestamp: false })], allowedMentions: { parse: [] } }).catch(() => null);
+      const sent = await embed.sendEmbed(message.channel, guildId, `\`${domain}\` ajouté à la whitelist média (autorisé dans salons/catégories média).`, { timestamp: false });
       if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
       return;
     }
@@ -374,21 +374,21 @@ exports.run = async (client, message, args) => {
       }
       list.splice(idx, 1);
       db.setAntiraidConfig(guildId, 'antilinkMediaWhitelist', JSON.stringify(list));
-      const sent = await message.channel.send({ embeds: [embed.build(guildId, `\`${domain}\` retiré de la whitelist média.`, { timestamp: false })], allowedMentions: { parse: [] } }).catch(() => null);
+      const sent = await embed.sendEmbed(message.channel, guildId, `\`${domain}\` retiré de la whitelist média.`, { timestamp: false });
       if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
       return;
     }
 
     if (sub === 'list') {
       const display = list.length ? list.map(d => `\`${d}\``).join('\n').slice(0, 1024) : 'Aucun domaine média autorisé.';
-      const sent = await message.channel.send({ embeds: [embed.build(guildId, null, { title: 'Whitelist média antilink', fields: [{ name: `${list.length} domaine(s)`, value: display, inline: false }], timestamp: false })], allowedMentions: { parse: [] } }).catch(() => null);
+      const sent = await embed.sendEmbed(message.channel, guildId, null, { title: 'Whitelist média antilink', fields: [{ name: `${list.length} domaine(s)`, value: display, inline: false }], timestamp: false });
       if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
       return;
     }
 
     if (sub === 'clear') {
       db.setAntiraidConfig(guildId, 'antilinkMediaWhitelist', JSON.stringify([]));
-      const sent = await message.channel.send({ embeds: [embed.build(guildId, 'Whitelist média vidée.', { timestamp: false })], allowedMentions: { parse: [] } }).catch(() => null);
+      const sent = await embed.sendEmbed(message.channel, guildId, 'Whitelist média vidée.', { timestamp: false });
       if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
       return;
     }
@@ -417,7 +417,7 @@ exports.run = async (client, message, args) => {
       }
       list.push(channel.id);
       db.setAntiraidConfig(guildId, 'antilinkAllowedChannels', JSON.stringify(list));
-      const sent = await message.channel.send({ embeds: [embed.build(guildId, `${channel} ajouté aux salons autorisés antilink.`, { timestamp: false })], allowedMentions: { parse: [] } }).catch(() => null);
+      const sent = await embed.sendEmbed(message.channel, guildId, `${channel} ajouté aux salons autorisés antilink.`, { timestamp: false });
       if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
       return;
     }
@@ -437,14 +437,14 @@ exports.run = async (client, message, args) => {
       }
       list.splice(idx, 1);
       db.setAntiraidConfig(guildId, 'antilinkAllowedChannels', JSON.stringify(list));
-      const sent = await message.channel.send({ embeds: [embed.build(guildId, `${channel} retiré des salons autorisés antilink.`, { timestamp: false })], allowedMentions: { parse: [] } }).catch(() => null);
+      const sent = await embed.sendEmbed(message.channel, guildId, `${channel} retiré des salons autorisés antilink.`, { timestamp: false });
       if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
       return;
     }
 
     if (sub === 'list') {
       const display = list.length ? list.map(id => `<#${id}>`).join('\n') : 'Aucun salon autorisé.';
-      const sent = await message.channel.send({ embeds: [embed.build(guildId, null, { title: 'Salons autorisés antilink', fields: [{ name: `${list.length} salon(s)`, value: display.slice(0, 1024), inline: false }], timestamp: false })], allowedMentions: { parse: [] } }).catch(() => null);
+      const sent = await embed.sendEmbed(message.channel, guildId, null, { title: 'Salons autorisés antilink', fields: [{ name: `${list.length} salon(s)`, value: display.slice(0, 1024), inline: false }], timestamp: false });
       if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
       return;
     }
@@ -474,7 +474,7 @@ exports.run = async (client, message, args) => {
       }
       list.push(category.id);
       db.setAntiraidConfig(guildId, 'antilinkAllowedCategories', JSON.stringify(list));
-      const sent = await message.channel.send({ embeds: [embed.build(guildId, `Catégorie \`${category.name}\` ajoutée aux catégories autorisées antilink.`, { timestamp: false })], allowedMentions: { parse: [] } }).catch(() => null);
+      const sent = await embed.sendEmbed(message.channel, guildId, `Catégorie \`${category.name}\` ajoutée aux catégories autorisées antilink.`, { timestamp: false });
       if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
       return;
     }
@@ -489,7 +489,7 @@ exports.run = async (client, message, args) => {
       }
       list.splice(idx, 1);
       db.setAntiraidConfig(guildId, 'antilinkAllowedCategories', JSON.stringify(list));
-      const sent = await message.channel.send({ embeds: [embed.build(guildId, 'Catégorie retirée des catégories autorisées antilink.', { timestamp: false })], allowedMentions: { parse: [] } }).catch(() => null);
+      const sent = await embed.sendEmbed(message.channel, guildId, 'Catégorie retirée des catégories autorisées antilink.', { timestamp: false });
       if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
       return;
     }
@@ -498,7 +498,7 @@ exports.run = async (client, message, args) => {
       const display = list.length
         ? list.map(id => { const c = message.guild.channels.cache.get(id); return c ? `\`${c.name}\` (${id})` : `\`${id}\``; }).join('\n')
         : 'Aucune catégorie autorisée.';
-      const sent = await message.channel.send({ embeds: [embed.build(guildId, null, { title: 'Catégories autorisées antilink', fields: [{ name: `${list.length} catégorie(s)`, value: display.slice(0, 1024), inline: false }], timestamp: false })], allowedMentions: { parse: [] } }).catch(() => null);
+      const sent = await embed.sendEmbed(message.channel, guildId, null, { title: 'Catégories autorisées antilink', fields: [{ name: `${list.length} catégorie(s)`, value: display.slice(0, 1024), inline: false }], timestamp: false });
       if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
       return;
     }
@@ -527,7 +527,7 @@ exports.run = async (client, message, args) => {
       }
       list.push(role.id);
       db.setAntiraidConfig(guildId, 'antilinkImageRoles', JSON.stringify(list));
-      const sent = await message.channel.send({ embeds: [embed.build(guildId, `${role} ajouté aux rôles image/média antilink.`, { timestamp: false })], allowedMentions: { parse: [] } }).catch(() => null);
+      const sent = await embed.sendEmbed(message.channel, guildId, `${role} ajouté aux rôles image/média antilink.`, { timestamp: false });
       if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
       return;
     }
@@ -547,14 +547,14 @@ exports.run = async (client, message, args) => {
       }
       list.splice(idx, 1);
       db.setAntiraidConfig(guildId, 'antilinkImageRoles', JSON.stringify(list));
-      const sent = await message.channel.send({ embeds: [embed.build(guildId, `${role} retiré des rôles image/média antilink.`, { timestamp: false })], allowedMentions: { parse: [] } }).catch(() => null);
+      const sent = await embed.sendEmbed(message.channel, guildId, `${role} retiré des rôles image/média antilink.`, { timestamp: false });
       if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
       return;
     }
 
     if (sub === 'list') {
       const display = list.length ? list.map(id => `<@&${id}>`).join('\n') : 'Aucun rôle image configuré.';
-      const sent = await message.channel.send({ embeds: [embed.build(guildId, null, { title: 'Rôles image/média antilink', fields: [{ name: `${list.length} rôle(s)`, value: display.slice(0, 1024), inline: false }], timestamp: false })], allowedMentions: { parse: [] } }).catch(() => null);
+      const sent = await embed.sendEmbed(message.channel, guildId, null, { title: 'Rôles image/média antilink', fields: [{ name: `${list.length} rôle(s)`, value: display.slice(0, 1024), inline: false }], timestamp: false });
       if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
       return;
     }
@@ -584,7 +584,7 @@ exports.run = async (client, message, args) => {
       }
       list.push(domain);
       db.setAntiraidConfig(guildId, 'antilinkMediaDomains', JSON.stringify(list));
-      const sent = await message.channel.send({ embeds: [embed.build(guildId, `\`${domain}\` ajouté aux domaines médias (rôle image).`, { timestamp: false })], allowedMentions: { parse: [] } }).catch(() => null);
+      const sent = await embed.sendEmbed(message.channel, guildId, `\`${domain}\` ajouté aux domaines médias (rôle image).`, { timestamp: false });
       if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
       return;
     }
@@ -603,14 +603,14 @@ exports.run = async (client, message, args) => {
       }
       list.splice(idx, 1);
       db.setAntiraidConfig(guildId, 'antilinkMediaDomains', JSON.stringify(list));
-      const sent = await message.channel.send({ embeds: [embed.build(guildId, `\`${domain}\` retiré des domaines médias.`, { timestamp: false })], allowedMentions: { parse: [] } }).catch(() => null);
+      const sent = await embed.sendEmbed(message.channel, guildId, `\`${domain}\` retiré des domaines médias.`, { timestamp: false });
       if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
       return;
     }
 
     if (sub === 'list') {
       const display = list.length ? list.map(d => `\`${d}\``).join('\n').slice(0, 1024) : 'Aucun domaine média custom.';
-      const sent = await message.channel.send({ embeds: [embed.build(guildId, null, { title: 'Domaines médias custom (rôle image)', fields: [{ name: `${list.length} domaine(s)`, value: display, inline: false }], timestamp: false })], allowedMentions: { parse: [] } }).catch(() => null);
+      const sent = await embed.sendEmbed(message.channel, guildId, null, { title: 'Domaines médias custom (rôle image)', fields: [{ name: `${list.length} domaine(s)`, value: display, inline: false }], timestamp: false });
       if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
       return;
     }
@@ -647,10 +647,7 @@ exports.run = async (client, message, args) => {
       desc += '\nNote : avec le soft active, la sanction delete ne fait qu\'une suppression finale. Utilisez warn ou mute pour une vraie escalade.';
     }
 
-    const sent = await message.channel.send({
-      embeds: [embed.build(guildId, desc, { timestamp: false })],
-      allowedMentions: { parse: [] },
-    }).catch(() => null);
+    const sent = await embed.sendEmbed(message.channel, guildId, desc, { timestamp: false });
     if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
     return;
   }
@@ -661,14 +658,14 @@ exports.run = async (client, message, args) => {
 
     if (sub === 'on') {
       db.setAntiraidConfig(guildId, 'antilinkSoftEnabled', 1);
-      const sent = await message.channel.send({ embeds: [embed.build(guildId, 'Antilink **soft mode** activé. Les premières infractions donneront un rappel avant sanction.', { timestamp: false })], allowedMentions: { parse: [] } }).catch(() => null);
+      const sent = await embed.sendEmbed(message.channel, guildId, 'Antilink **soft mode** activé. Les premières infractions donneront un rappel avant sanction.', { timestamp: false });
       if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
       return;
     }
 
     if (sub === 'off') {
       db.setAntiraidConfig(guildId, 'antilinkSoftEnabled', 0);
-      const sent = await message.channel.send({ embeds: [embed.build(guildId, 'Antilink **soft mode** désactivé. Toute infraction applique directement la sanction.', { timestamp: false })], allowedMentions: { parse: [] } }).catch(() => null);
+      const sent = await embed.sendEmbed(message.channel, guildId, 'Antilink **soft mode** désactivé. Toute infraction applique directement la sanction.', { timestamp: false });
       if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
       return;
     }
@@ -681,7 +678,7 @@ exports.run = async (client, message, args) => {
         return;
       }
       db.setAntiraidConfig(guildId, 'antilinkSoftThreshold', val);
-      const sent = await message.channel.send({ embeds: [embed.build(guildId, `Seuil soft antilink : **${val}** infraction(s) avant sanction.`, { timestamp: false })], allowedMentions: { parse: [] } }).catch(() => null);
+      const sent = await embed.sendEmbed(message.channel, guildId, `Seuil soft antilink : **${val}** infraction(s) avant sanction.`, { timestamp: false });
       if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
       return;
     }
@@ -694,7 +691,7 @@ exports.run = async (client, message, args) => {
         return;
       }
       db.setAntiraidConfig(guildId, 'antilinkSoftWindow', val);
-      const sent = await message.channel.send({ embeds: [embed.build(guildId, `Fenêtre soft antilink : **${val}** secondes.`, { timestamp: false })], allowedMentions: { parse: [] } }).catch(() => null);
+      const sent = await embed.sendEmbed(message.channel, guildId, `Fenêtre soft antilink : **${val}** secondes.`, { timestamp: false });
       if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
       return;
     }
@@ -709,10 +706,7 @@ exports.run = async (client, message, args) => {
       desc += '\n\nNote : avec le soft activé, la sanction delete ne fait qu\'une suppression finale. Utilise warn ou timeout pour une vraie escalade.';
     }
     desc += '\n\n\`antilink soft on/off\` - \`antilink soft threshold <n>\` - \`antilink soft window <s>\`';
-    const sent = await message.channel.send({
-      embeds: [embed.build(guildId, desc, { timestamp: false })],
-      allowedMentions: { parse: [] },
-    }).catch(() => null);
+    const sent = await embed.sendEmbed(message.channel, guildId, desc, { timestamp: false });
     if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
     return;
   }

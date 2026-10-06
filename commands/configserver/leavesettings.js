@@ -866,27 +866,17 @@ async function _refresh(panel, guildId, state, member) {
 }
 
 async function _ephemeral(interaction, guildId, content) {
-  return interaction.reply({
-    embeds: [
-      embed.build(guildId, content, {
+  return interaction.reply({ ...embed.buildPayload(guildId, content, {
         color    : '#ED4245',
         timestamp: false,
-      }),
-    ],
-    flags: 64,
-  }).catch(() => {});
+      }) });
 }
 
 async function _modalError(submit, guildId, content) {
-  return submit.reply({
-    embeds: [
-      embed.build(guildId, content, {
+  return submit.reply({ ...embed.buildPayload(guildId, content, {
         color    : '#ED4245',
         timestamp: false,
-      }),
-    ],
-    flags: 64,
-  }).catch(() => {});
+      }) });
 }
 
 async function _sendError(message, content, deleteReply, deleteDelay) {
@@ -1352,16 +1342,10 @@ async function _optLeavePreview(message, guildId, i, state) {
     'Note : la vraie notification n\'est envoyée que lors d\'un vrai départ. ' +
     '`{MemberMention}` ne ping pas dans cet aperçu.';
 
-  await i.reply({
-    embeds: [
-      embed.build(guildId, text, {
+  await embed.sendEmbed(i.channel, guildId, text, {
         title     : 'Prévisualisation leave',
         timestamp : false,
-      }),
-    ],
-    flags           : 64,
-    allowedMentions : { parse: [] },
-  }).catch(() => {});
+      });
 
 
   void state;

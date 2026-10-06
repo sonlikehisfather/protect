@@ -263,7 +263,7 @@ exports.run = async (client, message, args) => {
           `Solde : **${embed.fmtCoins(finalCoins)}** coins`,
         ],
       });
-      if (V2_AVAILABLE) {
+      if (embed.shouldUseV2(guildId, module.exports.help.name)) {
         const c = new ContainerBuilder();
         c.addTextDisplayComponents(new TextDisplayBuilder().setContent(
           `## ◉ Roulette Russe\n\n> Mise : **${embed.fmtCoins(amount)}** coins ・ **Expiré**\n> Remboursement : **${embed.fmtCoins(amount)}** coins\n> Solde : **${embed.fmtCoins(finalCoins)}** coins`

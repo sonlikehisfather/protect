@@ -130,7 +130,7 @@ module.exports = {
     const name1   = m1.displayName;
     const name2   = m2.displayName;
 
-    if (!V2_AVAILABLE) {
+    if (!embed.shouldUseV2(guildId, module.exports.help.name)) {
       const s = await embed.reply(message, null, {
         title     : '💘 Love Calculator',
         timestamp : false,

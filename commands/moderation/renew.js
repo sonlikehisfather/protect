@@ -132,16 +132,7 @@ module.exports = {
       .catch(() => null);
 
     if (!deleted) {
-      const sent = await created.send({
-        embeds: [
-          embed.build(
-            guildId,
-            "Le nouveau salon a été créé, mais l'ancien salon n'a pas pu être supprimé.",
-            { timestamp: false }
-          )
-        ],
-        allowedMentions: { repliedUser: false },
-      }).catch(() => null);
+      const sent = await embed.sendEmbed(created, guildId, "Le nouveau salon a été créé, mais l'ancien salon n'a pas pu être supprimé.", { allowedMentions: { repliedUser: false } });
 
       if (sent && deleteReply) {
         embed.scheduleDelete(sent, deleteDelay);
@@ -153,16 +144,7 @@ module.exports = {
     const renewDeleteEnabled = Boolean(config?.autoDeleteRenewReply);
     const renewDeleteDelay   = config?.autoDeleteRenewDelay ?? deleteDelay;
 
-    const sent = await created.send({
-      embeds: [
-        embed.build(
-          guildId,
-          `Le salon a été recréé par <@${message.author.id}>.`,
-          { timestamp: false }
-        )
-      ],
-      allowedMentions: { repliedUser: false },
-    }).catch(() => null);
+    const sent = await embed.sendEmbed(created, guildId, `Le salon a été recréé par <@${message.author.id}>.`, { timestamp: false , allowedMentions: { repliedUser: false } });
 
     if (sent && renewDeleteEnabled) {
       embed.scheduleDelete(sent, renewDeleteDelay);

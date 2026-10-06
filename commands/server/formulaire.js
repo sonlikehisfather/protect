@@ -106,20 +106,10 @@ module.exports = {
         .setStyle(ButtonStyle.Primary)
     );
 
-    const sentForm = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          'Cliquez sur le bouton ci-dessous pour répondre au formulaire.',
-          {
+    const sentForm = await message.channel.send({ ...embed.buildPayload(guildId, 'Cliquez sur le bouton ci-dessous pour répondre au formulaire.', {
             title     : 'Formulaire',
             timestamp : false,
-          }
-        ),
-      ],
-      components: [row],
-      allowedMentions: { repliedUser: false },
-    }).catch(() => null);
+          components: [row] }) });
 
     if (!sentForm) {
       const sent = await embed.replyError(

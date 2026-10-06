@@ -59,12 +59,7 @@ module.exports = {
         modeLabel = `**Rôle mute** : <@&${muteRole.id}>\n*Vérifiez les permissions du rôle sur tous les salons avec \`+muteconfig setup\` si besoin.*`;
       }
 
-      const sent = await message.channel.send({
-        embeds: [
-          embed.build(
-            guildId,
-            null,
-            {
+      const sent = await embed.sendEmbed(message.channel, guildId, null, {
               title  : 'Configuration du mute',
               fields : [
                 {
@@ -84,11 +79,7 @@ module.exports = {
                 },
               ],
               timestamp: false,
-            }
-          ),
-        ],
-        allowedMentions: { repliedUser: false },
-      }).catch(() => null);
+            });
 
       if (sent && deleteReply) {
         embed.scheduleDelete(sent, deleteDelay);
@@ -248,16 +239,7 @@ module.exports = {
         ? 'Setup rôle mute partiel.\nLe rôle mute a été conservé, mais certains salons n\'ont pas pu être configurés.'
         : 'Setup terminé. Le rôle mute est correctement appliqué sur tous les salons.';
 
-      const sent = await message.channel.send({
-        embeds: [
-          embed.build(
-            guildId,
-            description,
-            { fields, timestamp: false }
-          ),
-        ],
-        allowedMentions: { parse: [], repliedUser: false },
-      }).catch(() => null);
+      const sent = await embed.sendEmbed(message.channel, guildId, description, { fields, timestamp: false });
 
       if (sent && deleteReply) {
         embed.scheduleDelete(sent, deleteDelay);
@@ -556,20 +538,10 @@ async function _confirmMuteSetup(message, guildId, opts = {}) {
     '• Désactiver le mode timeout natif\n\n' +
     'Cette action peut prendre quelques secondes et modifie de nombreux salons.';
 
-  const confirmMessage = await message.channel.send({
-    embeds: [
-      embed.build(
-        guildId,
-        description,
-        {
+  const confirmMessage = await message.channel.send({ ...embed.buildPayload(guildId, description, {
           title    : 'Confirmer muteconfig setup',
           timestamp: false,
-        }
-      ),
-    ],
-    components      : [_buildMuteSetupConfirmRow(false)],
-    allowedMentions : { parse: [] },
-  }).catch(() => null);
+          components: [_buildMuteSetupConfirmRow(false)] }) });
 
   if (!confirmMessage) return false;
 
@@ -589,15 +561,10 @@ async function _confirmMuteSetup(message, guildId, opts = {}) {
     collector.on('collect', async interaction => {
       if (interaction.customId === 'local:muteconfig:cancel') {
         result = false;
-        await interaction.update({
-          embeds: [
-            embed.build(message.guild.id, 'Action annulée. Aucun rôle n\'a été créé.', {
+        await interaction.update({ ...embed.buildPayload(message.guild.id, 'Action annulée. Aucun rôle n\'a été créé.', {
               title    : 'Setup annulé',
               timestamp: false,
-            }),
-          ],
-          components: [_buildMuteSetupConfirmRow(true)],
-        }).catch(() => {});
+          components: [_buildMuteSetupConfirmRow(true)] }) });
         collector.stop('cancelled');
         return;
       }

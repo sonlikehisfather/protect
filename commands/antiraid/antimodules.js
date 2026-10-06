@@ -31,15 +31,10 @@ async function _deleteCommand(message, options) {
 }
 
 async function _send(message, guildId, content, options = {}, deleteOptions = null) {
-  const sent = await message.channel.send({
-    embeds: [
-      embed.build(guildId, content, {
+  const sent = await embed.sendEmbed(message.channel, guildId, content, {
         timestamp : false,
         ...options,
-      })
-    ],
-    allowedMentions: { repliedUser: false },
-  }).catch(() => null);
+          allowedMentions: { repliedUser: false } });
 
   if (sent && deleteOptions?.deleteReply) {
     embed.scheduleDelete(sent, deleteOptions.deleteDelay);

@@ -343,7 +343,7 @@ async function _handleSettings(client, message, guildId) {
     embed.clearPrivateInteraction(panel);
     if (reason === 'closed') return;
 
-    if (V2_AVAILABLE) {
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
       try {
         const ro = _buildReadOnlyV2(guildId, state);
         await panel.edit(ro).catch(() => {});
@@ -391,7 +391,7 @@ function _stateFromConfig(cfg) {
 
 function _buildPanelPayload(guildId, state) {
   if (state.view === 'tpl') {
-    if (V2_AVAILABLE) {
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
       try {
         const payload = _buildTplV2(guildId, state);
         if (payload) return payload;
@@ -400,7 +400,7 @@ function _buildPanelPayload(guildId, state) {
     return _buildTplLegacy(guildId, state);
   }
 
-  if (V2_AVAILABLE) {
+  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
     try {
       const payload = _buildV2(guildId, state);
       if (payload) return payload;
@@ -411,7 +411,7 @@ function _buildPanelPayload(guildId, state) {
 
 function _buildV2(guildId, state) {
   const accent    = _hexToInt(state.baseColor);
-  const container = new ContainerBuilder().setAccentColor(accent);
+  const container = new ContainerBuilder();
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent('## Configuration des MPs automatiques'),
@@ -487,7 +487,7 @@ function _buildV2(guildId, state) {
 
 function _buildTplV2(guildId, state) {
   const accent    = _hexToInt(state.baseColor);
-  const container = new ContainerBuilder().setAccentColor(accent);
+  const container = new ContainerBuilder();
 
   const tplType  = state.tplType in TPL_KEYS ? state.tplType : 'global';
   const current  = state.templates?.[tplType];
@@ -646,7 +646,7 @@ function _buildTplLegacy(guildId, state) {
 
 function _buildReadOnlyV2(guildId, state) {
   const accent    = _hexToInt(state.baseColor);
-  const container = new ContainerBuilder().setAccentColor(accent);
+  const container = new ContainerBuilder();
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent('## Configuration des MPs automatiques'),

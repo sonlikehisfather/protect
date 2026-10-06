@@ -84,12 +84,7 @@ module.exports = {
       return;
     }
 
-    const loadingMessage = await message.channel.send({
-      embeds: [
-        _buildLoadingEmbed(guildId, content, 0),
-      ],
-      allowedMentions: { parse: [] },
-    }).catch(() => null);
+    const loadingMessage = await embed.sendEmbed(message.channel, guildId, _buildLoadingText(content, 0), { title: 'Chargement en cours', timestamp: false, allowedMentions: { parse: [] } }).catch(() => null);
 
     if (!loadingMessage) return;
 
@@ -106,37 +101,23 @@ module.exports = {
       if (currentStep >= steps) {
         clearInterval(interval);
 
-        await loadingMessage.edit({
-          embeds: [
-            _buildLoadingEmbed(guildId, content, 100, true),
-          ],
-          allowedMentions: { parse: [] },
-        }).catch(() => {});
+        await embed.editEmbed(loadingMessage, guildId, _buildLoadingText(content, 100, true), { title: 'Chargement terminé', timestamp: false, allowedMentions: { parse: [] } }).catch(() => {});
 
         return;
       }
 
-      await loadingMessage.edit({
-        embeds: [
-          _buildLoadingEmbed(guildId, content, percent),
-        ],
-        allowedMentions: { parse: [] },
-      }).catch(() => {});
+      await embed.editEmbed(loadingMessage, guildId, _buildLoadingText(content, percent), { title: 'Chargement en cours', timestamp: false, allowedMentions: { parse: [] } }).catch(() => {});
     }, intervalDelay);
   },
 };
 
-function _buildLoadingEmbed(guildId, content, percent, done = false) {
+function _buildLoadingText(content, percent, done = false) {
   let status = 'Initialisation...';
 
   if (percent >= 25) status = 'Traitement en cours...';
   if (percent >= 50) status = 'Progression avancée...';
   if (percent >= 75) status = 'Finalisation...';
   if (done)          status = 'Chargement terminé.';
-
-  const title = done
-    ? 'Chargement terminé'
-    : 'Chargement en cours';
 
   const text =
     `**Action**\n` +
@@ -146,5 +127,5 @@ function _buildLoadingEmbed(guildId, content, percent, done = false) {
     `**Statut**\n` +
     `${status}`;
 
-  return embed.build(guildId, text, { title, timestamp: false });
+  return text;
 }

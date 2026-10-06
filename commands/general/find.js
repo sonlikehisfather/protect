@@ -1,5 +1,15 @@
 'use strict';
 
+const {
+  ContainerBuilder,
+  TextDisplayBuilder,
+  MessageFlags,
+} = require('discord.js');
+
+const COMPONENTS_V2_FLAG = MessageFlags?.IsComponentsV2 ?? (1 << 15);
+const V2_AVAILABLE       = typeof ContainerBuilder === 'function' &&
+                           typeof TextDisplayBuilder === 'function';
+
 const db    = require('../../core/database');
 const embed = require('../../utils/embed');
 
@@ -74,30 +84,63 @@ module.exports = {
       if (flags.length) voiceDetail = flags.join(' • ');
     }
 
-    const fields = [
-      { name: 'Membre',  value: `<@${member.id}>`,           inline: true },
-      { name: 'Vocal',   value: voiceStatus,                  inline: true },
+    const lines = [
+      `## Localisation membre`,
+      `> <@${member.id}>`,
+      '',
+      `Vocal \u203a ${voiceStatus}`,
     ];
 
     if (voiceDetail) {
-      fields.push({ name: 'État', value: voiceDetail, inline: true });
+      lines.push(`\u00c9tat \u203a ${voiceDetail}`);
     }
 
     if (vc) {
-      fields.push({ name: 'Participants', value: `${vc.members.size}`, inline: true });
+      lines.push(`Participants \u203a ${vc.members.size}`);
     }
 
-    const sent = await message.reply({
-      embeds: [
-        embed.build(guildId, null, {
-          title     : 'Localisation membre',
-          fields,
-          thumbnail : member.user.displayAvatarURL({ dynamic: true }),
-          timestamp : false,
-        }),
-      ],
-      allowedMentions: { parse: [] },
-    }).catch(() => null);
+    const text = lines.join('\n');
+
+    let sent = null;
+
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
+      try {
+        const container = new ContainerBuilder();
+        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
+        sent = await message.reply({
+          components      : [container],
+          flags           : COMPONENTS_V2_FLAG,
+          allowedMentions : { parse: [] },
+        }).catch(() => null);
+      } catch {}
+    }
+
+    if (!sent) {
+      const fields = [
+        { name: 'Membre',  value: `<@${member.id}>`,           inline: true },
+        { name: 'Vocal',   value: voiceStatus,                  inline: true },
+      ];
+
+      if (voiceDetail) {
+        fields.push({ name: '\u00c9tat', value: voiceDetail, inline: true });
+      }
+
+      if (vc) {
+        fields.push({ name: 'Participants', value: `${vc.members.size}`, inline: true });
+      }
+
+      sent = await message.reply({
+        embeds: [
+          embed.build(guildId, null, {
+            title     : 'Localisation membre',
+            fields,
+            thumbnail : member.user.displayAvatarURL({ dynamic: true }),
+            timestamp : false,
+          }),
+        ],
+        allowedMentions: { parse: [] },
+      }).catch(() => null);
+    }
 
     if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
   },

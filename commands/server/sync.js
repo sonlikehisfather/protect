@@ -123,19 +123,10 @@ async function _syncChannel(channel, message, guildId, deleteReply, deleteDelay)
     return;
   }
 
-  const sent = await message.channel.send({
-    embeds: [
-      embed.build(
-        guildId,
-        `**Salon synchronisé**\n${channel}\n\n**Catégorie**\n${channel.parent}`,
-        {
+  const sent = await embed.sendEmbed(message.channel, guildId, `**Salon synchronisé**\n${channel}\n\n**Catégorie**\n${channel.parent}`, {
           title     : 'Synchronisation terminée',
           timestamp : false,
-        }
-      ),
-    ],
-    allowedMentions: { repliedUser: false },
-  }).catch(() => null);
+          allowedMentions: { repliedUser: false } });
 
   if (sent && deleteReply) {
     embed.scheduleDelete(sent, deleteDelay);
@@ -180,19 +171,10 @@ async function _syncCategory(category, message, guildId, deleteReply, deleteDela
     `**Échecs**\n` +
     `\`${failed}\``;
 
-  const sent = await message.channel.send({
-    embeds: [
-      embed.build(
-        guildId,
-        text,
-        {
+  const sent = await embed.sendEmbed(message.channel, guildId, text, {
           title     : 'Synchronisation terminée',
           timestamp : false,
-        }
-      ),
-    ],
-    allowedMentions: { repliedUser: false },
-  }).catch(() => null);
+          allowedMentions: { repliedUser: false } });
 
   if (sent && deleteReply) {
     embed.scheduleDelete(sent, deleteDelay);
@@ -216,19 +198,10 @@ async function _syncAll(guild, message, guildId, deleteReply, deleteDelay) {
     return;
   }
 
-  const pending = await message.channel.send({
-    embeds: [
-      embed.build(
-        guildId,
-        `Synchronisation en cours sur \`${channels.size}\` salon(s).`,
-        {
+  const pending = await embed.sendEmbed(message.channel, guildId, `Synchronisation en cours sur \`${channels.size}\` salon(s).`, {
           title     : 'Synchronisation en cours',
           timestamp : false,
-        }
-      ),
-    ],
-    allowedMentions: { repliedUser: false },
-  }).catch(() => null);
+          allowedMentions: { repliedUser: false } });
 
   let success = 0;
   let failed  = 0;
@@ -274,19 +247,10 @@ async function _syncAll(guild, message, guildId, deleteReply, deleteDelay) {
     return;
   }
 
-  const sent = await message.channel.send({
-    embeds: [
-      embed.build(
-        guildId,
-        text,
-        {
+  const sent = await embed.sendEmbed(message.channel, guildId, text, {
           title     : 'Synchronisation terminée',
           timestamp : false,
-        }
-      ),
-    ],
-    allowedMentions: { repliedUser: false },
-  }).catch(() => null);
+          allowedMentions: { repliedUser: false } });
 
   if (sent && deleteReply) {
     embed.scheduleDelete(sent, deleteDelay);

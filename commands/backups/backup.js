@@ -489,7 +489,7 @@ function _buildPanelPayload(guildId, state, disabled = false) {
   }
 
   if (V2_OK) {
-    const c = new ContainerBuilder().setAccentColor(accent);
+    const c = new ContainerBuilder();
     c.addTextDisplayComponents(new TextDisplayBuilder().setContent(bodyLines.join('\n')));
     if (rows.length) {
       c.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));

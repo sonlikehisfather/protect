@@ -149,7 +149,7 @@ exports.run = async (client, message, args) => {
       slotsLine += `${bold}×${m}${bold} `;
     }
 
-    if (V2_AVAILABLE) {
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
       const container = new ContainerBuilder();
       container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
         `## ◉ Plinko\n\n> Mise : **${embed.fmtCoins(amount)}** coins ・ Risque : **${RISK_LABELS[currentRisk]}**\n\nChoisis ton niveau de risque puis lance la balle !`
@@ -187,7 +187,7 @@ exports.run = async (client, message, args) => {
     const grid = buildGrid(path, currentRow, finalSlot, mults);
     const header = `## ◉ Plinko\n\n> Mise : **${embed.fmtCoins(amount)}** coins ・ Risque : **${RISK_LABELS[risk]}**\n`;
 
-    if (V2_AVAILABLE) {
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
       const container = new ContainerBuilder();
       container.addTextDisplayComponents(new TextDisplayBuilder().setContent(header + '\n' + grid));
       return { components: [container], flags: COMPONENTS_V2_FLAG, allowedMentions: { parse: [] } };
@@ -233,7 +233,7 @@ exports.run = async (client, message, args) => {
         riskLabel: RISK_LABELS[risk],
       });
       const attachment = new AttachmentBuilder(buffer, { name: 'plinko.png' });
-      if (V2_AVAILABLE) {
+      if (embed.shouldUseV2(guildId, module.exports.help.name)) {
         const container = new ContainerBuilder();
         container.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL('attachment://plinko.png')));
         return { components: [container], flags: COMPONENTS_V2_FLAG, files: [attachment], allowedMentions: { parse: [] } };
@@ -248,7 +248,7 @@ exports.run = async (client, message, args) => {
       else if (netGain === 0) resultLine = `> = **Egalite.** ×${finalMult} → **${embed.fmtCoins(winAmount)}** coins`;
       else resultLine = `> ‼ **Perdu.** ×${finalMult} → **-${embed.fmtCoins(Math.abs(netGain))}** coins`;
       const header = `## ◉ Plinko\n\n> Mise : **${embed.fmtCoins(amount)}** coins ・ Risque : **${RISK_LABELS[risk]}**\n`;
-      if (V2_AVAILABLE) {
+      if (embed.shouldUseV2(guildId, module.exports.help.name)) {
         const container = new ContainerBuilder();
         container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
           header + '\n' + grid + '\n\n### Resultat\n' + slotDisplay + '\n\n' + resultLine + '\n> Solde : **' + embed.fmtCoins(finalCoins) + '** coins'
@@ -328,7 +328,7 @@ exports.run = async (client, message, args) => {
           `Solde : **${embed.fmtCoins(finalCoins)}** coins`,
         ],
       });
-      if (V2_AVAILABLE) {
+      if (embed.shouldUseV2(guildId, module.exports.help.name)) {
         const c = new ContainerBuilder();
         c.addTextDisplayComponents(new TextDisplayBuilder().setContent(
           `## ◉ Plinko\n\n> Mise : **${embed.fmtCoins(amount)}** coins ・ **Expiré**\n> Remboursement : **${embed.fmtCoins(amount)}** coins\n> Solde : **${embed.fmtCoins(finalCoins)}** coins`

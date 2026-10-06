@@ -47,17 +47,18 @@ module.exports = {
     if (deleteCmd) await message.delete().catch(() => {});
 
     const templates = db.listEmbeds(guildId);
+    const _w = (p) => embed.wrapPayload(guildId, p, 'myembeds');
 
     if (!templates.length) {
       const container = new ContainerBuilder()
         .addTextDisplayComponents(new TextDisplayBuilder().setContent(
           `## Mes templates\n\nAucun template sauvegardé.\nUtilise \`${config?.prefix || '+'}embed capture\` pour en créer un.`
         ));
-      const sent = await message.channel.send({
+      const sent = await message.channel.send(_w({
         components      : [container],
         flags           : COMPONENTS_V2_FLAG,
         allowedMentions : { parse: [] },
-      }).catch(() => null);
+      })).catch(() => null);
       if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
       return;
     }
@@ -127,8 +128,8 @@ module.exports = {
       const navRow = new ActionRowBuilder();
       if (pages > 1) {
         navRow.addComponents(
-          new ButtonBuilder().setCustomId('mye:prev').setLabel('◀').setStyle(ButtonStyle.Secondary).setDisabled(page === 0),
-          new ButtonBuilder().setCustomId('mye:next').setLabel('▶').setStyle(ButtonStyle.Secondary).setDisabled(page >= pages - 1),
+          new ButtonBuilder().setCustomId('mye:prev').setLabel('←').setStyle(ButtonStyle.Secondary).setDisabled(page === 0),
+          new ButtonBuilder().setCustomId('mye:next').setLabel('→').setStyle(ButtonStyle.Secondary).setDisabled(page >= pages - 1),
         );
       }
       navRow.addComponents(new ButtonBuilder().setCustomId('mye:close').setLabel('✖').setStyle(ButtonStyle.Danger));
@@ -141,7 +142,7 @@ module.exports = {
       };
     };
 
-    const panel = await message.channel.send(_buildPanel()).catch(() => null);
+    const panel = await message.channel.send(_w(_buildPanel())).catch(() => null);
     if (!panel) return;
 
     embed.registerPrivateInteraction(panel, message.author.id, TIMEOUT);
@@ -171,7 +172,7 @@ module.exports = {
         page = Math.max(0, page - 1);
         selectedName = null;
         await i.deferUpdate().catch(() => {});
-        await panel.edit(_buildPanel()).catch(() => {});
+        await panel.edit(_w(_buildPanel())).catch(() => {});
         return;
       }
 
@@ -179,21 +180,21 @@ module.exports = {
         page = Math.min(pages - 1, page + 1);
         selectedName = null;
         await i.deferUpdate().catch(() => {});
-        await panel.edit(_buildPanel()).catch(() => {});
+        await panel.edit(_w(_buildPanel())).catch(() => {});
         return;
       }
 
       if (id === 'mye:back') {
         selectedName = null;
         await i.deferUpdate().catch(() => {});
-        await panel.edit(_buildPanel()).catch(() => {});
+        await panel.edit(_w(_buildPanel())).catch(() => {});
         return;
       }
 
       if (id === 'mye:select') {
         selectedName = i.values[0];
         await i.deferUpdate().catch(() => {});
-        await panel.edit(_buildPanel()).catch(() => {});
+        await panel.edit(_w(_buildPanel())).catch(() => {});
         return;
       }
 
@@ -279,11 +280,11 @@ module.exports = {
           );
 
         await i.deferUpdate().catch(() => {});
-        await panel.edit({
+        await panel.edit(_w({
           components      : [confirmContainer],
           flags           : COMPONENTS_V2_FLAG,
           allowedMentions : { parse: [] },
-        }).catch(() => {});
+        })).catch(() => {});
 
         const confirmCollector = panel.createMessageComponentCollector({
           filter: x => x.user.id === message.author.id && (x.customId === 'mye:delyes' || x.customId === 'mye:delno'),
@@ -304,27 +305,27 @@ module.exports = {
                 .addTextDisplayComponents(new TextDisplayBuilder().setContent(
                   `## Mes templates\n\nTous les templates ont été supprimés.\nUtilise \`${config?.prefix || '+'}embed capture\` pour en créer un.`
                 ));
-              await panel.edit({
+              await panel.edit(_w({
                 components      : [emptyContainer],
                 flags           : COMPONENTS_V2_FLAG,
                 allowedMentions : { parse: [] },
-              }).catch(() => {});
+              })).catch(() => {});
               if (deleteReply) embed.scheduleDelete(panel, deleteDelay);
               return;
             }
             const newPages = Math.ceil(templates.length / PAGE_SIZE);
             if (page >= newPages) page = Math.max(0, newPages - 1);
             await x.deferUpdate().catch(() => {});
-            await panel.edit(_buildPanel()).catch(() => {});
+            await panel.edit(_w(_buildPanel())).catch(() => {});
           } else {
             await x.deferUpdate().catch(() => {});
-            await panel.edit(_buildPanel()).catch(() => {});
+            await panel.edit(_w(_buildPanel())).catch(() => {});
           }
         });
 
         confirmCollector.on('end', (_, reason) => {
           if (reason === 'time') {
-            panel.edit(_buildPanel()).catch(() => {});
+            panel.edit(_w(_buildPanel())).catch(() => {});
           }
         });
         return;
@@ -336,7 +337,7 @@ module.exports = {
     collector.on('end', (_, reason) => {
       embed.clearPrivateInteraction(panel);
       if (reason === 'closed' || reason === 'deleted_all') return;
-      panel.edit({ ..._buildPanel(), embeds: [] }).catch(() => {});
+      panel.edit({ ..._w(_buildPanel()), embeds: [] }).catch(() => {});
     });
   },
 };

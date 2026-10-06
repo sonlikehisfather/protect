@@ -120,16 +120,7 @@ module.exports = {
     if (!bans.size) {
 
       const sent =
-        await message.channel.send({
-          embeds: [
-            embed.build(
-              guildId,
-              'Aucun membre banni.',
-              { timestamp: false }
-            )
-          ],
-          allowedMentions: { parse: [] },
-        });
+        await embed.sendEmbed(message.channel, guildId, 'Aucun membre banni.', { timestamp: false , allowedMentions: { parse: [] } });
 
       if (sent && deleteReply)
         embed.scheduleDelete(
@@ -280,16 +271,7 @@ async function _runUnbanAll(client, message, guild, guildId, bans, deleteReply, 
     `\`${failedCount}\``;
 
   const sent =
-    await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          text,
-          { timestamp: false }
-        )
-      ],
-      allowedMentions: { parse: [] },
-    }).catch(() => null);
+    await embed.sendEmbed(message.channel, guildId, text, { timestamp: false , allowedMentions: { parse: [] } });
 
   if (sent && deleteReply)
     embed.scheduleDelete(

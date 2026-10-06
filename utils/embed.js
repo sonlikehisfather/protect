@@ -383,7 +383,9 @@ function log(guildId, title, fields = [], extra = {}) {
 async function reply(message, description, options = {}) {
   const { allowedMentions: customAllowed, ...buildOpts } = options;
 
-  if (_V2_AVAILABLE) {
+  const guildId = message.guild?.id;
+  const cmdName = message.commandName || null;
+  if (shouldUseV2(guildId, cmdName)) {
     const container = new ContainerBuilder();
     const parts = [];
     if (buildOpts.title) parts.push(`### ${buildOpts.title}`);
@@ -415,8 +417,10 @@ async function reply(message, description, options = {}) {
 async function replyError(message, description, options = {}) {
   const { allowedMentions: customAllowed, ...buildOpts } = options;
 
-  if (_V2_AVAILABLE) {
-    const container = new ContainerBuilder().setAccentColor(0xED4245);
+  const guildId = message.guild?.id;
+  const cmdName = message.commandName || null;
+  if (shouldUseV2(guildId, cmdName)) {
+    const container = new ContainerBuilder();
     const parts = [];
     if (buildOpts.title) parts.push(`### ${buildOpts.title}`);
     if (description) parts.push(String(description));
@@ -466,6 +470,238 @@ async function send(channel, embedBuilt) {
 }
 
 
+function buildV2Container(guildId, description = '', options = {}) {
+  const container = new ContainerBuilder();
+  const parts = [];
+
+  if (options.title) parts.push('### ' + options.title);
+  if (description) parts.push(String(description));
+  if (!parts.length) parts.push('');
+
+  if (options.fields?.length) {
+    for (const f of options.fields) {
+      parts.push('', '**' + f.name + '**', String(f.value));
+    }
+  }
+
+  if (options.footer) {
+    const footerText = typeof options.footer === 'string' ? options.footer : (options.footer?.text ?? '');
+    if (footerText) parts.push('', '-# ' + footerText);
+  }
+
+  if (options.timestamp !== false) {
+    parts.push('-# <t:' + Math.floor(Date.now() / 1000) + ':R>');
+  }
+
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(parts.join('\n').slice(0, 4000)));
+  return container;
+}
+
+
+function _embedBuilderToContainer(embedBuilder) {
+  const data = embedBuilder?.data || embedBuilder || {};
+  const container = new ContainerBuilder();
+  const parts = [];
+
+  if (data.title) parts.push('### ' + String(data.title));
+  if (data.description) parts.push(String(data.description));
+  if (data.author?.name) parts.push('> ' + String(data.author.name));
+  if (Array.isArray(data.fields)) {
+    for (const f of data.fields) {
+      parts.push('', '**' + String(f.name || '') + '**', String(f.value || ''));
+    }
+  }
+  if (data.footer?.text) parts.push('', '-# ' + String(data.footer.text));
+  if (data.timestamp) parts.push('-# <t:' + Math.floor(Date.now() / 1000) + ':R>');
+
+  if (parts.length) {
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(parts.join('\n').slice(0, 4000)));
+  }
+
+  const mediaItems = [];
+  if (data.thumbnail?.url) mediaItems.push({ url: data.thumbnail.url });
+  if (data.image?.url) mediaItems.push({ url: data.image.url });
+  if (mediaItems.length) {
+    const { MediaGalleryBuilder, MediaGalleryItemBuilder } = require('discord.js');
+    const gallery = new MediaGalleryBuilder();
+    for (const item of mediaItems) {
+      gallery.addItems(new MediaGalleryItemBuilder().setURL(item.url));
+    }
+    container.addMediaGalleryComponents(gallery);
+  }
+
+  if (data.color) {
+    try { container.setAccentColor(data.color); } catch {}
+  }
+
+  return container;
+}
+
+
+function embedToPayload(guildId, embedBuilder, options = {}) {
+  const { allowedMentions: customAllowed, components, ...rest } = options;
+  const cmdName = options._cmdName || null;
+
+  if (shouldUseV2(guildId, cmdName)) {
+    try {
+      const container = _embedBuilderToContainer(embedBuilder);
+      const payload = {
+        components : components ? [container, ...components] : [container],
+        flags      : _V2_FLAG,
+        allowedMentions: customAllowed ?? { parse: [] },
+      };
+      return payload;
+    } catch {}
+  }
+
+  const payload = {
+    embeds: [embedBuilder],
+    allowedMentions: customAllowed ?? { parse: [] },
+  };
+  if (components) payload.components = components;
+  return payload;
+}
+
+
+function v2PayloadToV1(payload) {
+  if (!payload?.components?.length) return payload;
+
+  const container = payload.components[0];
+  let data;
+  try { data = container.toJSON ? container.toJSON() : container; } catch { return payload; }
+
+  const { ActionRowBuilder } = require('discord.js');
+
+  const textParts = [];
+  const actionRows = [];
+
+  if (data.components) {
+    for (const comp of data.components) {
+      const t = comp.type;
+      if (t === 10 || t === 'TEXT_DISPLAY') {
+        textParts.push(comp.content || '');
+      } else if (t === 1 || t === 'ACTION_ROW') {
+        try { actionRows.push(ActionRowBuilder.from(comp)); } catch {}
+      }
+    }
+  }
+
+  let title = null;
+  let description = '';
+  const fields = [];
+  let footer = null;
+
+  for (const text of textParts) {
+    if (text.startsWith('## ')) {
+      const lines = text.split('\n');
+      title = lines[0].substring(3);
+      const rest = lines.slice(1).join('\n').trim();
+      if (rest) description += (description ? '\n' : '') + rest;
+    } else if (text.startsWith('### ')) {
+      const lines = text.split('\n');
+      fields.push({ name: lines[0].substring(4), value: lines.slice(1).join('\n').trim() || ' ', inline: false });
+    } else if (text.startsWith('-# ')) {
+      footer = text.substring(3);
+    } else if (text.trim()) {
+      description += (description ? '\n' : '') + text;
+    }
+  }
+
+  const e = new EmbedBuilder();
+  if (title) e.setTitle(title.slice(0, 256));
+  if (description.trim()) e.setDescription(description.trim().slice(0, 4096));
+  if (fields.length) {
+    for (const f of fields.slice(0, 25)) {
+      e.addFields({ name: f.name.slice(0, 256), value: f.value.slice(0, 1024), inline: f.inline });
+    }
+  }
+  if (footer) e.setFooter({ text: footer.slice(0, 2048) });
+
+  const result = { embeds: [e] };
+  if (actionRows.length) result.components = actionRows;
+  if (payload.allowedMentions) result.allowedMentions = payload.allowedMentions;
+  return result;
+}
+
+
+function wrapPayload(guildId, payload, cmdName = null) {
+  if (shouldUseV2(guildId, cmdName)) return payload;
+  return v2PayloadToV1(payload);
+}
+
+
+function buildPayload(guildId, description = '', options = {}) {
+  const { allowedMentions: customAllowed, components, ...buildOpts } = options;
+  const cmdName = options._cmdName || null;
+
+  if (shouldUseV2(guildId, cmdName)) {
+    try {
+      const container = buildV2Container(guildId, description, buildOpts);
+      const payload = {
+        components : [container],
+        flags      : _V2_FLAG,
+        allowedMentions: customAllowed ?? { parse: [] },
+      };
+      if (components) payload.components = [container, ...components];
+      return payload;
+    } catch {}
+  }
+
+  const payload = {
+    embeds: [build(guildId, description, buildOpts)],
+    allowedMentions: customAllowed ?? { parse: [] },
+  };
+  if (components) payload.components = components;
+  return payload;
+}
+
+
+async function sendEmbed(channel, guildId, description = '', options = {}) {
+  if (!channel) return null;
+  const { allowedMentions: customAllowed, ...buildOpts } = options;
+  const cmdName = options._cmdName || null;
+
+  if (shouldUseV2(guildId, cmdName)) {
+    try {
+      const container = buildV2Container(guildId, description, buildOpts);
+      return channel.send({
+        components      : [container],
+        flags           : _V2_FLAG,
+        allowedMentions : customAllowed ?? { parse: [] },
+      }).catch(() => null);
+    } catch {}
+  }
+
+  return channel.send({
+    embeds          : [build(guildId, description, buildOpts)],
+    allowedMentions : customAllowed ?? { parse: [] },
+  }).catch(() => null);
+}
+
+
+async function editEmbed(message, guildId, description = '', options = {}) {
+  if (!message) return null;
+  const { allowedMentions: customAllowed, ...buildOpts } = options;
+  const cmdName = options._cmdName || null;
+
+  if (shouldUseV2(guildId, cmdName)) {
+    try {
+      const container = buildV2Container(guildId, description, buildOpts);
+      return message.edit({
+        components      : [container],
+        flags           : _V2_FLAG,
+        allowedMentions : customAllowed ?? { parse: [] },
+      }).catch(() => null);
+    } catch {}
+  }
+
+  return message.edit({
+    embeds          : [build(guildId, description, buildOpts)],
+    allowedMentions : customAllowed ?? { parse: [] },
+  }).catch(() => null);
+}
+
+
 const EXPIRED_PANEL_GRACE_MS = 1500;
 
 
@@ -508,10 +744,41 @@ async function replyExpiredPanel(interaction) {
 }
 
 
+function shouldUseV2(guildId, commandName) {
+  if (!guildId) return _V2_AVAILABLE;
+
+  try {
+    const config = db.getGuildConfig(guildId);
+    const mode = config?.embedMode || 'auto';
+
+    let exceptions = [];
+    if (config?.embedModeExceptions) {
+      try { exceptions = JSON.parse(config.embedModeExceptions); } catch {}
+    }
+
+    const isException = commandName && exceptions.includes(commandName);
+
+    if (mode === 'v2') {
+      return isException ? false : true;
+    }
+
+    if (mode === 'v1') {
+      return isException ? true : false;
+    }
+
+    return _V2_AVAILABLE;
+  } catch {
+    return _V2_AVAILABLE;
+  }
+}
+
+
 module.exports = {
 
   build,
   error,
+
+  shouldUseV2,
 
   noPerm,
   usage,
@@ -522,6 +789,13 @@ module.exports = {
   replyError,
   replyInteraction,
   send,
+  sendEmbed,
+  editEmbed,
+  buildV2Container,
+  buildPayload,
+  embedToPayload,
+  v2PayloadToV1,
+  wrapPayload,
 
   scheduleDelete,
 

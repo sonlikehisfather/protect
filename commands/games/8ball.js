@@ -71,7 +71,7 @@ exports.run = async (client, message, args) => {
   const response = RESPONSES[Math.floor(Math.random() * RESPONSES.length)];
 
   let sent;
-  if (V2_AVAILABLE) {
+  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
     const body = [
       `## 🎱 8-Ball`,
       ``,

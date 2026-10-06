@@ -126,23 +126,14 @@ async function _reloadTracking(client, message, silent = false) {
 
 
 async function _reloadEventsWithConfirm(client, message) {
-  const confirmMsg = await message.channel.send({
-    embeds: [
-      embed.build(
-        message.guild?.id,
-        null,
-        {
+  const confirmMsg = await message.channel.send({ ...embed.buildPayload(message.guild?.id, null, {
           title     : 'Reload events',
           description:
             '**Attention** : reload events peut laisser des timers orphelins ' +
             '(sanctions, tempRoles, reminders, presence, antideco).\n\n' +
             'Preferez `pm2 restart` sauf si vous savez ce que vous faites.',
           timestamp : false,
-        }
-      ),
-    ],
-    components: [_buildConfirmRow(false)],
-  }).catch(() => null);
+          components: [_buildConfirmRow(false)] }) });
 
   if (!confirmMsg) return;
 
@@ -158,16 +149,11 @@ async function _reloadEventsWithConfirm(client, message) {
     if (interaction.customId === 'local:reload-events:cancel') {
       collector.stop('cancelled');
       await interaction.deferUpdate().catch(() => {});
-      await confirmMsg.edit({
-        embeds: [
-          embed.build(message.guild?.id, null, {
+      await confirmMsg.edit({ ...embed.buildPayload(message.guild?.id, null, {
             title      : 'Reload events',
             description: 'Annule.',
             timestamp  : false,
-          }),
-        ],
-        components: [_buildConfirmRow(true)],
-      }).catch(() => {});
+          components: [_buildConfirmRow(true)] }) });
       return;
     }
 
@@ -188,16 +174,11 @@ async function _reloadEventsWithConfirm(client, message) {
 
     if (reason === 'confirmed' || reason === 'cancelled') return;
 
-    await confirmMsg.edit({
-      embeds: [
-        embed.build(message.guild?.id, null, {
+    await confirmMsg.edit({ ...embed.buildPayload(message.guild?.id, null, {
           title      : 'Reload events',
           description: 'Expiration - reload annule.',
           timestamp  : false,
-        }),
-      ],
-      components: [_buildConfirmRow(true)],
-    }).catch(() => {});
+          components: [_buildConfirmRow(true)] }) });
   });
 }
 

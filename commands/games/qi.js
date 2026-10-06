@@ -178,7 +178,7 @@ exports.run = async (client, message, args) => {
   const bar = '█'.repeat(Math.min(Math.floor(qi / 10), 25)) + '░'.repeat(Math.max(25 - Math.floor(qi / 10), 0));
 
   let sent;
-  if (V2_AVAILABLE) {
+  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
     const body = [
       `## ${cat.emoji} Test de QI`,
       ``,

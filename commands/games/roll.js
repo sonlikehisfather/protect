@@ -67,7 +67,7 @@ exports.run = async (client, message, args) => {
   fields.push({ name: 'Résultat', value: rollDisplay, inline: false });
 
   let sent;
-  if (V2_AVAILABLE) {
+  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
     const lines = [
       `## 🎲 Lancer de dés`,
       ``,

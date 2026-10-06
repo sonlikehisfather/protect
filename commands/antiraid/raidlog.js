@@ -31,16 +31,7 @@ exports.run = async (client, message, args) => {
   const current = db.getGuildConfig(guildId);
 
   if (!sub) {
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          `Logs antiraid : **${current?.raidLogChannel ? 'Activés' : 'Désactivés'}** - salon : ${current?.raidLogChannel ? `<#${current.raidLogChannel}>` : 'Non configuré'}.`,
-          { timestamp: false }
-        )
-      ],
-      allowedMentions: { repliedUser: false },
-    }).catch(() => null);
+    const sent = await embed.sendEmbed(message.channel, guildId, `Logs antiraid : **${current?.raidLogChannel ? 'Activés' : 'Désactivés'}** - salon : ${current?.raidLogChannel ? `<#${current.raidLogChannel}>` : 'Non configuré'}.`, { timestamp: false , allowedMentions: { repliedUser: false } });
 
     if (sent && deleteReply) {
       embed.scheduleDelete(sent, deleteDelay);
@@ -51,16 +42,7 @@ exports.run = async (client, message, args) => {
   if (sub === 'off') {
     db.setGuildConfig(guildId, 'raidLogChannel', null);
 
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          'Les logs antiraid ont été désactivés.',
-          { timestamp: false }
-        )
-      ],
-      allowedMentions: { repliedUser: false },
-    }).catch(() => null);
+    const sent = await embed.sendEmbed(message.channel, guildId, 'Les logs antiraid ont été désactivés.', { timestamp: false , allowedMentions: { repliedUser: false } });
 
     if (sent && deleteReply) {
       embed.scheduleDelete(sent, deleteDelay);
@@ -120,16 +102,7 @@ exports.run = async (client, message, args) => {
 
     db.setGuildConfig(guildId, 'raidLogChannel', targetChannel.id);
 
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          `Les logs antiraid sont maintenant envoyés dans <#${targetChannel.id}>.`,
-          { timestamp: false }
-        )
-      ],
-      allowedMentions: { repliedUser: false },
-    }).catch(() => null);
+    const sent = await embed.sendEmbed(message.channel, guildId, `Les logs antiraid sont maintenant envoyés dans <#${targetChannel.id}>.`, { timestamp: false , allowedMentions: { repliedUser: false } });
 
     if (sent && deleteReply) {
       embed.scheduleDelete(sent, deleteDelay);

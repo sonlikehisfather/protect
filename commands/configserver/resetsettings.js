@@ -68,20 +68,10 @@ exports.run = async (client, message) => {
   if (hasCustomColor)          summary.push('Couleur d\'embed personnalisée');
   if (publicChannels.length)   summary.push(`**${publicChannels.length}** salon(s) public(s)`);
 
-  const confirmMessage = await message.channel.send({
-    embeds: [
-      embed.build(
-        guildId,
-        `Les éléments suivants seront réinitialisés :\n• ${summary.join('\n• ')}\n\nCette action est irréversible.`,
-        {
+  const confirmMessage = await message.channel.send({ ...embed.buildPayload(guildId, `Les éléments suivants seront réinitialisés :\n• ${summary.join('\n• ')}\n\nCette action est irréversible.`, {
           title    : 'Confirmer la réinitialisation des paramètres',
           timestamp: false,
-        }
-      ),
-    ],
-    components      : [_buildConfirmRow(false)],
-    allowedMentions : { parse: [] },
-  }).catch(() => null);
+          components: [_buildConfirmRow(false)] }) });
 
   if (!confirmMessage) return;
 
@@ -98,15 +88,10 @@ exports.run = async (client, message) => {
   collector.on('collect', async interaction => {
     if (interaction.customId === 'local:resetsettings:cancel') {
       collector.stop('cancelled');
-      await interaction.update({
-        embeds: [
-          embed.build(guildId, 'Action annulée. Aucun paramètre n\'a été modifié.', {
+      await interaction.update({ ...embed.buildPayload(guildId, 'Action annulée. Aucun paramètre n\'a été modifié.', {
             title    : 'Réinitialisation annulée',
             timestamp: false,
-          }),
-        ],
-        components: [_buildConfirmRow(true)],
-      }).catch(() => {});
+          components: [_buildConfirmRow(true)] }) });
       return;
     }
 
@@ -125,14 +110,9 @@ exports.run = async (client, message) => {
       if (id) db.removePublicChannel(guildId, id);
     }
 
-    await confirmMessage.edit({
-      embeds: [
-        embed.build(guildId, 'Les paramètres serveur ont été réinitialisés.', {
+    await confirmMessage.edit({ ...embed.buildPayload(guildId, 'Les paramètres serveur ont été réinitialisés.', {
           timestamp: false,
-        }),
-      ],
-      components: [_buildConfirmRow(true)],
-    }).catch(() => {});
+          components: [_buildConfirmRow(true)] }) });
 
     if (deleteReply) {
       embed.scheduleDelete(confirmMessage, deleteDelay);

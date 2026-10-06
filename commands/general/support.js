@@ -46,7 +46,7 @@ module.exports = {
 
     let sent;
 
-    if (V2_AVAILABLE) {
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
       const container = new ContainerBuilder()
         .addTextDisplayComponents(
           new TextDisplayBuilder().setContent('## Serveur support'),
@@ -62,14 +62,10 @@ module.exports = {
         allowedMentions: { parse: [] },
       }).catch(() => null);
     } else {
-      sent = await message.channel.send({
-        embeds: [embed.build(guildId, null, {
+      sent = await message.channel.send({ ...embed.buildPayload(guildId, null, {
           title     : 'Serveur support',
           timestamp : false,
-        })],
-        components      : [new ActionRowBuilder().addComponents(linkBtn)],
-        allowedMentions : { parse: [] },
-      }).catch(() => null);
+          components: [new ActionRowBuilder().addComponents(linkBtn)] }) });
     }
 
     if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);

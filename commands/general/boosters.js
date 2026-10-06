@@ -5,7 +5,16 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  ContainerBuilder,
+  TextDisplayBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  MessageFlags,
 } = require('discord.js');
+
+const COMPONENTS_V2_FLAG = MessageFlags?.IsComponentsV2 ?? (1 << 15);
+const V2_AVAILABLE       = typeof ContainerBuilder === 'function' &&
+                           typeof TextDisplayBuilder === 'function';
 
 const db    = require('../../core/database');
 const embed = require('../../utils/embed');
@@ -48,98 +57,84 @@ module.exports = {
       .map(member => formatBoosterLine(member));
 
     if (!boosters.length) {
-      const sent = await message.channel.send({
-        embeds: [
-          embed.build(
-            guildId,
-            null,
-            {
-              title     : 'Boosters du serveur',
-              fields    : [
-                {
-                  name  : 'Résultat',
-                  value : 'Aucun booster n’a été trouvé sur ce serveur.',
-                  inline: false,
-                },
-              ],
-              timestamp : false,
-            }
-          )
-        ],
-        allowedMentions: {
-          repliedUser: false,
-        },
-      }).catch(() => null);
-
-      if (sent && deleteReply) {
-        embed.scheduleDelete(sent, deleteDelay);
+      const text = '## Boosters du serveur\n\n> Aucun booster n’a été trouvé sur ce serveur.';
+      let sent = null;
+      if (embed.shouldUseV2(guildId, module.exports.help.name)) {
+        try {
+          const container = new ContainerBuilder();
+          container.addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
+          sent = await message.channel.send({
+            components      : [container],
+            flags           : COMPONENTS_V2_FLAG,
+            allowedMentions : { repliedUser: false },
+          }).catch(() => null);
+        } catch {}
       }
-
+      if (!sent) {
+        sent = await embed.sendEmbed(message.channel, guildId, null, {
+            title  : 'Boosters du serveur',
+            fields : [{ name: 'R\u00e9sultat', value: 'Aucun booster n’a été trouvé sur ce serveur.', inline: false }],
+            timestamp : false,
+          });
+      }
+      if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
       return;
     }
 
     const pages = chunkArray(boosters, PAGE_SIZE);
     let page = 0;
 
-    const buildEmbed = () => embed.build(
-      guildId,
-      null,
-      {
-        title  : 'Boosters du serveur',
-        fields : [
-          {
-            name  : 'Membres',
-            value : String(boosters.length),
-            inline: true,
-          },
-          {
-            name  : 'Boosts serveur',
-            value : String(guild.premiumSubscriptionCount ?? boosters.length),
-            inline: true,
-          },
-          {
-            name  : 'Niveau',
-            value : String(guild.premiumTier ?? 0),
-            inline: true,
-          },
-          {
-            name  : 'Liste',
-            value : pages[page].join('\n'),
-            inline: false,
-          },
-        ],
-        footer    : `Page ${page + 1}/${pages.length}`,
-        timestamp : false,
+    const buildPayload = (disabled = false) => {
+      const header = `## Boosters du serveur\n`;
+      const body   = header + pages[page].join('\n');
+      const footer = `-# Membres : ${boosters.length} \u2022 Page ${page + 1}/${pages.length}`;
+
+      const prevBtn = new ButtonBuilder()
+        .setCustomId('boosters:prev')
+        .setLabel('\u2190')
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(disabled || page === 0);
+      const nextBtn = new ButtonBuilder()
+        .setCustomId('boosters:next')
+        .setLabel('\u2192')
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(disabled || page >= pages.length - 1);
+      const closeBtn = new ButtonBuilder()
+        .setCustomId('boosters:close')
+        .setLabel('\u2716')
+        .setStyle(ButtonStyle.Danger)
+        .setDisabled(disabled);
+      const navRow = new ActionRowBuilder().addComponents(prevBtn, nextBtn, closeBtn);
+
+      if (embed.shouldUseV2(guildId, module.exports.help.name)) {
+        try {
+          const container = new ContainerBuilder();
+          container.addTextDisplayComponents(new TextDisplayBuilder().setContent(body));
+          container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
+          container.addTextDisplayComponents(new TextDisplayBuilder().setContent(footer));
+          if (pages.length > 1) container.addActionRowComponents(navRow);
+          return { embeds: [], components: [container], flags: COMPONENTS_V2_FLAG, allowedMentions: { repliedUser: false } };
+        } catch {}
       }
-    );
 
-    const buildRows = (disabled = false) => [
-      new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId('boosters:prev')
-          .setLabel('\u2190')
-          .setStyle(ButtonStyle.Secondary)
-          .setDisabled(disabled || page === 0),
-        new ButtonBuilder()
-          .setCustomId('boosters:next')
-          .setLabel('\u2192')
-          .setStyle(ButtonStyle.Secondary)
-          .setDisabled(disabled || page >= pages.length - 1),
-        new ButtonBuilder()
-          .setCustomId('boosters:close')
-          .setLabel('\u2716')
-          .setStyle(ButtonStyle.Danger)
-          .setDisabled(disabled),
-      ),
-    ];
+      return {
+        embeds: [embed.build(guildId, null, {
+          title  : 'Boosters du serveur',
+          fields : [
+            { name: 'Membres', value: String(boosters.length), inline: true },
+            { name: 'Boosts serveur', value: String(guild.premiumSubscriptionCount ?? boosters.length), inline: true },
+            { name: 'Niveau', value: String(guild.premiumTier ?? 0), inline: true },
+            { name: 'Liste', value: pages[page].join('\n'), inline: false },
+          ],
+          footer    : `Page ${page + 1}/${pages.length}`,
+          timestamp : false,
+        })],
+        components: pages.length > 1 ? [navRow] : [],
+        allowedMentions: { repliedUser: false },
+      };
+    };
 
-    const sent = await message.channel.send({
-      embeds     : [buildEmbed()],
-      components : pages.length > 1 ? buildRows() : [],
-      allowedMentions: {
-        repliedUser: false,
-      },
-    }).catch(() => null);
+    const sent = await message.channel.send(buildPayload()).catch(() => null);
 
     if (!sent) return;
 
@@ -177,10 +172,7 @@ module.exports = {
           page++;
         }
 
-        await interaction.update({
-          embeds     : [buildEmbed()],
-          components : buildRows(),
-        });
+        await interaction.update(buildPayload());
 
       } catch (err) {
         if (err?.code !== 10062 && err?.code !== 40060) {
@@ -192,9 +184,7 @@ module.exports = {
     collector.on('end', (_, reason) => {
       embed.clearPrivateInteraction(sent);
       if (reason === 'closed') return;
-      sent.edit({
-        components: [],
-      }).catch(() => {});
+      sent.edit(buildPayload(true)).catch(() => {});
     });
   },
 };

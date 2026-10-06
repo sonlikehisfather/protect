@@ -88,7 +88,7 @@ exports.run = async (client, message, args) => {
     }
 
     if (volImage) {
-      if (V2_AVAILABLE) {
+      if (embed.shouldUseV2(guildId, module.exports.help.name)) {
         const container = new ContainerBuilder();
         container.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL('attachment://vol_result.png')));
         return message.reply({ components: [container], flags: COMPONENTS_V2_FLAG, files: [new AttachmentBuilder(volImage, { name: 'vol_result.png' })], allowedMentions: { parse: [] } });
@@ -96,7 +96,7 @@ exports.run = async (client, message, args) => {
       return embed.reply(message, `<@${target.id}> avait un bouclier ! Le vol a echoue. (${targetShields - 1} bouclier(s) restant(s))`, { title: 'Vol Bloque', image: 'attachment://vol_result.png', files: [new AttachmentBuilder(volImage, { name: 'vol_result.png' })] });
     }
 
-    if (V2_AVAILABLE) {
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
       const container = new ContainerBuilder();
       container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
         `## Vol Bloque\n\n` +
@@ -134,7 +134,7 @@ exports.run = async (client, message, args) => {
     }
 
     if (volImage) {
-      if (V2_AVAILABLE) {
+      if (embed.shouldUseV2(guildId, module.exports.help.name)) {
         const container = new ContainerBuilder();
         container.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL('attachment://vol_result.png')));
         return message.reply({ components: [container], flags: COMPONENTS_V2_FLAG, files: [new AttachmentBuilder(volImage, { name: 'vol_result.png' })], allowedMentions: { parse: [] } });
@@ -142,7 +142,7 @@ exports.run = async (client, message, args) => {
       return embed.reply(message, `Tu as tente de voler <@${target.id}> mais tu as echoue.`, { title: 'Vol Rate', image: 'attachment://vol_result.png', files: [new AttachmentBuilder(volImage, { name: 'vol_result.png' })] });
     }
 
-    if (V2_AVAILABLE) {
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
       const container = new ContainerBuilder();
       container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
         `## Vol Rate\n\n` +
@@ -208,7 +208,7 @@ exports.run = async (client, message, args) => {
   }
 
   if (volImage) {
-    if (V2_AVAILABLE) {
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
       const container = new ContainerBuilder();
       container.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL('attachment://vol_result.png')));
       return message.reply({ components: [container], flags: COMPONENTS_V2_FLAG, files: [new AttachmentBuilder(volImage, { name: 'vol_result.png' })], allowedMentions: { parse: [] } });
@@ -219,7 +219,7 @@ exports.run = async (client, message, args) => {
     return embed.reply(message, desc, { title: 'Vol', image: 'attachment://vol_result.png', files: [new AttachmentBuilder(volImage, { name: 'vol_result.png' })] });
   }
 
-  if (V2_AVAILABLE) {
+  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
     const container = new ContainerBuilder();
     let text = `## Vol Reussi\n\n` +
       `> Cible : <@${target.id}>\n` +

@@ -145,24 +145,15 @@ async function _handleStatus(message, channel, row, guildId, deleteReply, delete
     everyoneOverwrite?.deny?.has(PermissionsBitField.Flags.ViewChannel)
   );
 
-  const sent = await message.channel.send({
-    embeds: [
-      embed.build(
-        guildId,
-        `Salon : ${channel}\n` +
+  const sent = await embed.sendEmbed(message.channel, guildId, `Salon : ${channel}\n` +
         `Propriétaire : <@${row.ownerId}>\n` +
         `Verrouillé : ${locked ? '`Oui`' : '`Non`'}\n` +
         `Caché : ${hidden ? '`Oui`' : '`Non`'}\n` +
         `Limite : \`${channel.userLimit || 0}\`\n` +
-        `Membres : \`${channel.members.size}\``,
-        {
+        `Membres : \`${channel.members.size}\``, {
           title    : 'Vocal temporaire',
           timestamp: false,
-        }
-      ),
-    ],
-    allowedMentions: { parse: [] },
-  }).catch(() => null);
+          allowedMentions: { parse: [] } });
 
   if (sent && deleteReply) {
     embed.scheduleDelete(sent, deleteDelay);
@@ -582,11 +573,7 @@ async function _resolveMember(message, query) {
 }
 
 async function _showHelp(message, guildId, deleteReply, deleteDelay) {
-  const sent = await message.channel.send({
-    embeds: [
-      embed.build(
-        guildId,
-        `Commandes disponibles :\n` +
+  const sent = await embed.sendEmbed(message.channel, guildId, `Commandes disponibles :\n` +
         `\`${message.prefix || '+'}voc status\` - affiche les informations du vocal\n` +
         `\`${message.prefix || '+'}voc lock\` - ferme l\'accès au vocal\n` +
         `\`${message.prefix || '+'}voc unlock\` - réouvre l\'accès au vocal\n` +
@@ -599,15 +586,10 @@ async function _showHelp(message, guildId, deleteReply, deleteDelay) {
         `\`${message.prefix || '+'}voc reject <membre>\` - refuse un membre\n` +
         `\`${message.prefix || '+'}voc reset <membre>\` - reset les permissions d\'un membre\n` +
         `\`${message.prefix || '+'}voc kick <membre>\` - expulse un membre du vocal\n` +
-        `\`${message.prefix || '+'}voc owner <membre>\` - transfère le vocal`,
-        {
+        `\`${message.prefix || '+'}voc owner <membre>\` - transfère le vocal`, {
           title    : 'Tempvoc',
           timestamp: false,
-        }
-      ),
-    ],
-    allowedMentions: { parse: [] },
-  }).catch(() => null);
+          allowedMentions: { parse: [] } });
 
   if (sent && deleteReply) {
     embed.scheduleDelete(sent, deleteDelay);

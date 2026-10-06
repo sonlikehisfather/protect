@@ -79,7 +79,7 @@ exports.run = async (client, message, args) => {
   const lines = results.map(r => `${r.emoji} · **${r.pct}%** ${r.key}`).join('\n');
 
   let sent;
-  if (V2_AVAILABLE) {
+  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
     const body = [
       `## Calculateur d'orientation`,
       ``,

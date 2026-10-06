@@ -53,16 +53,7 @@ module.exports = {
     const total     = sanctions.length;
 
     if (!total) {
-      const sent = await message.channel.send({
-        embeds: [
-          embed.build(
-            guildId,
-            `**${target.user.tag}** n’a aucun avertissement.`,
-            { timestamp: false }
-          )
-        ],
-        allowedMentions: { repliedUser: false },
-      }).catch(() => null);
+      const sent = await embed.sendEmbed(message.channel, guildId, `**${target.user.tag}** n’a aucun avertissement.`, { timestamp: false , allowedMentions: { repliedUser: false } });
 
       if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
       return;

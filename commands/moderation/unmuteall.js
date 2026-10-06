@@ -181,16 +181,7 @@ async function _runUnmuteAll(client, message, guild, guildId, config, deleteRepl
   const verbe     = unmutedCount > 1 ? 'ont' : 'a';
   const participe = unmutedCount > 1 ? 'démutés' : 'démuté';
 
-  const sent = await message.channel.send({
-    embeds: [
-      embed.build(
-        guildId,
-        `**${unmutedCount}** ${sujet} ${verbe} été ${participe}.`,
-        { timestamp: false }
-      )
-    ],
-    allowedMentions: { repliedUser: false },
-  }).catch(() => null);
+  const sent = await embed.sendEmbed(message.channel, guildId, `**${unmutedCount}** ${sujet} ${verbe} été ${participe}.`, { timestamp: false , allowedMentions: { repliedUser: false } });
 
   if (sent && deleteReply) {
     embed.scheduleDelete(sent, deleteDelay);

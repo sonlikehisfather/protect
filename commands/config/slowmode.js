@@ -159,18 +159,9 @@ module.exports = {
       return;
     }
 
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          seconds === 0
+    const sent = await embed.sendEmbed(message.channel, guildId, seconds === 0
             ? `Le mode lent a été désactivé dans <#${channel.id}>.`
-            : `Le mode lent de <#${channel.id}> a été défini sur **${formatSlowmode(seconds)}**.`,
-          { timestamp: false }
-        ),
-      ],
-      allowedMentions: { repliedUser: false },
-    }).catch(() => null);
+            : `Le mode lent de <#${channel.id}> a été défini sur **${formatSlowmode(seconds)}**.`, { timestamp: false });
 
     if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
   },

@@ -63,7 +63,7 @@ exports.run = async (client, message, args) => {
     ],
   });
 
-  if (V2_AVAILABLE) {
+  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
     const container = new ContainerBuilder().addTextDisplayComponents(new TextDisplayBuilder().setContent(
       `## Clear Inventory\n\n` +
       `> Inventaire de <@${target.id}> vidé avec succes\n` +

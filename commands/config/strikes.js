@@ -121,12 +121,7 @@ async function _showList(message, guildId, deleteReply, deleteDelay) {
     return `\`${trigger}\` ${label}\nNouveau : **${strikes}** - Ancien : **${ancienStr}**`;
   });
 
-  const sent = await message.channel.send({
-    embeds: [
-      embed.build(
-        guildId,
-        null,
-        {
+  const sent = await embed.sendEmbed(message.channel, guildId, null, {
           title  : 'Poids de strikes par déclencheur',
           fields : [
             {
@@ -141,11 +136,7 @@ async function _showList(message, guildId, deleteReply, deleteDelay) {
             },
           ],
           timestamp: false,
-        }
-      ),
-    ],
-    allowedMentions: { repliedUser: false },
-  }).catch(() => null);
+        });
 
   if (sent && deleteReply) {
     embed.scheduleDelete(sent, deleteDelay);
@@ -153,12 +144,7 @@ async function _showList(message, guildId, deleteReply, deleteDelay) {
 }
 
 async function _replySuccess(message, guildId, content, deleteReply, deleteDelay) {
-  const sent = await message.channel.send({
-    embeds: [
-      embed.build(guildId, content, { timestamp: false }),
-    ],
-    allowedMentions: { repliedUser: false },
-  }).catch(() => null);
+  const sent = await embed.sendEmbed(message.channel, guildId, content, { timestamp: false });
 
   if (sent && deleteReply) {
     embed.scheduleDelete(sent, deleteDelay);

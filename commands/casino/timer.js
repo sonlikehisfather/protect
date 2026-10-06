@@ -43,7 +43,7 @@ exports.run = async (client, message, args) => {
   const readyList = cooldowns.filter(c => c.ready);
   const waitingList = cooldowns.filter(c => !c.ready);
 
-  if (V2_AVAILABLE) {
+  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
     const container = new ContainerBuilder();
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
       '## ⏱ Cooldowns Casino\n' +

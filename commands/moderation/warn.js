@@ -180,19 +180,10 @@ module.exports = {
     if (!lines.length)
       lines.push('Aucune action effectuée.');
 
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          lines.join('\n\n'),
-          {
+    const sent = await embed.sendEmbed(message.channel, guildId, lines.join('\n\n'), {
             fields   : [{ name: 'Raison', value: reason, inline: false }],
             timestamp: false,
-          }
-        ),
-      ],
-      allowedMentions: { parse: [] },
-    }).catch(() => null);
+          allowedMentions: { parse: [] } });
 
     if (sent && deleteReply) {
       embed.scheduleDelete(sent, deleteDelay);
@@ -339,16 +330,7 @@ async function _applyWarnThreshold(client, message, guild, guildId, target, hit,
         ? `mute (${_formatDuration(duration ?? (10 * 60))})`
         : sanction.toLowerCase();
 
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          `Seuil de **${total} warns** atteint.\nUtilisateur **${target.user.tag}** sanctionné : **${sanctionLabel}**.`,
-          { timestamp: false }
-        )
-      ],
-      allowedMentions: { repliedUser: false },
-    }).catch(() => null);
+    const sent = await embed.sendEmbed(message.channel, guildId, `Seuil de **${total} warns** atteint.\nUtilisateur **${target.user.tag}** sanctionné : **${sanctionLabel}**.`, { timestamp: false , allowedMentions: { repliedUser: false } });
 
     if (sent && deleteReply) {
       embed.scheduleDelete(sent, deleteDelay);

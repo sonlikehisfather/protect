@@ -62,7 +62,7 @@ module.exports = {
     const globalNames = history.filter(r => r.type === 'globalname');
     const nicknames   = history.filter(r => r.type === 'nickname');
 
-    const sent = V2_AVAILABLE
+    const sent = embed.shouldUseV2(guildId, module.exports.help.name)
       ? await _sendV2(message, guildId, displayName, history, usernames, globalNames, nicknames)
       : await _sendEmbed(message, guildId, fetchedUser, displayName, history, usernames, globalNames, nicknames);
 
@@ -268,15 +268,12 @@ async function _sendEmbed(message, guildId, fetchedUser, displayName, history, u
   const avatarURL = fetchedUser.displayAvatarURL({ dynamic: true, size: 256 });
 
   if (!history.length) {
-    return message.channel.send({
-      embeds: [embed.build(guildId, 'Aucun ancien pseudo enregistré pour cet utilisateur.', {
+    return embed.sendEmbed(message.channel, guildId, 'Aucun ancien pseudo enregistré pour cet utilisateur.', {
         title      : 'Historique des pseudos',
         authorName : fetchedUser.globalName ?? fetchedUser.username,
         color      : '#FEE75C',
         timestamp  : false,
-      })],
-      allowedMentions: { parse: [] },
-    }).catch(() => null);
+      });
   }
 
   const fields = [];
@@ -305,15 +302,12 @@ async function _sendEmbed(message, guildId, fetchedUser, displayName, history, u
     });
   }
 
-  return message.channel.send({
-    embeds: [embed.build(guildId, null, {
+  return embed.sendEmbed(message.channel, guildId, null, {
       title      : 'Historique des pseudos',
       authorName : displayName,
       thumbnail  : avatarURL,
       fields,
       footer     : `${history.length} pseudo(s) affiché(s) (max ${MAX_DISPLAY})`,
       timestamp  : false,
-    })],
-    allowedMentions: { parse: [] },
-  }).catch(() => null);
+    });
 }

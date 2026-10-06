@@ -5,6 +5,7 @@ const Database = require('better-sqlite3');
 const path     = require('path');
 
 const DB_PATH = path.join(__dirname, '..', 'database.sqlite');
+const GLOBAL_EMBED_SCOPE = '__global__';
 
 
 let _db    = null;
@@ -97,6 +98,11 @@ const GUILD_CONFIG_KEYS = new Set([
   'roleLogChannel',
   'raidLogChannel',
   'errorLogChannel',
+  'inviteLogChannel',
+  'levelLogChannel',
+  'channelLogChannel',
+  'serverLogChannel',
+  'emojiLogChannel',
   'welcomeChannel',
   'welcomeMessage',
   'welcomeDmMessage',
@@ -232,6 +238,9 @@ const GUILD_CONFIG_KEYS = new Set([
 
   'ghostPingEnabled',
   'ghostPingChannels',
+
+  'embedMode',
+  'embedModeExceptions',
 ]);
 
 const CUSTOM_COMMAND_KEYS = new Set([
@@ -551,6 +560,11 @@ const MIGRATIONS = [
           roleLogChannel      TEXT,
           raidLogChannel      TEXT,
           errorLogChannel     TEXT,
+          inviteLogChannel    TEXT,
+          levelLogChannel     TEXT,
+          channelLogChannel   TEXT,
+          serverLogChannel    TEXT,
+          emojiLogChannel     TEXT,
           welcomeChannel      TEXT,
           welcomeMessage      TEXT,
           welcomeDmMessage    TEXT,
@@ -3720,6 +3734,29 @@ up(db) {
     },
   },
 
+  {
+    version: 109,
+    up(db) {
+      const cols = db.prepare('PRAGMA table_info(guild_config)').all().map(c => c.name);
+      if (!cols.includes('embedMode'))
+        db.exec(`ALTER TABLE guild_config ADD COLUMN embedMode TEXT NOT NULL DEFAULT 'auto'`);
+      if (!cols.includes('embedModeExceptions'))
+        db.exec(`ALTER TABLE guild_config ADD COLUMN embedModeExceptions TEXT`);
+    },
+  },
+
+  {
+    version: 110,
+    up(db) {
+      const cols = db.prepare('PRAGMA table_info(guild_config)').all().map(c => c.name);
+      if (!cols.includes('inviteLogChannel')) db.exec(`ALTER TABLE guild_config ADD COLUMN inviteLogChannel TEXT`);
+      if (!cols.includes('levelLogChannel'))  db.exec(`ALTER TABLE guild_config ADD COLUMN levelLogChannel TEXT`);
+      if (!cols.includes('channelLogChannel')) db.exec(`ALTER TABLE guild_config ADD COLUMN channelLogChannel TEXT`);
+      if (!cols.includes('serverLogChannel'))  db.exec(`ALTER TABLE guild_config ADD COLUMN serverLogChannel TEXT`);
+      if (!cols.includes('emojiLogChannel'))   db.exec(`ALTER TABLE guild_config ADD COLUMN emojiLogChannel TEXT`);
+    },
+  },
+
 ];
 
 
@@ -5781,23 +5818,23 @@ const db = {
 
 
   saveEmbed(guildId, name, data, createdBy) {
-    getDb().prepare('INSERT OR REPLACE INTO saved_embeds (guildId, name, data, createdBy, updatedAt) VALUES (?, ?, ?, ?, unixepoch())').run(guildId, name, JSON.stringify(data), createdBy);
+    getDb().prepare('INSERT OR REPLACE INTO saved_embeds (guildId, name, data, createdBy, updatedAt) VALUES (?, ?, ?, ?, unixepoch())').run(GLOBAL_EMBED_SCOPE, name, JSON.stringify(data), createdBy);
   },
 
   getEmbed(guildId, name) {
-    const row = getDb().prepare('SELECT * FROM saved_embeds WHERE guildId = ? AND name = ?').get(guildId, name);
+    const row = getDb().prepare('SELECT * FROM saved_embeds WHERE guildId = ? AND name = ?').get(GLOBAL_EMBED_SCOPE, name);
     return row ? { ...row, data: JSON.parse(row.data) } : null;
   },
 
   listEmbeds(guildId) {
-    return getDb().prepare('SELECT id, name, createdBy, createdAt, data FROM saved_embeds WHERE guildId = ?').all(guildId).map(r => {
+    return getDb().prepare('SELECT id, name, createdBy, createdAt, data FROM saved_embeds WHERE guildId = ?').all(GLOBAL_EMBED_SCOPE).map(r => {
       try { r.data = JSON.parse(r.data); } catch { r.data = {}; }
       return r;
     });
   },
 
   deleteEmbed(guildId, name) {
-    getDb().prepare('DELETE FROM saved_embeds WHERE guildId = ? AND name = ?').run(guildId, name);
+    getDb().prepare('DELETE FROM saved_embeds WHERE guildId = ? AND name = ?').run(GLOBAL_EMBED_SCOPE, name);
   },
 
 

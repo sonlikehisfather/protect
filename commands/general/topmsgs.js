@@ -47,7 +47,7 @@ module.exports = {
     let days = Number(args[0]) || 7;
     if (!VALID_DAYS.includes(days)) days = 7;
 
-    const sent = V2_AVAILABLE
+    const sent = embed.shouldUseV2(guildId, module.exports.help.name)
       ? await _sendV2(client, message, guildId, days, deleteCmd ? null : message)
       : await _sendEmbed(client, message, guildId, days);
 

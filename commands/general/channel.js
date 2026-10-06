@@ -2,6 +2,16 @@
 
 
 const { ChannelType, PermissionFlagsBits } = require('discord.js');
+
+const {
+  ContainerBuilder,
+  TextDisplayBuilder,
+  MessageFlags,
+} = require('discord.js');
+
+const COMPONENTS_V2_FLAG = MessageFlags?.IsComponentsV2 ?? (1 << 15);
+const V2_AVAILABLE       = typeof ContainerBuilder === 'function' &&
+                           typeof TextDisplayBuilder === 'function';
 const db    = require('../../core/database');
 const embed = require('../../utils/embed');
 
@@ -203,25 +213,55 @@ catch {
       });
     }
 
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          null,
-          {
+    const lines = [
+      '## Informations salon',
+      '> #' + (channel.name || 'Salon'),
+      '',
+      'Salon › <#' + channel.id + '>',
+      'ID › `' + channel.id + '`',
+      '**Type** › ' + typeLabel,
+      'Catégorie › ' + category,
+      '**Position** › ' + (channel.position ?? 0),
+      'NSFW › ' + isNsfw,
+      'Visibilité › ' + visibility,
+      'Accès › **' + accessCount + '** membres',
+      'Mode lent › ' + slowmode,
+    ];
+
+    if (bitrate !== null) lines.push('Bitrate › ' + bitrate);
+    if (userLimit !== null) lines.push('Limite utilisateurs › ' + userLimit);
+    if (createdAt) lines.push('Créé le › <t:' + createdAt + ':F> (<t:' + createdAt + ':R>)');
+    if (topic) lines.push('Sujet › ' + topic);
+
+    const text = lines.join('\n');
+
+    let sent = null;
+
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
+      try {
+        const container = new ContainerBuilder();
+        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
+        sent = await message.channel.send({
+          components      : [container],
+          flags           : COMPONENTS_V2_FLAG,
+          allowedMentions : { repliedUser: false },
+        }).catch(() => null);
+      } catch {}
+    }
+
+    if (!sent) {
+      sent = await message.channel.send({
+        embeds: [
+          embed.build(guildId, null, {
             title      : 'Informations salon',
-            authorName : channel.name
-              ? `#${channel.name}`
-              : 'Salon',
+            authorName : channel.name ? `#${channel.name}` : 'Salon',
             fields,
             timestamp : false,
-          }
-        )
-      ],
-      allowedMentions: {
-        repliedUser: false,
-      },
-    }).catch(() => null);
+          })
+        ],
+        allowedMentions: { repliedUser: false },
+      }).catch(() => null);
+    }
 
     if (sent && deleteReply) {
       embed.scheduleDelete(sent, deleteDelay);

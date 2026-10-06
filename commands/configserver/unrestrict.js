@@ -192,8 +192,7 @@ async function _handleList(message, guild, guildId, deleteReply, deleteDelay) {
 
   if (visible.length <= LIST_PER_PAGE) {
     const sent = await message.channel.send({
-      embeds          : [buildEmbed()],
-      allowedMentions : { parse: [] },
+      ...embed.embedToPayload(guildId, buildEmbed(), { allowedMentions: { parse: [] } }),
     }).catch(() => null);
 
     if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
@@ -221,9 +220,7 @@ async function _handleList(message, guild, guildId, deleteReply, deleteDelay) {
   ];
 
   const msg = await message.channel.send({
-    embeds          : [buildEmbed()],
-    components      : buildRows(false),
-    allowedMentions : { parse: [] },
+    ...embed.embedToPayload(guildId, buildEmbed(), { components: buildRows(false), allowedMentions: { parse: [] } }),
   }).catch(() => null);
 
   if (!msg) return;
@@ -249,8 +246,7 @@ async function _handleList(message, guild, guildId, deleteReply, deleteDelay) {
       if (interaction.customId === 'local:unrestrict:next' && page < totalPages - 1) page++;
 
       return interaction.update({
-        embeds     : [buildEmbed()],
-        components : buildRows(false),
+        ...embed.embedToPayload(guildId, buildEmbed(), { components: buildRows(false) }),
       });
     } catch (err) {
       if (err?.code !== 10062 && err?.code !== 40060) {

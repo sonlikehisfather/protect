@@ -266,19 +266,10 @@ async function _listCooldowns(message, deleteReply, deleteDelay) {
     ? `${statusLine}${lines.join('\n')}${extra}`
     : `${statusLine}Aucun cooldown personnalisé configuré.`;
 
-  const sent = await message.channel.send({
-    embeds: [
-      embed.build(
-        guildId,
-        content,
-        {
+  const sent = await embed.sendEmbed(message.channel, guildId, content, {
           title    : 'Cooldowns des commandes',
           timestamp: false,
-        }
-      ),
-    ],
-    allowedMentions: { parse: [] },
-  }).catch(() => null);
+          allowedMentions: { parse: [] } });
 
   if (sent && deleteReply) {
     embed.scheduleDelete(sent, deleteDelay);

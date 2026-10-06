@@ -141,10 +141,7 @@
         }
         const lines = templates.slice(0, 25).map(t => `\`${t.name}\`${t.data?.isV2 ? ' ◈' : ''} - créé par <@${t.createdBy}>`);
         if (templates.length > 25) lines.push(`…et ${templates.length - 25} autre(s).`);
-        const s = await message.channel.send({
-          embeds: [embed.build(guildId, lines.join('\n'), { title: 'Templates sauvegardés', timestamp: false })],
-          allowedMentions: { parse: [] },
-        }).catch(() => null);
+        const s = await embed.sendEmbed(message.channel, guildId, lines.join('\n'), { title: 'Templates sauvegardés', timestamp: false });
         if (s && deleteReply) embed.scheduleDelete(s, deleteDelay);
         return;
       }
@@ -316,8 +313,10 @@
             }
             captureState.busy = true;
 
+            const addModalId = `cap:modal:add:${i.id}`;
+
             const modal = new ModalBuilder()
-              .setCustomId('cap:modal:add')
+              .setCustomId(addModalId)
               .setTitle("Charger un embed")
               .addComponents(
                 new ActionRowBuilder().addComponents(
@@ -340,11 +339,25 @@
 
             await i.showModal(modal).catch(() => {});
 
-            const submit = await i.awaitModalSubmit({ time: 120_000 }).catch(() => null);
+            const submit = await i.awaitModalSubmit({
+              time: 120_000,
+              filter: m => m.customId === addModalId && m.user.id === i.user.id,
+            }).catch(() => null);
             if (!submit) { captureState.busy = false; return; }
 
             console.log('[capture:add] modal soumis');
-            await submit.deferReply({ flags: 64 }).catch(e => { console.error('[capture:add] deferReply err:', e); });
+            let submitAck = false;
+            if (!submit.deferred && !submit.replied) {
+              submitAck = await submit.deferReply({ flags: 64 })
+                .then(() => true)
+                .catch(e => {
+                  const code = Number(e?.code);
+                  if (code !== 10062 && code !== 40060) {
+                    console.error('[capture:add] deferReply err:', e);
+                  }
+                  return false;
+                });
+            }
 
             const channelQuery = submit.fields.getTextInputValue('cap:input:channel').trim();
             const msgIdRaw     = submit.fields.getTextInputValue('cap:input:msgid').trim();
@@ -374,10 +387,16 @@
               return;
             }
 
-            const targetMsg = await resolvedCh.messages.fetch(msgIdRaw).catch(e => { console.error('[capture:add] fetch msg err:', e); return null; });
-            console.log('[capture:add] targetMsg:', targetMsg?.id ?? 'null', '| embeds:', targetMsg?.embeds?.length ?? 0);
+            const fetchResult = await _fetchCaptureMessage(guild, resolvedCh, msgIdRaw);
+            const targetMsg = fetchResult.message;
+            const fetchErrCode = fetchResult.errCode;
+            const sourceChannelId = fetchResult.channelId || resolvedCh.id;
+            console.log('[capture:add] targetMsg:', targetMsg?.id ?? 'null', '| embeds:', targetMsg?.embeds?.length ?? 0, '| sourceCh:', sourceChannelId);
             if (!targetMsg) {
-              captureState.status = `## Message introuvable\nAucun message avec l'ID \`${msgIdRaw}\` dans <#${resolvedCh.id}>.`;
+              const reason = fetchErrCode === 10008
+                ? 'Message introuvable, supprimé, ou ID/salon incorrect.'
+                : 'Impossible de récupérer le message (accès refusé ou erreur API).';
+              captureState.status = `## Message introuvable\n${reason}\nVérifie l'ID et que le message existe dans <#${resolvedCh.id}>.`;
               await panelMsg.edit(_buildPanel()).catch(e => console.error('[capture:add] edit err (no msg):', e));
               setTimeout(async () => {
                 captureState.status = '';
@@ -410,7 +429,7 @@
               }
               console.log('[capture:add] V2 capturé:', v2Json.length, 'composants');
 
-              captureState.channelId = resolvedCh.id;
+              captureState.channelId = sourceChannelId;
               captureState.messageId = msgIdRaw;
               captureState.isV2      = true;
               captureState.v2Json    = v2Json;
@@ -418,7 +437,7 @@
               captureState.saveData  = { isV2: true, components: v2Json };
 
               await panelMsg.edit(_buildPanel()).catch(e => console.error('[capture:add] edit V2 err:', e));
-              submit.editReply({ content: '✓ Message V2 capturé.' }).catch(() => {});
+              if (submitAck) submit.editReply({ content: '✓ Message V2 capturé.' }).catch(() => {});
               captureState.busy = false;
               return;
             }
@@ -426,7 +445,7 @@
             const raw     = targetMsg.embeds[0];
             const rawData = raw?.data || raw?.toJSON?.() || {};
 
-            captureState.channelId = resolvedCh.id;
+            captureState.channelId = sourceChannelId;
             captureState.messageId = msgIdRaw;
             captureState.embedData = rawData;
             captureState.saveData  = {
@@ -449,7 +468,7 @@
 
             console.log('[capture:add] tout ok, edition du panel');
             await panelMsg.edit(_buildPanel()).catch(e => console.error('[capture:add] edit final err:', e));
-            submit.editReply({ content: '✓ Embed capturé.' }).catch(() => {});
+            if (submitAck) submit.editReply({ content: '✓ Embed capturé.' }).catch(() => {});
             console.log('[capture:add] done');
             captureState.busy = false;
             return;
@@ -463,7 +482,7 @@
 
             const tplCount = db.listEmbeds(guildId).length;
             if (tplCount >= 25) {
-              captureState.status = `## Limite atteinte\n**25 templates** maximum par serveur.`;
+              captureState.status = `## Limite atteinte\n**25 templates** maximum (globaux).`;
               await i.deferUpdate().catch(() => {});
               await panelMsg.edit(_buildPanel()).catch(() => {});
               setTimeout(async () => {
@@ -473,8 +492,10 @@
               return;
             }
 
+            const saveModalId = `cap:modal:save:${i.id}`;
+
             const saveModal = new ModalBuilder()
-              .setCustomId('cap:modal:save')
+              .setCustomId(saveModalId)
               .setTitle('Nommer le template')
               .addComponents(
                 new ActionRowBuilder().addComponents(
@@ -491,10 +512,18 @@
 
             await i.showModal(saveModal).catch(() => {});
 
-            const saveSubmit = await i.awaitModalSubmit({ time: 120_000 }).catch(() => null);
+            const saveSubmit = await i.awaitModalSubmit({
+              time: 120_000,
+              filter: m => m.customId === saveModalId && m.user.id === i.user.id,
+            }).catch(() => null);
             if (!saveSubmit) return;
 
-            await saveSubmit.deferReply({ flags: 64 }).catch(() => {});
+            let saveSubmitAck = false;
+            if (!saveSubmit.deferred && !saveSubmit.replied) {
+              saveSubmitAck = await saveSubmit.deferReply({ flags: 64 })
+                .then(() => true)
+                .catch(() => false);
+            }
 
             const rawName = _normalizeTemplateName(saveSubmit.fields.getTextInputValue('cap:input:name'));
 
@@ -519,7 +548,7 @@
             }
 
             db.saveEmbed(guildId, rawName, captureState.saveData, message.author.id);
-            saveSubmit.deleteReply().catch(() => {});
+            if (saveSubmitAck) saveSubmit.deleteReply().catch(() => {});
 
             collector.stop('saved');
             const doneContainer = new ContainerBuilder()
@@ -558,16 +587,12 @@
           if (s && deleteReply) embed.scheduleDelete(s, deleteDelay);
           return;
         }
-        const confirmMsg = await message.channel.send({
-          embeds: [embed.build(guildId, `Supprimer le template \`${rawName}\` ?`, { timestamp: false })],
-          components: [
+        const confirmMsg = await message.channel.send({ ...embed.buildPayload(guildId, `Supprimer le template \`${rawName}\` ?`, { timestamp: false , components: [
             new ActionRowBuilder().addComponents(
               new ButtonBuilder().setCustomId('embed:tpl:delconfirm').setLabel('Supprimer').setStyle(ButtonStyle.Danger),
               new ButtonBuilder().setCustomId('embed:tpl:delcancel').setLabel('Annuler').setStyle(ButtonStyle.Secondary),
             ),
-          ],
-          allowedMentions: { parse: [] },
-        }).catch(() => null);
+          ] }) });
         if (!confirmMsg) return;
         try {
           const btn = await confirmMsg.awaitMessageComponent({
@@ -576,25 +601,13 @@
           });
           if (btn.customId === 'embed:tpl:delconfirm') {
             db.deleteEmbed(guildId, rawName);
-            await btn.update({
-              embeds: [embed.build(guildId, `Template supprimé : \`${rawName}\`.`, { timestamp: false })],
-              components: [],
-              allowedMentions: { parse: [] },
-            }).catch(() => {});
+            await btn.update({ ...embed.buildPayload(guildId, `Template supprimé : \`${rawName}\`.`, { timestamp: false , components: [] }) });
           } else {
-            await btn.update({
-              embeds: [embed.build(guildId, 'Suppression annulée.', { timestamp: false })],
-              components: [],
-              allowedMentions: { parse: [] },
-            }).catch(() => {});
+            await btn.update({ ...embed.buildPayload(guildId, 'Suppression annulée.', { timestamp: false , components: [] }) });
           }
           if (deleteReply) embed.scheduleDelete(confirmMsg, deleteDelay);
         } catch {
-          await confirmMsg.edit({
-            embeds: [embed.build(guildId, 'Suppression expirée.', { timestamp: false })],
-            components: [],
-            allowedMentions: { parse: [] },
-          }).catch(() => {});
+          await confirmMsg.edit({ ...embed.buildPayload(guildId, 'Suppression expirée.', { timestamp: false , components: [] }) });
           if (deleteReply) embed.scheduleDelete(confirmMsg, deleteDelay);
         }
         return;
@@ -612,6 +625,7 @@
       const state = sourceEmbed
         ? _stateFromEmbed(sourceEmbed, defaultColor)
         : {
+            guildId     : guildId,
             title       : null,
             description : null,
             author      : null,
@@ -626,7 +640,10 @@
             timestamp   : false,
             fields      : [],
             view        : 'main',
+            buildMode   : 'v1',
           };
+
+          state.guildId = guildId;
 
       if (templateData) {
         _loadTemplateIntoState(state, templateData, defaultColor);
@@ -688,6 +705,19 @@
             await _ephemeral(interaction, guildId, 'Aucun contenu à prévisualiser.');
             return;
           }
+          if (state.buildMode === 'v2') {
+            try {
+              const container = _buildV2FromState(state, varCtx);
+              await interaction.reply({
+                components      : [container],
+                flags           : COMPONENTS_V2_FLAG | 64,
+                allowedMentions : { parse: [] },
+              }).catch(() => {});
+            } catch {
+              await _ephemeral(interaction, guildId, 'Erreur lors de la prévisualisation V2.');
+            }
+            return;
+          }
           await interaction.reply({
             embeds          : [_buildPreview(state, false, varCtx)],
             flags           : 64,
@@ -718,6 +748,13 @@
             flags           : 64,
             allowedMentions : { parse: [] },
           }).catch(() => {});
+          return;
+        }
+
+        if (id === 'embed:buildmode') {
+          state.buildMode = state.buildMode === 'v2' ? 'v1' : 'v2';
+          await interaction.deferUpdate().catch(() => {});
+          await _refresh(panel, state, mode);
           return;
         }
 
@@ -789,8 +826,8 @@
             if (pages > 1) {
               container.addActionRowComponents(
                 new ActionRowBuilder().addComponents(
-                  new ButtonBuilder().setCustomId('eload:prev').setLabel('◀').setStyle(ButtonStyle.Secondary).setDisabled(pg === 0),
-                  new ButtonBuilder().setCustomId('eload:next').setLabel('▶').setStyle(ButtonStyle.Secondary).setDisabled(pg >= pages - 1),
+                  new ButtonBuilder().setCustomId('eload:prev').setLabel('←').setStyle(ButtonStyle.Secondary).setDisabled(pg === 0),
+                  new ButtonBuilder().setCustomId('eload:next').setLabel('→').setStyle(ButtonStyle.Secondary).setDisabled(pg >= pages - 1),
                   new ButtonBuilder().setCustomId('eload:close').setLabel('✖').setStyle(ButtonStyle.Danger),
                 )
               );
@@ -1012,7 +1049,7 @@
 
           const tplCount = db.listEmbeds(guildId).length;
           if (tplCount >= 25) {
-            await _modalError(submit, guildId, 'Limite atteinte : 25 templates maximum par serveur.');
+            await _modalError(submit, guildId, 'Limite atteinte : 25 templates maximum (globaux).');
             busy = false;
             await _refresh(panel, state, mode);
             return;
@@ -1260,10 +1297,7 @@
               }
 
               await panel.delete().catch(() => {});
-              const sent = await message.channel.send({
-                embeds: [embed.build(guildId, `Message V2 envoyé dans ${channel}.`, { timestamp: false })],
-                allowedMentions: { repliedUser: false },
-              }).catch(() => null);
+              const sent = await embed.sendEmbed(message.channel, guildId, `Message V2 envoyé dans ${channel}.`, { timestamp: false });
               if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
 
               busy = false;
@@ -1279,6 +1313,65 @@
 
           if (!_hasEmbedContent(state)) {
             state.description = 'Embed vide.';
+          }
+
+          if (state.buildMode === 'v2' && mode !== 'edit') {
+            const modalId = `embed:send:${panel.id}:${interaction.id}`;
+            const shown = await interaction.showModal(
+              _buildModal(modalId, 'Envoyer le message V2', [
+                _input('channel', 'Salon cible', TextInputStyle.Short, {
+                  maxLength: 100, required: true, placeholder: '#salon, ID ou nom',
+                }),
+              ])
+            ).then(() => true).catch(() => false);
+
+            busy = false;
+            if (!shown) return;
+
+            const submit = await _awaitOwnModal(interaction, modalId);
+            if (!submit) { await _refresh(panel, state, mode); return; }
+
+            busy = true;
+            const query  = submit.fields.getTextInputValue('channel').trim();
+            const channel = await _resolveTextChannel(guild, query);
+
+            if (!channel) {
+              await _modalError(submit, guildId, 'Salon introuvable ou invalide.');
+              busy = false;
+              await _refresh(panel, state, mode);
+              return;
+            }
+
+            await submit.deferUpdate().catch(() => {});
+
+            try {
+              const container = _buildV2FromState(state, varCtx);
+              const sentV2 = await channel.send({
+                components      : [container],
+                flags           : COMPONENTS_V2_FLAG,
+                allowedMentions : { parse: [] },
+              }).catch(() => null);
+
+              if (!sentV2) {
+                busy = false;
+                await _temporaryError(message, guildId, 'Impossible d\'envoyer le message V2 dans ce salon.');
+                await _refresh(panel, state, mode);
+                return;
+              }
+
+              await panel.delete().catch(() => {});
+              const sent = await embed.sendEmbed(message.channel, guildId, `Message V2 envoyé dans ${channel}.`, { timestamp: false });
+              if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
+
+              busy = false;
+              collector.stop('sent');
+              return;
+            } catch {
+              busy = false;
+              await _temporaryError(message, guildId, 'Erreur lors de l\'envoi V2.');
+              await _refresh(panel, state, mode);
+              return;
+            }
           }
 
           if (_totalChars(state) > 6000) {
@@ -1398,10 +1491,13 @@
       const defaultColor = _safeColor(db.getGuildConfig(guildId)?.color);
 
       const state = initialState || {
+        guildId: guildId,
         title: null, description: null, author: null, authorIcon: null, authorUrl: null,
         footer: null, footerIcon: null, thumbnail: null, image: null, url: null,
-        color: defaultColor, timestamp: false, fields: [], view: 'main',
+        color: defaultColor, timestamp: false, fields: [], view: 'main', buildMode: 'v1',
       };
+
+      state.guildId = guildId;
 
       const panel = await message.channel.send(_buildPanelPayload(state, 'ticket')).catch(() => null);
       if (!panel) return null;
@@ -1516,8 +1612,8 @@
             if (pages > 1) {
               container.addActionRowComponents(
                 new ActionRowBuilder().addComponents(
-                  new ButtonBuilder().setCustomId('eload:prev').setLabel('◀').setStyle(ButtonStyle.Secondary).setDisabled(pg === 0),
-                  new ButtonBuilder().setCustomId('eload:next').setLabel('▶').setStyle(ButtonStyle.Secondary).setDisabled(pg >= pages - 1),
+                  new ButtonBuilder().setCustomId('eload:prev').setLabel('←').setStyle(ButtonStyle.Secondary).setDisabled(pg === 0),
+                  new ButtonBuilder().setCustomId('eload:next').setLabel('→').setStyle(ButtonStyle.Secondary).setDisabled(pg >= pages - 1),
                   new ButtonBuilder().setCustomId('eload:close').setLabel('✖').setStyle(ButtonStyle.Danger),
                 )
               );
@@ -1760,7 +1856,7 @@
 
           const tplCount = db.listEmbeds(guildId).length;
           if (tplCount >= 25) {
-            await _modalError(submit, guildId, 'Limite atteinte : 25 templates maximum par serveur.');
+            await _modalError(submit, guildId, 'Limite atteinte : 25 templates maximum (globaux).');
             busy = false;
             await _refresh(panel, state, 'ticket');
             return;
@@ -1830,6 +1926,13 @@
             flags: 64,
             allowedMentions: { parse: [] },
           }).catch(() => {});
+          return;
+        }
+
+        if (id === 'embed:buildmode') {
+          state.buildMode = state.buildMode === 'v2' ? 'v1' : 'v2';
+          await interaction.deferUpdate().catch(() => {});
+          await _refresh(panel, state, 'ticket');
           return;
         }
 
@@ -2028,6 +2131,52 @@
         },
       )
       .setTimestamp();
+  }
+
+  function _buildV2FromState(state, ctx = null) {
+    const v = (text) => ctx ? replaceVariables(text, ctx) : (text ?? '');
+    const container = new ContainerBuilder();
+    const textParts = [];
+
+    if (state.title) {
+      textParts.push('## ' + v(state.title));
+    }
+    if (state.author) {
+      textParts.push('> ' + v(state.author));
+    }
+    if (state.description) {
+      textParts.push('', v(state.description));
+    }
+    if (Array.isArray(state.fields) && state.fields.length) {
+      for (const f of state.fields) {
+        textParts.push('', '**' + v(f.name || '') + '**', v(f.value || ''));
+      }
+    }
+    if (state.footer) {
+      textParts.push('', '-# ' + v(state.footer));
+    }
+    if (state.timestamp) {
+      textParts.push('-# <t:' + Math.floor(Date.now() / 1000) + ':R>');
+    }
+
+    if (textParts.length) {
+      container.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(textParts.join('\n').slice(0, 4000)),
+      );
+    }
+
+    const mediaItems = [];
+    if (state.thumbnail) mediaItems.push({ url: state.thumbnail });
+    if (state.image) mediaItems.push({ url: state.image });
+    if (mediaItems.length) {
+      const gallery = new MediaGalleryBuilder();
+      for (const item of mediaItems) {
+        gallery.addItems(new MediaGalleryItemBuilder().setURL(item.url));
+      }
+      container.addMediaGalleryComponents(gallery);
+    }
+
+    return container;
   }
 
   function _buildPreview(state, previewMode = false, ctx = null) {
@@ -2439,11 +2588,11 @@
 
   function _buildPanelPayload(state, mode) {
     const view = state.view || 'main';
+    const guildId = state?.guildId;
 
-    if (V2_AVAILABLE) {
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
       try {
-        const accent    = _hexToInt(state.color);
-        const container = new ContainerBuilder().setAccentColor(accent);
+        const container = new ContainerBuilder();
 
         const panelTitle = mode === 'edit' ? 'Édition d\'embed' : mode === 'copy' ? 'Copie d\'embed' : 'Générateur d\'embed';
         const sendLabel  = mode === 'edit' ? 'Sauvegarder' : mode === 'copy' ? 'Envoyer la copie' : 'Envoyer';
@@ -2505,7 +2654,7 @@
           );
           container.addActionRowComponents(
             new ActionRowBuilder().addComponents(
-              new ButtonBuilder().setCustomId('embed:nav:main').setLabel('↩️').setStyle(ButtonStyle.Secondary),
+              new ButtonBuilder().setCustomId('embed:nav:main').setLabel('⤶').setStyle(ButtonStyle.Secondary),
             ),
           );
         } else if (view === 'images') {
@@ -2534,7 +2683,7 @@
           );
           container.addActionRowComponents(
             new ActionRowBuilder().addComponents(
-              new ButtonBuilder().setCustomId('embed:nav:main').setLabel('↩️').setStyle(ButtonStyle.Secondary),
+              new ButtonBuilder().setCustomId('embed:nav:main').setLabel('⤶').setStyle(ButtonStyle.Secondary),
             ),
           );
         } else if (view === 'fields') {
@@ -2564,7 +2713,7 @@
           );
           container.addActionRowComponents(
             new ActionRowBuilder().addComponents(
-              new ButtonBuilder().setCustomId('embed:nav:main').setLabel('↩️').setStyle(ButtonStyle.Secondary),
+              new ButtonBuilder().setCustomId('embed:nav:main').setLabel('⤶').setStyle(ButtonStyle.Secondary),
             ),
           );
         } else if (view === 'tools') {
@@ -2587,7 +2736,11 @@
           );
           container.addActionRowComponents(
             new ActionRowBuilder().addComponents(
-              new ButtonBuilder().setCustomId('embed:nav:main').setLabel('↩️').setStyle(ButtonStyle.Secondary),
+              new ButtonBuilder()
+                .setCustomId('embed:buildmode')
+                .setLabel(state.buildMode === 'v2' ? 'Mode : V2' : 'Mode : V1')
+                .setStyle(state.buildMode === 'v2' ? ButtonStyle.Primary : ButtonStyle.Secondary),
+              new ButtonBuilder().setCustomId('embed:nav:main').setLabel('⤶').setStyle(ButtonStyle.Secondary),
             ),
           );
         } else if (view === 'tools_reset') {
@@ -2640,9 +2793,11 @@
   }
 
   function _buildClosedPayload(state, text) {
-    if (V2_AVAILABLE) {
+    const guildId = state?.guildId;
+
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
       try {
-        const container = new ContainerBuilder().setAccentColor(_hexToInt(state.color));
+        const container = new ContainerBuilder();
         container.addTextDisplayComponents(
           new TextDisplayBuilder().setContent(text),
         );
@@ -2688,10 +2843,7 @@
     const _teCfg   = db.getGuildConfig(guildId);
     const _teDelay = _teCfg?.autoDeleteDelay ?? 4;
 
-    const sent = await message.channel.send({
-      embeds: [embed.build(guildId, content, { timestamp: false })],
-      allowedMentions: { repliedUser: false },
-    }).catch(() => null);
+    const sent = await embed.sendEmbed(message.channel, guildId, content, { timestamp: false });
 
     if (sent) embed.scheduleDelete(sent, _teDelay);
   }
@@ -2721,6 +2873,69 @@
         (ch.type === ChannelType.GuildText || ch.type === ChannelType.GuildAnnouncement) &&
         ch.name.toLowerCase() === lower
     ) ?? null;
+  }
+
+  function _isCaptureChannel(ch) {
+    return ch?.type === ChannelType.GuildText ||
+      ch?.type === ChannelType.GuildAnnouncement ||
+      ch?.type === ChannelType.PublicThread ||
+      ch?.type === ChannelType.PrivateThread ||
+      ch?.type === ChannelType.AnnouncementThread;
+  }
+
+  async function _fetchCaptureMessage(guild, channel, messageId) {
+    let errCode = null;
+
+    const direct = await channel.messages.fetch(messageId).catch(e => {
+      errCode = Number(e?.code) || null;
+      return null;
+    });
+    if (direct) return { message: direct, channelId: channel.id, errCode: null };
+
+    if (errCode !== 10008) {
+      console.error('[capture:add] fetch msg err:', errCode, 'in', channel.id);
+      return { message: null, channelId: channel.id, errCode };
+    }
+
+    const candidates = [];
+
+    const activeThreads = await guild.channels.fetchActiveThreads().catch(() => null);
+    if (activeThreads?.threads?.size) {
+      for (const th of activeThreads.threads.values()) {
+        if (th?.parentId === channel.id && _isCaptureChannel(th)) {
+          candidates.push(th);
+        }
+      }
+    }
+
+    if (channel?.threads) {
+      const archivedPublic = await channel.threads.fetchArchived({ type: 'public', limit: 50 }).catch(() => null);
+      if (archivedPublic?.threads?.size) {
+        for (const th of archivedPublic.threads.values()) {
+          if (_isCaptureChannel(th)) candidates.push(th);
+        }
+      }
+      const archivedPrivate = await channel.threads.fetchArchived({ type: 'private', limit: 50 }).catch(() => null);
+      if (archivedPrivate?.threads?.size) {
+        for (const th of archivedPrivate.threads.values()) {
+          if (_isCaptureChannel(th)) candidates.push(th);
+        }
+      }
+    }
+
+    const seen = new Set();
+    for (const th of candidates) {
+      if (!th?.id || seen.has(th.id)) continue;
+      seen.add(th.id);
+      const msg = await th.messages.fetch(messageId).catch(() => null);
+      if (msg) {
+        console.log('[capture:add] message trouvé dans thread:', th.id);
+        return { message: msg, channelId: th.id, errCode: null };
+      }
+    }
+
+    console.warn('[capture:add] message introuvable:', messageId, 'dans', channel.id, '(et threads liés)');
+    return { message: null, channelId: channel.id, errCode: 10008 };
   }
 
   function _isUrl(value) {
@@ -2923,6 +3138,7 @@
         value  : f.value || '',
         inline : f.inline ?? false,
       })),
+      buildMode   : state.buildMode || 'v1',
     };
   }
 
@@ -2947,6 +3163,7 @@
         }))
       : [];
     state.view = 'main';
+    state.buildMode = savedData.buildMode || 'v1';
   }
 
   function _normalizeTemplateName(input) {

@@ -308,7 +308,7 @@ module.exports = {
         ? [`## ◈ Rainbow Role ・ ${entries.length} rôle${entries.length > 1 ? 's' : ''} configuré${entries.length > 1 ? 's' : ''}`, '', ...lines]
         : ['## ◈ Rainbow Role', '', ...lines];
 
-      const container = new ContainerBuilder().setAccentColor(accent)
+      const container = new ContainerBuilder()
         .addTextDisplayComponents(new TextDisplayBuilder().setContent(headerLines.join('\n')))
         .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
         .addTextDisplayComponents(new TextDisplayBuilder().setContent(['### ◈ Configuration', '', ...details].join('\n')))
@@ -359,7 +359,7 @@ module.exports = {
       
 
       if (state.view === 'list') {
-        const listContainer = new ContainerBuilder().setAccentColor(accent)
+        const listContainer = new ContainerBuilder()
           .addTextDisplayComponents(new TextDisplayBuilder().setContent(['## Configuration Rainbow Role', '', ...lines].join('\n')))
           .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
 

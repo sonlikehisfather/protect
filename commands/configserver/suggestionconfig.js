@@ -270,7 +270,7 @@ module.exports = {
       embed.clearPrivateInteraction(panel);
       if (reason === 'closed') return;
 
-      if (V2_AVAILABLE) {
+      if (embed.shouldUseV2(guildId, module.exports.help.name)) {
         try {
           const ro = _buildReadOnlyV2(guildId, state);
           await panel.edit(ro).catch(() => {});
@@ -301,7 +301,7 @@ function _stateFromConfig(config) {
 
 
 function _buildPanelPayload(guildId, state) {
-  if (V2_AVAILABLE) {
+  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
     try {
       const payload = _buildV2(guildId, state);
       if (payload) return payload;
@@ -312,7 +312,7 @@ function _buildPanelPayload(guildId, state) {
 
 function _buildV2(guildId, state) {
   const accent    = _hexToInt(state.baseColor);
-  const container = new ContainerBuilder().setAccentColor(accent);
+  const container = new ContainerBuilder();
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent('## Suggestions'),
@@ -380,7 +380,7 @@ function _buildV2(guildId, state) {
 
 function _buildReadOnlyV2(guildId, state) {
   const accent    = _hexToInt(state.baseColor);
-  const container = new ContainerBuilder().setAccentColor(accent);
+  const container = new ContainerBuilder();
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent('## Suggestions'),

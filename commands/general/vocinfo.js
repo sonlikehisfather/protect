@@ -6,7 +6,16 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  ContainerBuilder,
+  TextDisplayBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  MessageFlags,
 } = require('discord.js');
+
+const COMPONENTS_V2_FLAG = MessageFlags?.IsComponentsV2 ?? (1 << 15);
+const V2_AVAILABLE       = typeof ContainerBuilder === 'function' &&
+                           typeof TextDisplayBuilder === 'function';
 
 const db    = require('../../core/database');
 const embed = require('../../utils/embed');
@@ -77,47 +86,37 @@ module.exports = {
       );
 
     if (!lines.length) {
-
-      const sent = await message.channel.send({
-        embeds: [
-          embed.build(
-            guildId,
-            null,
-            {
-              title  : 'Informations vocales',
-              fields : [
-                {
-                  name  : 'Salons vocaux',
-                  value : String(totalVoice),
-                  inline: true,
-                },
-                {
-                  name  : 'Membres connectés',
-                  value : '0',
-                  inline: true,
-                },
-                {
-                  name  : 'Salons actifs',
-                  value : '0',
-                  inline: true,
-                },
-                {
-                  name  : 'Salons vides',
-                  value : String(totalEmpty),
-                  inline: true,
-                },
-                {
-                  name  : 'Liste',
-                  value : 'Aucun salon vocal actif.',
-                  inline: false,
-                },
-              ],
-              timestamp : false,
-            }
-          )
-        ],
-        allowedMentions: { parse: [] },
-      }).catch(() => null);
+      const text = '## Informations vocales\n\n' +
+        'Salons vocaux › ' + totalVoice + '\n' +
+        'Membres connectés › 0\n' +
+        'Salons actifs › 0\n' +
+        'Salons vides › ' + totalEmpty + '\n\n' +
+        'Aucun salon vocal actif.';
+      let sent = null;
+      if (embed.shouldUseV2(guildId, module.exports.help.name)) {
+        try {
+          const container = new ContainerBuilder();
+          container.addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
+          sent = await message.channel.send({
+            components      : [container],
+            flags           : COMPONENTS_V2_FLAG,
+            allowedMentions : { parse: [] },
+          }).catch(() => null);
+        } catch {}
+      }
+      if (!sent) {
+        sent = await embed.sendEmbed(message.channel, guildId, null, {
+            title  : 'Informations vocales',
+            fields : [
+              { name: 'Salons vocaux', value: String(totalVoice), inline: true },
+              { name: 'Membres connectés', value: '0', inline: true },
+              { name: 'Salons actifs', value: '0', inline: true },
+              { name: 'Salons vides', value: String(totalEmpty), inline: true },
+              { name: 'Liste', value: 'Aucun salon vocal actif.', inline: false },
+            ],
+            timestamp : false,
+          });
+      }
 
       if (sent && deleteReply) {
         embed.scheduleDelete(sent, deleteDelay);
@@ -129,70 +128,59 @@ module.exports = {
     const pages = chunkArray(lines, PAGE_SIZE);
     let page = 0;
 
-    const buildEmbed = () => embed.build(
-      guildId,
-      null,
-      {
-        title  : 'Informations vocales',
-        fields : [
-          {
-            name  : 'Salons vocaux',
-            value : String(totalVoice),
-            inline: true,
-          },
-          {
-            name  : 'Membres connectés',
-            value : String(totalMembers),
-            inline: true,
-          },
-          {
-            name  : 'Salons actifs',
-            value : String(totalActive),
-            inline: true,
-          },
-          {
-            name  : 'Salons vides',
-            value : String(totalEmpty),
-            inline: true,
-          },
-          {
-            name  : 'Liste',
-            value : pages[page].join('\n'),
-            inline: false,
-          },
-        ],
-        footer    : `Page ${page + 1}/${pages.length}`,
-        timestamp : false,
+const buildPayload = (disabled = false) => {
+      const header = '## Informations vocales\n';
+      const stats  = 'Salons vocaux \u203a ' + totalVoice + ' \u2022 Membres connect\u00e9s \u203a ' + totalMembers + ' \u2022 Actifs \u203a ' + totalActive + ' \u2022 Vides \u203a ' + totalEmpty;
+      const body   = header + stats + '\n\n' + pages[page].join('\n');
+      const footer = '-# Page ' + (page + 1) + '/' + pages.length;
+
+      const prevBtn = new ButtonBuilder()
+        .setCustomId('vocinfo:prev')
+        .setLabel('\u2190')
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(disabled || page === 0);
+      const nextBtn = new ButtonBuilder()
+        .setCustomId('vocinfo:next')
+        .setLabel('\u2192')
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(disabled || page >= pages.length - 1);
+      const closeBtn = new ButtonBuilder()
+        .setCustomId('vocinfo:close')
+        .setLabel('\u2716')
+        .setStyle(ButtonStyle.Danger)
+        .setDisabled(disabled);
+      const navRow = new ActionRowBuilder().addComponents(prevBtn, nextBtn, closeBtn);
+
+      if (embed.shouldUseV2(guildId, module.exports.help.name)) {
+        try {
+          const container = new ContainerBuilder();
+          container.addTextDisplayComponents(new TextDisplayBuilder().setContent(body));
+          container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
+          container.addTextDisplayComponents(new TextDisplayBuilder().setContent(footer));
+          if (pages.length > 1) container.addActionRowComponents(navRow);
+          return { embeds: [], components: [container], flags: COMPONENTS_V2_FLAG, allowedMentions: { parse: [] } };
+        } catch {}
       }
-    );
 
-    const buildRows = (disabled = false) => [
-      new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId('vocinfo:prev')
-          .setLabel('\u2190')
-          .setStyle(ButtonStyle.Secondary)
-          .setDisabled(disabled || page === 0),
+      return {
+        embeds: [embed.build(guildId, null, {
+          title  : 'Informations vocales',
+          fields : [
+            { name: 'Salons vocaux', value: String(totalVoice), inline: true },
+            { name: 'Membres connect\u00e9s', value: String(totalMembers), inline: true },
+            { name: 'Salons actifs', value: String(totalActive), inline: true },
+            { name: 'Salons vides', value: String(totalEmpty), inline: true },
+            { name: 'Liste', value: pages[page].join('\n'), inline: false },
+          ],
+          footer    : `Page ${page + 1}/${pages.length}`,
+          timestamp : false,
+        })],
+        components: pages.length > 1 ? [navRow] : [],
+        allowedMentions: { parse: [] },
+      };
+    };
 
-        new ButtonBuilder()
-          .setCustomId('vocinfo:next')
-          .setLabel('\u2192')
-          .setStyle(ButtonStyle.Secondary)
-          .setDisabled(disabled || page >= pages.length - 1),
-
-        new ButtonBuilder()
-          .setCustomId('vocinfo:close')
-          .setLabel('\u2716')
-          .setStyle(ButtonStyle.Danger)
-          .setDisabled(disabled),
-      ),
-    ];
-
-    const sent = await message.channel.send({
-      embeds          : [buildEmbed()],
-      components      : pages.length > 1 ? buildRows() : [],
-      allowedMentions : { parse: [] },
-    }).catch(() => null);
+    const sent = await message.channel.send(buildPayload()).catch(() => null);
 
     if (!sent) return;
 
@@ -228,10 +216,7 @@ module.exports = {
           page++;
         }
 
-        await interaction.update({
-          embeds     : [buildEmbed()],
-          components : buildRows(),
-        });
+        await interaction.update(buildPayload());
       } catch (err) {
         if (err?.code !== 10062 && err?.code !== 40060) {}
       }
@@ -240,9 +225,7 @@ module.exports = {
     collector.on('end', (_, reason) => {
       embed.clearPrivateInteraction(sent);
       if (reason === 'closed') return;
-      sent.edit({
-        components: [],
-      }).catch(() => {});
+      sent.edit(buildPayload(true)).catch(() => {});
 
     });
 
@@ -323,21 +306,39 @@ async function _handleUser(message, args, guildId, deleteReply, deleteDelay) {
     { name: 'Fiabilité',          value: fiabilityStr,                           inline: false },
   ];
 
-  const sent = await message.channel.send({
-    embeds: [
-      embed.build(
-        guildId,
-        null,
-        {
-          title     : `Vocal - ${member.user.globalName ?? member.user.username}`,
-          thumbnail : member.user.displayAvatarURL({ size: 128 }),
-          fields,
-          timestamp : false,
-        }
-      ),
-    ],
-    allowedMentions: { parse: [] },
-  }).catch(() => null);
+  const text = '## Vocal - ' + (member.user.globalName ?? member.user.username) + '\n\n' +
+      'En vocal \u203a ' + (voiceCh ? 'Oui' : 'Non') + '\n' +
+      'Salon actuel \u203a ' + (voiceCh ? '<#' + voiceCh.id + '>' : '-') + '\n' +
+      'Depuis \u203a ' + sinceStr + '\n' +
+      'Session actuelle \u203a ' + sessionStr + '\n' +
+      'Temps vocal total \u203a ' + _formatDuration(totalSeconds) + '\n' +
+      'Fiabilit\u00e9 \u203a ' + (stats?.lastStaleClearAt ? 'Session interrompue lors d\'un red\u00e9marrage \u00b7 <t:' + stats.lastStaleClearAt + ':R>' : 'OK');
+
+    let sent = null;
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
+      try {
+        const container = new ContainerBuilder();
+        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
+        sent = await message.channel.send({
+          components      : [container],
+          flags           : COMPONENTS_V2_FLAG,
+          allowedMentions : { parse: [] },
+        }).catch(() => null);
+      } catch {}
+    }
+    if (!sent) {
+      sent = await message.channel.send({
+        embeds: [
+          embed.build(guildId, null, {
+            title     : `Vocal - ${member.user.globalName ?? member.user.username}`,
+            thumbnail : member.user.displayAvatarURL({ size: 128 }),
+            fields,
+            timestamp : false,
+          }),
+        ],
+        allowedMentions: { parse: [] },
+      }).catch(() => null);
+    }
 
   if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
 }

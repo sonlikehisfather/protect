@@ -116,13 +116,9 @@ exports.run = async (client, message, args) => {
     const _gsCfg   = db.getGuildConfig(guildId);
     const _gsDelay = _gsCfg?.autoDeleteDelay ?? 4;
 
-    const confirm = await message.channel.send({
-      embeds: [
-        embed.build(guildId, `Giveaway lanc\u00e9 dans <#${channel.id}> !`, {
+    const confirm = await embed.sendEmbed(message.channel, guildId, `Giveaway lanc\u00e9 dans <#${channel.id}> !`, {
           timestamp: false,
-        }),
-      ],
-    }).catch(() => null);
+        });
 
     if (confirm) embed.scheduleDelete(confirm, _gsDelay);
 

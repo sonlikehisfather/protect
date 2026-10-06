@@ -169,22 +169,13 @@ module.exports = {
     if (removedTimeout) details.push('timeout retiré');
     if (removedRole) details.push('rôle mute retiré');
 
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          `**${target.user.tag}** a été unmute.`,
-          {
+    const sent = await embed.sendEmbed(message.channel, guildId, `**${target.user.tag}** a été unmute.`, {
             fields: [
               { name: 'Raison', value: reason, inline: false },
               { name: 'Action', value: details.join(' • '), inline: false },
             ],
             timestamp: false,
-          }
-        )
-      ],
-      allowedMentions: { repliedUser: false },
-    }).catch(() => null);
+          allowedMentions: { repliedUser: false } });
 
     if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
 

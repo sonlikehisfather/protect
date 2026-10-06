@@ -217,19 +217,10 @@ module.exports = {
       option?.id ?? null
     );
 
-    const welcome = await channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          `Ticket ouvert manuellement par <@${message.author.id}> pour <@${member.id}>.\n\nCe membre n'a pas reçu de notification automatique.`,
-          {
+    const welcome = await embed.sendEmbed(channel, guildId, `Ticket ouvert manuellement par <@${message.author.id}> pour <@${member.id}>.\n\nCe membre n'a pas reçu de notification automatique.`, {
             title     : 'Modmail ouvert',
             timestamp: new Date(),
-          }
-        ),
-      ],
-      allowedMentions: { users: [message.author.id, member.id] },
-    }).catch(() => null);
+          allowedMentions: { users: [message.author.id, member.id] } });
 
     if (welcome && typeof db.setTicketLastMessageId === 'function') {
       db.setTicketLastMessageId(channel.id, welcome.id);

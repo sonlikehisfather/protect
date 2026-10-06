@@ -440,10 +440,10 @@ module.exports = {
       embed.clearPrivateInteraction(panel);
       if (reason === 'closed') return;
 
-      if (V2_AVAILABLE) {
+      if (embed.shouldUseV2(guildId, module.exports.help.name)) {
         try {
           const accent = _hexToInt(state.baseColor);
-          const ro = new ContainerBuilder().setAccentColor(accent);
+          const ro = new ContainerBuilder();
           ro.addTextDisplayComponents(
             new TextDisplayBuilder().setContent('## Tempvoc'),
           );
@@ -511,7 +511,7 @@ function _parseJsonArray(value) {
 
 
 function _buildPanelPayload(guildId, state, guild) {
-  if (V2_AVAILABLE) {
+  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
     try {
       const payload = _buildV2(guildId, state, guild);
       if (payload) return payload;
@@ -522,7 +522,7 @@ function _buildPanelPayload(guildId, state, guild) {
 
 function _buildV2(guildId, state, guild) {
   const accent    = _hexToInt(state.baseColor);
-  const container = new ContainerBuilder().setAccentColor(accent);
+  const container = new ContainerBuilder();
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent('## Tempvoc'),

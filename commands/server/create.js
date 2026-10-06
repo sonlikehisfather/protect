@@ -182,19 +182,10 @@ module.exports = {
       `**ID**\n` +
       `\`${created.id}\``;
 
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          text,
-          {
+    const sent = await embed.sendEmbed(message.channel, guildId, text, {
             title     : 'Émoji créé avec succès',
             timestamp : false,
-          }
-        ),
-      ],
-      allowedMentions: { repliedUser: false },
-    }).catch(() => null);
+          allowedMentions: { repliedUser: false } });
 
     if (sent && deleteReply) {
       embed.scheduleDelete(sent, deleteDelay);

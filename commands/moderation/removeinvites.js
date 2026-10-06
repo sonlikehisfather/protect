@@ -56,14 +56,7 @@ module.exports = {
     db.addInviteBonus(guildId, target.id, -amount);
     const stats = db.getInviteStats(guildId, target.id);
 
-    const sent = await message.channel.send({
-      embeds: [embed.build(
-        guildId,
-        `**-${amount}** invitation(s) retirée(s) à ${target}.\nBonus total : \`${Math.max(0, stats.bonus)}\``,
-        { timestamp: false }
-      )],
-      allowedMentions: { parse: [] },
-    }).catch(() => null);
+    const sent = await embed.sendEmbed(message.channel, guildId, `**-${amount}** invitation(s) retirée(s) à ${target}.\nBonus total : \`${Math.max(0, stats.bonus)}\``, { timestamp: false , allowedMentions: { parse: [] } });
 
     if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
   },

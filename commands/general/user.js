@@ -5,7 +5,16 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  ContainerBuilder,
+  TextDisplayBuilder,
+  MediaGalleryBuilder,
+  MediaGalleryItemBuilder,
+  MessageFlags,
 } = require('discord.js');
+
+const COMPONENTS_V2_FLAG = MessageFlags?.IsComponentsV2 ?? (1 << 15);
+const V2_AVAILABLE       = typeof ContainerBuilder === 'function' &&
+                           typeof TextDisplayBuilder === 'function';
 
 const db    = require('../../core/database');
 const embed = require('../../utils/embed');
@@ -110,6 +119,28 @@ module.exports = {
       });
     }
 
+    const lines = [
+      `## Informations utilisateur`,
+      `> ${displayName}`,
+      '',
+      `**Utilisateur** \u203a <@${fetchedUser.id}>`,
+      `ID \u203a \`${fetchedUser.id}\``,
+      `**Bot** \u203a ${fetchedUser.bot ? 'Oui' : 'Non'}`,
+      `Nom affich\u00e9 \u203a ${fetchedUser.globalName ?? fetchedUser.username}`,
+      `**Nom utilisateur** \u203a @${fetchedUser.username}`,
+      `Compte cr\u00e9\u00e9 le \u203a <t:${createdAt}:F> (<t:${createdAt}:R>)`,
+    ];
+
+    if (avatarURL) {
+      lines.push(`Avatar \u203a [Avatar global](${avatarURL})`);
+    }
+
+    if (bannerURL) {
+      lines.push(`Banni\u00e8re \u203a [Banni\u00e8re globale](${bannerURL})`);
+    }
+
+    const text = lines.join('\n');
+
     const profileRow = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setLabel('Voir le profil')
@@ -117,12 +148,32 @@ module.exports = {
         .setURL(`https://discord.com/users/${fetchedUser.id}`)
     );
 
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          null,
-          {
+    let sent = null;
+
+    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
+      try {
+        const container = new ContainerBuilder();
+        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
+        if (bannerURL) {
+          container.addMediaGalleryComponents(
+            new MediaGalleryBuilder().addItems(
+              new MediaGalleryItemBuilder().setURL(bannerURL)
+            )
+          );
+        }
+        container.addActionRowComponents(profileRow);
+        sent = await message.channel.send({
+          components      : [container],
+          flags           : COMPONENTS_V2_FLAG,
+          allowedMentions : { parse: [] },
+        }).catch(() => null);
+      } catch {}
+    }
+
+    if (!sent) {
+      sent = await message.channel.send({
+        embeds: [
+          embed.build(guildId, null, {
             title      : 'Informations utilisateur',
             authorName : displayName,
             authorIcon : avatarURL,
@@ -130,12 +181,12 @@ module.exports = {
             image      : bannerURL ?? undefined,
             fields,
             timestamp  : false,
-          }
-        ),
-      ],
-      components: [profileRow],
-      allowedMentions: { parse: [] },
-    }).catch(() => null);
+          }),
+        ],
+        components: [profileRow],
+        allowedMentions: { parse: [] },
+      }).catch(() => null);
+    }
 
     if (sent && deleteReply) {
       embed.scheduleDelete(sent, deleteDelay);

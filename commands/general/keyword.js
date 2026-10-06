@@ -223,19 +223,16 @@ function buildConfigPayload(ownerId, guildId, selectedKw = null, status = null, 
 }
 
 async function openPanel(channel, author, guildId, invokeMsg = null) {
-  if (!V2_AVAILABLE) {
+  if (!embed.shouldUseV2(guildId, module.exports.help.name)) {
     const list = db.getKeywords(author.id, guildId);
     const desc = list.length
       ? list.map((r, i) => `**${i + 1}.** \`${r.keyword}\``).join('\n')
       : 'Aucun mot-clé enregistré.';
-    return channel.send({
-      embeds: [embed.build(guildId, desc, {
+    return embed.sendEmbed(channel, guildId, desc, {
         title  : 'Mots-clés ・ notifications DM',
         footer : `${list.length}/${MAX_KEYWORDS}`,
         timestamp: false,
-      })],
-      allowedMentions: { parse: [] },
-    }).catch(() => null);
+      });
   }
 
   const msg = await channel.send(buildMainPayload(author.id, guildId)).catch(() => null);

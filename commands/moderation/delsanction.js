@@ -90,12 +90,7 @@ module.exports = {
       return;
     }
 
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          `La sanction n°**${index}** de **${target.tag}** a été supprimée.`,
-          {
+    const sent = await embed.sendEmbed(message.channel, guildId, `La sanction n°**${index}** de **${target.tag}** a été supprimée.`, {
             fields: [
               {
                 name  : 'Type',
@@ -109,11 +104,7 @@ module.exports = {
               },
             ],
             timestamp: false,
-          }
-        )
-      ],
-      allowedMentions: { repliedUser: false },
-    }).catch(() => null);
+          allowedMentions: { repliedUser: false } });
 
     if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
   },

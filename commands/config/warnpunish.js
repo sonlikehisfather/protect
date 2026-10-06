@@ -51,22 +51,13 @@ module.exports = {
 
       db.setupDefaultWarnThresholds(guildId);
 
-      const sent = await message.channel.send({
-        embeds: [
-          embed.build(
-            guildId,
-            [
+      const sent = await embed.sendEmbed(message.channel, guildId, [
               'Paliers par défaut configurés :',
               '`3 warns` - mute 10m',
               '`5 warns` - kick',
               '`7 warns` - tempban 1j',
               '`10 warns` - ban',
-            ].join('\n'),
-            { timestamp: false }
-          ),
-        ],
-        allowedMentions: { repliedUser: false },
-      }).catch(() => null);
+            ].join('\n'), { timestamp: false });
 
       if (sent && deleteReply) {
         embed.scheduleDelete(sent, deleteDelay);
@@ -248,28 +239,14 @@ async function _showThresholds(message, guildId) {
   const thresholds = db.getWarnThresholds(guildId);
 
   if (!thresholds.length) {
-    return message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          'Aucun palier configuré.\nUtilisez `warnpunish add <seuil> <sanction> [durée]` ou `warnpunish setup`.',
-          { timestamp: false }
-        ),
-      ],
-      allowedMentions: { repliedUser: false },
-    });
+    return embed.sendEmbed(message.channel, guildId, 'Aucun palier configuré.\nUtilisez `warnpunish add <seuil> <sanction> [durée]` ou `warnpunish setup`.', { timestamp: false });
   }
 
   const lines = thresholds.map((threshold, index) =>
     `\`${index + 1}.\` ${threshold.threshold} warns - **${threshold.sanction}**${threshold.duration ? ` (${_formatDuration(threshold.duration)})` : ''}`
   );
 
-  return message.channel.send({
-    embeds: [
-      embed.build(
-        guildId,
-        null,
-        {
+  return embed.sendEmbed(message.channel, guildId, null, {
           title  : 'Paliers de sanction automatique',
           fields : [
             {
@@ -284,11 +261,7 @@ async function _showThresholds(message, guildId) {
             },
           ],
           timestamp: false,
-        }
-      ),
-    ],
-    allowedMentions: { repliedUser: false },
-  });
+        });
 }
 
 function _formatDuration(seconds) {

@@ -50,16 +50,7 @@ module.exports = {
     const sanctions = db.getSanctions(guildId, target.id);
 
     if (!sanctions.length) {
-      const sent = await message.channel.send({
-        embeds: [
-          embed.build(
-            guildId,
-            `**${target.tag}** n'a aucune sanction.`,
-            { timestamp: false }
-          )
-        ],
-        allowedMentions: { repliedUser: false },
-      }).catch(() => null);
+      const sent = await embed.sendEmbed(message.channel, guildId, `**${target.tag}** n'a aucune sanction.`, { timestamp: false , allowedMentions: { repliedUser: false } });
 
       if (deleteCmd) {
         await message.delete().catch(() => {});

@@ -58,7 +58,7 @@ exports.run = async (client, message, args) => {
     ],
   });
 
-  if (V2_AVAILABLE) {
+  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
     const after = db.getCasinoUser(guildId, target.id);
     const container = new ContainerBuilder().addTextDisplayComponents(new TextDisplayBuilder().setContent(
       `## × Clear Coins\n\n× **-${embed.fmtCoins(current)}** coins ← <@${target.id}>\n▱ Nouveau solde : **${embed.fmtCoins(after.coins)}**`

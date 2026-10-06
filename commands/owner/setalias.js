@@ -97,10 +97,10 @@ module.exports = {
 
       const btnRow = new ActionRowBuilder().addComponents(addBtn, removeBtn, closeBtn);
 
-      if (V2_AVAILABLE) {
+      if (embed.shouldUseV2(guildId, module.exports.help.name)) {
         try {
           const accent    = _hexToInt(embed.getGuildColor(guildId));
-          const container = new ContainerBuilder().setAccentColor(accent);
+          const container = new ContainerBuilder();
           container.addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
           container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
           container.addActionRowComponents(btnRow);
@@ -182,8 +182,7 @@ module.exports = {
         await submit.deferUpdate().catch(() => {});
 
         if (!allCmds.includes(cmdInput)) {
-          const err = await message.channel.send({ embeds: [embed.build(guildId,
-            `Commande \`${cmdInput}\` introuvable.`, { timestamp: false, color: '#2b2d31' })] }).catch(() => null);
+          const err = await embed.sendEmbed(message.channel, guildId, `Commande \`${cmdInput}\` introuvable.`, { timestamp: false, color: '#2b2d31' });
           if (err) embed.scheduleDelete(err, 3);
           return;
         }
@@ -210,9 +209,8 @@ module.exports = {
         }
 
         if (errors.length) {
-          const errMsg = await message.channel.send({ embeds: [embed.build(guildId,
-            (added.length ? `Ajouté(s) : ${added.map(a => `\`${a}\``).join(', ')}\n` : '') +
-            `Erreur(s) : ${errors.join(', ')}`, { timestamp: false, color: '#2b2d31' })] }).catch(() => null);
+          const errMsg = await embed.sendEmbed(message.channel, guildId, (added.length ? `Ajouté(s) : ${added.map(a => `\`${a}\``).join(', ')}\n` : '') +
+            `Erreur(s) : ${errors.join(', ')}`, { timestamp: false, color: '#2b2d31' });
           if (errMsg) embed.scheduleDelete(errMsg, 3);
         }
 
@@ -273,8 +271,8 @@ module.exports = {
           const navBtns = [];
           if (totalPages > 1) {
             navBtns.push(
-              new ButtonBuilder().setCustomId('sa:rm:prev').setLabel('◀').setStyle(ButtonStyle.Secondary).setDisabled(rmPage === 0),
-              new ButtonBuilder().setCustomId('sa:rm:next').setLabel('▶').setStyle(ButtonStyle.Secondary).setDisabled(rmPage >= totalPages - 1),
+              new ButtonBuilder().setCustomId('sa:rm:prev').setLabel('←').setStyle(ButtonStyle.Secondary).setDisabled(rmPage === 0),
+              new ButtonBuilder().setCustomId('sa:rm:next').setLabel('→').setStyle(ButtonStyle.Secondary).setDisabled(rmPage >= totalPages - 1),
             );
           }
           navBtns.push(new ButtonBuilder().setCustomId('sa:rm:cancel').setLabel('✖ Annuler').setStyle(ButtonStyle.Secondary));
@@ -285,10 +283,10 @@ module.exports = {
             (totalPages > 1 ? ` ・ Page ${rmPage + 1}/${totalPages}` : '') +
             `\n*Sélectionne la commande puis les alias à retirer.*`;
 
-          if (V2_AVAILABLE) {
+          if (embed.shouldUseV2(guildId, module.exports.help.name)) {
             try {
               const accent    = _hexToInt(embed.getGuildColor(guildId));
-              const container = new ContainerBuilder().setAccentColor(accent);
+              const container = new ContainerBuilder();
               container.addTextDisplayComponents(new TextDisplayBuilder().setContent(headerText));
               container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
               for (const row of rows) container.addActionRowComponents(row);

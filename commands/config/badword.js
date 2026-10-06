@@ -73,16 +73,7 @@ exports.run = async (client, message, args) => {
     list.push(word);
     db.setAntiraidConfig(guildId, 'badwordList', JSON.stringify(list));
 
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          `\`${word}\` a été ajouté à la liste des mots interdits. (${list.length} mot(s))`,
-          { timestamp: false }
-        )
-      ],
-      allowedMentions: { repliedUser: false },
-    }).catch(() => null);
+    const sent = await embed.sendEmbed(message.channel, guildId, `\`${word}\` a été ajouté à la liste des mots interdits. (${list.length} mot(s))`, { timestamp: false });
 
     if (sent && deleteReply) {
       embed.scheduleDelete(sent, deleteDelay);
@@ -121,16 +112,7 @@ exports.run = async (client, message, args) => {
     list.splice(idx, 1);
     db.setAntiraidConfig(guildId, 'badwordList', JSON.stringify(list));
 
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          `\`${word}\` a été retiré de la liste des mots interdits.`,
-          { timestamp: false }
-        )
-      ],
-      allowedMentions: { repliedUser: false },
-    }).catch(() => null);
+    const sent = await embed.sendEmbed(message.channel, guildId, `\`${word}\` a été retiré de la liste des mots interdits.`, { timestamp: false });
 
     if (sent && deleteReply) {
       embed.scheduleDelete(sent, deleteDelay);
@@ -139,12 +121,7 @@ exports.run = async (client, message, args) => {
   }
 
   if (sub === 'list') {
-    const sent = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          null,
-          {
+    const sent = await embed.sendEmbed(message.channel, guildId, null, {
             title : 'Mots interdits',
             fields: [
               {
@@ -156,11 +133,7 @@ exports.run = async (client, message, args) => {
               },
             ],
             timestamp: false,
-          }
-        )
-      ],
-      allowedMentions: { repliedUser: false },
-    }).catch(() => null);
+          });
 
     if (sent && deleteReply) {
       embed.scheduleDelete(sent, deleteDelay);

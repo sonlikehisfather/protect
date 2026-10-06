@@ -86,16 +86,7 @@ module.exports = {
 
       if (!list.length) {
 
-        const sent = await channel.send({
-          embeds: [
-            embed.build(
-              guildId,
-              'La whitelist antiraid est déjà vide.',
-              { timestamp: false }
-            )
-          ],
-          allowedMentions: { parse: [] },
-        }).catch(() => null);
+        const sent = await embed.sendEmbed(channel, guildId, 'La whitelist antiraid est déjà vide.', { timestamp: false , allowedMentions: { parse: [] } });
 
         if (sent && deleteReply) {
           embed.scheduleDelete(sent, deleteDelay);
@@ -387,16 +378,7 @@ module.exports = {
       desc += `\nIntrouvables : ${notFound.map(n => `\`${n}\``).join(', ')}`;
     }
 
-    const sent = await channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          desc,
-          { timestamp: false }
-        )
-      ],
-      allowedMentions: { parse: [] },
-    }).catch(() => null);
+    const sent = await embed.sendEmbed(channel, guildId, desc, { timestamp: false , allowedMentions: { parse: [] } });
 
     if (sent) {
       embed.scheduleDelete(sent, 7);
