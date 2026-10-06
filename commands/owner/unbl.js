@@ -1,19 +1,12 @@
 'use strict';
 
 const {
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
   ContainerBuilder,
   TextDisplayBuilder,
-  SeparatorBuilder,
-  SeparatorSpacingSize,
   MessageFlags,
 } = require('discord.js');
 
 const COMPONENTS_V2_FLAG = MessageFlags?.IsComponentsV2 ?? (1 << 15);
-const V2_AVAILABLE       = typeof ContainerBuilder === 'function' &&
-                           typeof TextDisplayBuilder === 'function';
 
 const db    = require('../../core/database');
 const embed = require('../../utils/embed');
@@ -56,109 +49,88 @@ exports.run = async (client, message, args) => {
     return embed.replyError(message, `${target.username} n'est pas dans la blacklist.`);
   }
 
-  const _v2Panel = (text, disabled = false) => {
-    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
-      try {
-        const container = new ContainerBuilder();
-        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
-        container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
-        container.addActionRowComponents(_buildConfirmRow(disabled));
-        return { embeds: [], components: [container], flags: COMPONENTS_V2_FLAG, allowedMentions: { parse: [] } };
-      } catch {}
-    }
-    return {
-      embeds: [embed.build(message.guild.id, text.replace(/^##[^\n]*\n/, ''), { title: 'Unblacklist globale', timestamp: false })],
-      components: [_buildConfirmRow(disabled)],
-      allowedMentions: { parse: [] },
-    };
-  };
-
-  const confirmText =
-    `## Unblacklist globale\n\n` +
-    `**Cible** › <@${target.id}> \`${target.id}\`\n\n` +
-    `-# Cette action retirera ce membre de la blacklist et tentera de le débannir de tous les serveurs du bot.`;
-
-  const panel = await message.channel.send(_v2Panel(confirmText, false)).catch(() => null);
+  const guilds = [...client.guilds.cache.values()];
+  const progressDescription =
+    `**Membre :** <@${target.id}> (\`${target.id}\`)\n\n` +
+    `Retrait de la blacklist et débannissement en cours sur ${guilds.length} serveur(s)...`;
+  const panel = await message.channel.send(
+    _statusPayload(guildId, `Unblacklist de ${target.username}`, progressDescription)
+  ).catch(() => null);
 
   if (!panel) {
-    return embed.replyError(message, 'Impossible de demander la confirmation.');
+    return embed.replyError(message, 'Impossible d’afficher le suivi de l’unblacklist.');
   }
 
-  embed.registerPrivateInteraction(panel, message.author.id, 120_000);
-
-  const collector = panel.createMessageComponentCollector({
-    filter: i => i.user.id === message.author.id && i.message.id === panel.id,
-    idle  : 60_000,
-    time  : 120_000,
-  });
-
-  let confirmed = false;
-
-  collector.on('collect', async interaction => {
-    if (interaction.customId === 'local:unbl:cancel') {
-      collector.stop('cancelled');
-      const cancelText = `## Annulé\n\n-# Action annulée par <@${message.author.id}>.`;
-      await interaction.update(_v2Panel(cancelText, true)).catch(() => {});
-      return;
-    }
-    if (interaction.customId === 'local:unbl:confirm') {
-      confirmed = true;
-      collector.stop('confirmed');
-      await interaction.deferUpdate().catch(() => {});
-    }
-  });
-
-  await new Promise(resolve => collector.on('end', resolve));
-  embed.clearPrivateInteraction(panel);
-
-  if (!confirmed) {
-    await panel.edit(_v2Panel(confirmText, true)).catch(() => {});
+  try {
+    db.removeBlacklist(target.id);
+  } catch {
+    const failure =
+      `**Membre :** <@${target.id}> (\`${target.id}\`)\n\n` +
+      `Impossible de retirer cette entrée de la blacklist globale.`;
+    await panel.edit(_statusPayload(guildId, 'Unblacklist non effectué', failure)).catch(() => {});
     return;
   }
 
-  db.removeBlacklist(target.id);
-
   let unbanned = 0;
+  const failures = [];
 
-  for (const guild of client.guilds.cache.values()) {
-    const ok = await guild.bans.remove(target.id, 'Blacklist retirée')
-      .then(() => true)
-      .catch(() => false);
-    if (ok) unbanned++;
+  for (const guild of guilds) {
+    try {
+      await guild.bans.remove(target.id, 'Blacklist retirée');
+      unbanned++;
+    } catch (error) {
+      failures.push(_unbanFailureReason(error));
+    }
     await _wait(300);
   }
 
-  const doneText =
-    `## Unblacklist appliquée\n\n` +
-    `**Membre** › <@${target.id}> \`${target.id}\`\n` +
-    `**Débanni de** › ${unbanned} serveur(s)\n\n` +
-    `-# <t:${Math.floor(Date.now() / 1000)}:f>`;
+  const failureCounts = new Map();
+  for (const reason of failures) {
+    failureCounts.set(reason, (failureCounts.get(reason) ?? 0) + 1);
+  }
+  const failureSummary = [...failureCounts]
+    .map(([reason, count]) => `• ${count} serveur(s) : ${reason}`)
+    .join('\n') || 'Aucun.';
+  const resultDescription =
+    `**Membre :** <@${target.id}> (\`${target.id}\`)\n` +
+    `**Débanni avec succès :** ${unbanned}/${guilds.length} serveur(s)\n` +
+    `**Non débanni :** ${failures.length} serveur(s)\n\n` +
+    `**Motifs :**\n${failureSummary}`;
 
+  return panel.edit(_statusPayload(guildId, 'Unblacklist terminé', resultDescription))
+    .catch(() => {});
+};
+
+function _statusPayload(guildId, title, description) {
   if (embed.shouldUseV2(guildId, module.exports.help.name)) {
     try {
       const container = new ContainerBuilder();
-      container.addTextDisplayComponents(new TextDisplayBuilder().setContent(doneText));
-      await panel.edit({ embeds: [], components: [container], flags: COMPONENTS_V2_FLAG, allowedMentions: { parse: [] } }).catch(() => {});
-      return;
+      container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${title}\n\n${description}`));
+      return {
+        embeds          : [],
+        components      : [container],
+        flags           : COMPONENTS_V2_FLAG,
+        allowedMentions : { parse: [] },
+      };
     } catch {}
   }
 
-  return embed.reply(message, `<@${target.id}> retiré de la blacklist. Débanni de ${unbanned} serveur(s).`);
-};
+  return {
+    embeds          : [embed.build(guildId, description, { title, timestamp: false })],
+    components      : [],
+    allowedMentions : { parse: [] },
+  };
+}
 
-function _buildConfirmRow(disabled = false) {
-  return new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('local:unbl:confirm')
-      .setLabel('Confirmer')
-      .setStyle(ButtonStyle.Danger)
-      .setDisabled(disabled),
-    new ButtonBuilder()
-      .setCustomId('local:unbl:cancel')
-      .setLabel('Annuler')
-      .setStyle(ButtonStyle.Secondary)
-      .setDisabled(disabled)
-  );
+function _unbanFailureReason(error) {
+  const code = Number(error?.code ?? error?.rawError?.code);
+  if (code === 10026) return 'membre déjà débanni ou absent de la liste des bans';
+  if (code === 50013 || error?.status === 403) {
+    return 'permissions insuffisantes ou hiérarchie des rôles du bot';
+  }
+  if (code === 50001) return 'le bot n’a pas accès au serveur';
+  if (code) return `erreur Discord (${code})`;
+  return 'erreur inattendue lors du débannissement';
 }
 
 function _wait(ms) {

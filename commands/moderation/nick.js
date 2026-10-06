@@ -11,7 +11,7 @@ module.exports = {
     name        : 'nick',
     description : 'Modifie le pseudo d’un membre.',
     usage       : 'nick <membre> <pseudo|reset>',
-    aliases     : ['nickname', 'rename'],
+    aliases     : ['nickname'],
   },
 
   async run(client, message, args) {
