@@ -154,48 +154,39 @@ exports.run = async (client, message, args) => {
     return;
   }
 
-  const banned = [];
+  let banned = 0;
   const protectedGuilds = [];
   const failed = [];
 
   for (const guild of guilds) {
     if (perms.isProtected(target.id, guild.id, null)) {
-      protectedGuilds.push({
-        name   : guild.name,
-        reason : _protectionReason(target.id, guild.id),
-      });
+      protectedGuilds.push(_protectionReason(target.id, guild.id));
     } else {
       try {
         await guild.members.ban(target.id, { reason: `Blacklist - ${reason}` });
-        banned.push(guild.name);
+        banned++;
       } catch (error) {
-        failed.push({ name: guild.name, reason: _banFailureReason(error) });
+        failed.push(_banFailureReason(error));
       }
     }
     await _wait(300);
   }
 
-  const protectedResults = protectedGuilds.map(entry => ({
-    name   : entry.name,
-    reason : entry.reason,
-  }));
-  const failedResults = failed.map(entry => ({
-    name   : entry.name,
-    reason : entry.reason,
-  }));
+  const reasonCounts = new Map();
+  for (const reason of [...protectedGuilds, ...failed]) {
+    reasonCounts.set(reason, (reasonCounts.get(reason) ?? 0) + 1);
+  }
+  const reasonSummary = [...reasonCounts]
+    .map(([reason, count]) => `• ${count} serveur(s) : ${reason}`)
+    .join('\n') || 'Aucun.';
   const resultDescription =
     `**Membre :** <@${target.id}> (\`${target.id}\`)\n` +
     `**Raison :** ${reason}\n` +
-    `**Blacklist globale :** entrée enregistrée\n` +
-    `**Banni avec succès :** ${banned.length}/${guilds.length} serveur(s)\n` +
-    `**Non banni :** ${protectedGuilds.length + failed.length} serveur(s)`;
-  const resultFields = [
-    { name: `Banni sur (${banned.length})`, value: _formatGuildResults(banned) },
-    { name: `Ignoré, protégé (${protectedGuilds.length})`, value: _formatGuildResults(protectedResults) },
-    { name: `Échec (${failed.length})`, value: _formatGuildResults(failedResults) },
-  ];
+    `**Banni avec succès :** ${banned}/${guilds.length} serveur(s)\n` +
+    `**Non banni :** ${protectedGuilds.length + failed.length} serveur(s)\n\n` +
+    `**Motifs :**\n${reasonSummary}`;
 
-  return panel.edit(_statusPayload(guildId, 'Blacklist globale terminée', resultDescription, resultFields))
+  return panel.edit(_statusPayload(guildId, 'Blacklist globale terminée', resultDescription))
     .catch(() => {});
 
 };
@@ -287,15 +278,11 @@ async function _showList(message) {
   });
 }
 
-function _statusPayload(guildId, title, description, fields = []) {
+function _statusPayload(guildId, title, description) {
   if (embed.shouldUseV2(guildId, module.exports.help.name)) {
     try {
       const container = new ContainerBuilder();
       container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${title}\n\n${description}`));
-      for (const field of fields) {
-        container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
-        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`**${field.name}**\n${field.value}`));
-      }
       return {
         embeds          : [],
         components      : [container],
@@ -306,7 +293,7 @@ function _statusPayload(guildId, title, description, fields = []) {
   }
 
   return {
-    embeds          : [embed.build(guildId, description, { title, fields, timestamp: false })],
+    embeds          : [embed.build(guildId, description, { title, timestamp: false })],
     components      : [],
     allowedMentions : { parse: [] },
   };
@@ -328,28 +315,6 @@ function _banFailureReason(error) {
   if (code === 50001) return 'le bot n’a pas accès au serveur';
   if (code) return `erreur Discord (${code})`;
   return 'erreur inattendue lors du bannissement';
-}
-
-function _formatGuildResults(results) {
-  if (!results.length) return 'Aucun.';
-
-  const lines = results.map(result => {
-    if (typeof result === 'string') return `• ${result}`;
-    return `• ${result.name} : ${result.reason}`;
-  });
-  let value = '';
-  let shown = 0;
-
-  for (const line of lines) {
-    const next = value ? `${value}\n${line}` : line;
-    if (next.length > 900) break;
-    value = next;
-    shown++;
-  }
-
-  const omitted = lines.length - shown;
-  if (omitted > 0) value += `\n… et ${omitted} autre(s), détails tronqués.`;
-  return value || lines[0].slice(0, 900);
 }
 
 function _wait(ms) {
