@@ -21,7 +21,7 @@ module.exports = {
     try {
       const config = db.getGuildConfig(guildId);
 
-      if (db.isBlacklisted(member.user.id)) {
+      if (db.isBlacklisted(member.user.id) && !perms.isProtected(member.user.id, guildId, member)) {
         const entry = db.getBlacklistEntry(member.user.id);
 
         const reason = entry?.reason

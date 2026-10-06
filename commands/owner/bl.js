@@ -12,8 +12,6 @@ const {
 } = require('discord.js');
 
 const COMPONENTS_V2_FLAG = MessageFlags?.IsComponentsV2 ?? (1 << 15);
-const V2_AVAILABLE       = typeof ContainerBuilder === 'function' &&
-                           typeof TextDisplayBuilder === 'function';
 
 const db    = require('../../core/database');
 const embed = require('../../utils/embed');
@@ -107,18 +105,11 @@ exports.run = async (client, message, args) => {
     );
   }
 
-  if (db.isProtectedUserAnywhere(target.id)) {
-    return embed.replyError(
-      message,
-      'T’as essayé de BL un utilisateur protégé ? '
-    );
-  }
-
   if (perms.isProtected(target.id, message.guild.id, null)) {
 
     return embed.replyError(
       message,
-      'Impossible de blacklister un compte protégé.'
+      'T’as essayé de blacklister un utilisateur protégé ?'
     );
 
   }
@@ -139,95 +130,73 @@ exports.run = async (client, message, args) => {
 
   }
 
-  const _v2Panel = (text, disabled = false) => {
-    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
-      try {
-        const container = new ContainerBuilder();
-        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
-        container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
-        container.addActionRowComponents(_buildConfirmRow(disabled));
-        return { embeds: [], components: [container], flags: COMPONENTS_V2_FLAG, allowedMentions: { parse: [] } };
-      } catch {}
-    }
-    return {
-      embeds: [embed.build(message.guild.id, text.replace(/^##[^\n]*\n/, ''), { title: 'Blacklist globale', timestamp: false })],
-      components: [_buildConfirmRow(disabled)],
-      allowedMentions: { parse: [] },
-    };
-  };
-
-  const confirmText =
-    `## Blacklist globale\n\n` +
-    `**Cible** › <@${target.id}> \`${target.id}\`\n` +
-    `**Raison** › ${reason}\n\n` +
-    `-# Cette action bannira ce membre de tous les serveurs du bot.`;
-
-  const panel = await message.channel.send(_v2Panel(confirmText, false)).catch(() => null);
+  const guilds = [...client.guilds.cache.values()];
+  const progressDescription =
+    `**Membre :** <@${target.id}> (\`${target.id}\`)\n` +
+    `**Raison :** ${reason}\n\n` +
+    `Blacklist globale en cours sur ${guilds.length} serveur(s)...`;
+  const panel = await message.channel.send(
+    _statusPayload(guildId, `Blacklist de ${target.username}`, progressDescription)
+  ).catch(() => null);
 
   if (!panel) {
-    return embed.replyError(message, 'Impossible de demander la confirmation.');
+    return embed.replyError(message, 'Impossible d’afficher le suivi de la blacklist.');
   }
 
-  embed.registerPrivateInteraction(panel, message.author.id, 120_000);
-
-  const collector = panel.createMessageComponentCollector({
-    filter: i => i.user.id === message.author.id && i.message.id === panel.id,
-    idle  : 60_000,
-    time  : 120_000,
-  });
-
-  let confirmed = false;
-
-  collector.on('collect', async interaction => {
-    if (interaction.customId === 'local:bl:cancel') {
-      collector.stop('cancelled');
-      const cancelText = `## Blacklist annulée\n\n-# Action annulée par <@${message.author.id}>.`;
-      await interaction.update(_v2Panel(cancelText, true)).catch(() => {});
-      return;
-    }
-    if (interaction.customId === 'local:bl:confirm') {
-      confirmed = true;
-      collector.stop('confirmed');
-      await interaction.deferUpdate().catch(() => {});
-    }
-  });
-
-  await new Promise(resolve => collector.on('end', resolve));
-  embed.clearPrivateInteraction(panel);
-
-  if (!confirmed) {
-    await panel.edit(_v2Panel(confirmText, true)).catch(() => {});
+  try {
+    db.addBlacklist(target.id, reason, authorId);
+  } catch {
+    const failure =
+      `**Membre :** <@${target.id}> (\`${target.id}\`)\n` +
+      `**Raison :** ${reason}\n\n` +
+      `Impossible d’enregistrer cette entrée dans la blacklist globale.`;
+    await panel.edit(_statusPayload(guildId, 'Blacklist non enregistrée', failure)).catch(() => {});
     return;
   }
 
-  db.addBlacklist(target.id, reason, authorId);
+  const banned = [];
+  const protectedGuilds = [];
+  const failed = [];
 
-  let banned = 0;
-
-  for (const guild of client.guilds.cache.values()) {
-    await guild.members.ban(target.id, { reason: `Blacklist - ${reason}` })
-      .then(() => banned++)
-      .catch(() => {});
+  for (const guild of guilds) {
+    if (perms.isProtected(target.id, guild.id, null)) {
+      protectedGuilds.push({
+        name   : guild.name,
+        reason : _protectionReason(target.id, guild.id),
+      });
+    } else {
+      try {
+        await guild.members.ban(target.id, { reason: `Blacklist - ${reason}` });
+        banned.push(guild.name);
+      } catch (error) {
+        failed.push({ name: guild.name, reason: _banFailureReason(error) });
+      }
+    }
     await _wait(300);
   }
 
-  const doneText =
-    `## Blacklist appliquée\n\n` +
-    `**Membre** › <@${target.id}> \`${target.id}\`\n` +
-    `**Raison** › ${reason}\n` +
-    `**Banni de** › ${banned} serveur(s)\n\n` +
-    `-# <t:${Math.floor(Date.now() / 1000)}:f>`;
+  const protectedResults = protectedGuilds.map(entry => ({
+    name   : entry.name,
+    reason : entry.reason,
+  }));
+  const failedResults = failed.map(entry => ({
+    name   : entry.name,
+    reason : entry.reason,
+  }));
+  const resultDescription =
+    `**Membre :** <@${target.id}> (\`${target.id}\`)\n` +
+    `**Raison :** ${reason}\n` +
+    `**Blacklist globale :** entrée enregistrée\n` +
+    `**Banni avec succès :** ${banned.length}/${guilds.length} serveur(s)\n` +
+    `**Non banni :** ${protectedGuilds.length + failed.length} serveur(s)`;
+  const resultFields = [
+    { name: `Banni sur (${banned.length})`, value: _formatGuildResults(banned) },
+    { name: `Ignoré, protégé (${protectedGuilds.length})`, value: _formatGuildResults(protectedResults) },
+    { name: `Échec (${failed.length})`, value: _formatGuildResults(failedResults) },
+  ];
 
-  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
-    try {
-      const container = new ContainerBuilder();
-      container.addTextDisplayComponents(new TextDisplayBuilder().setContent(doneText));
-      await panel.edit({ embeds: [], components: [container], flags: COMPONENTS_V2_FLAG, allowedMentions: { parse: [] } }).catch(() => {});
-      return;
-    } catch {}
-  }
-
-  return embed.reply(message, `<@${target.id}> ajouté à la blacklist. Banni de ${banned} serveur(s).`);
+  return panel.edit(_statusPayload(guildId, 'Blacklist globale terminée', resultDescription, resultFields))
+    .catch(() => {});
 
 };
 
@@ -318,19 +287,69 @@ async function _showList(message) {
   });
 }
 
-function _buildConfirmRow(disabled = false) {
-  return new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('local:bl:confirm')
-      .setLabel('Confirmer')
-      .setStyle(ButtonStyle.Danger)
-      .setDisabled(disabled),
-    new ButtonBuilder()
-      .setCustomId('local:bl:cancel')
-      .setLabel('Annuler')
-      .setStyle(ButtonStyle.Secondary)
-      .setDisabled(disabled)
-  );
+function _statusPayload(guildId, title, description, fields = []) {
+  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
+    try {
+      const container = new ContainerBuilder();
+      container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${title}\n\n${description}`));
+      for (const field of fields) {
+        container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
+        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`**${field.name}**\n${field.value}`));
+      }
+      return {
+        embeds          : [],
+        components      : [container],
+        flags           : COMPONENTS_V2_FLAG,
+        allowedMentions : { parse: [] },
+      };
+    } catch {}
+  }
+
+  return {
+    embeds          : [embed.build(guildId, description, { title, fields, timestamp: false })],
+    components      : [],
+    allowedMentions : { parse: [] },
+  };
+}
+
+function _protectionReason(userId, guildId) {
+  if (db.isProtectedUser(guildId, userId)) return 'utilisateur protégé sur ce serveur';
+  if (perms.isBuyer(userId)) return 'compte buyer protégé';
+  if (userId === process.env.CLIENT_ID) return 'il s’agit du bot';
+  if (perms.isOwner(guildId, userId)) return 'owner du serveur';
+  return 'protégé par une règle de protection du serveur';
+}
+
+function _banFailureReason(error) {
+  const code = Number(error?.code ?? error?.rawError?.code);
+  if (code === 50013 || error?.status === 403) {
+    return 'permissions insuffisantes ou hiérarchie des rôles du bot';
+  }
+  if (code === 50001) return 'le bot n’a pas accès au serveur';
+  if (code) return `erreur Discord (${code})`;
+  return 'erreur inattendue lors du bannissement';
+}
+
+function _formatGuildResults(results) {
+  if (!results.length) return 'Aucun.';
+
+  const lines = results.map(result => {
+    if (typeof result === 'string') return `• ${result}`;
+    return `• ${result.name} : ${result.reason}`;
+  });
+  let value = '';
+  let shown = 0;
+
+  for (const line of lines) {
+    const next = value ? `${value}\n${line}` : line;
+    if (next.length > 900) break;
+    value = next;
+    shown++;
+  }
+
+  const omitted = lines.length - shown;
+  if (omitted > 0) value += `\n… et ${omitted} autre(s), détails tronqués.`;
+  return value || lines[0].slice(0, 900);
 }
 
 function _wait(ms) {

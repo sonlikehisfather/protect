@@ -5,6 +5,7 @@ const db           = require('../core/database');
 const embed        = require('../utils/embed');
 const logger       = require('../utils/logger');
 const errorHandler = require('../utils/errorHandler');
+const perms        = require('../utils/permissions');
 
 module.exports = {
   name : 'guildBanRemove',
@@ -14,7 +15,7 @@ module.exports = {
     const guildId = ban.guild.id;
 
     try {
-      if (db.isBlacklisted(ban.user.id)) {
+      if (db.isBlacklisted(ban.user.id) && !perms.isProtected(ban.user.id, guildId, null)) {
         const entry = db.getBlacklistEntry(ban.user.id);
 
         const reason = entry?.reason

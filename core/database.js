@@ -6213,10 +6213,6 @@ const db = {
     return !!getDb().prepare('SELECT 1 FROM protected_users WHERE guildId = ? AND userId = ?').get(guildId, userId);
   },
 
-  isProtectedUserAnywhere(userId) {
-    return !!getDb().prepare('SELECT 1 FROM protected_users WHERE userId = ? LIMIT 1').get(userId);
-  },
-
   getAngelUsers(guildId) {
     return getDb().prepare('SELECT * FROM angel_users WHERE guildId = ? ORDER BY addedAt DESC').all(guildId);
   },
