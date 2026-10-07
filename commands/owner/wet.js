@@ -105,7 +105,7 @@ async function _unwet(client, message, target) {
     return embed.replyError(message, `Impossible de retirer l’utilisateur de la wetlist : ${error.message}`);
   }
   if (!removed) {
-    return embed.replyError(message, 'La wetlist a changé avant le retrait. Aucun unban global n’a été lancé.');
+    return embed.replyError(message, 'La wetlist a changé avant le retrait. Aucun unban n’a été lancé.');
   }
 
   const deleted = await message.delete().then(() => true).catch(() => false);

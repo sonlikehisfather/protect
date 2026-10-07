@@ -46,7 +46,7 @@ module.exports = {
     const body = [
       `## ${title}`,
       '',
-      `**Statut** › Wet (ban global)`,
+      `**Statut** › Wet`,
       `**Raison** › ${entry.reason || 'Aucune raison fournie'}`,
       `**Wet par** › <@${entry.addedBy}>`,
       '',

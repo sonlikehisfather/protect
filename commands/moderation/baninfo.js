@@ -73,7 +73,7 @@ module.exports = {
       : null;
 
     let statusText = wetEntry
-      ? 'Wet (ban global)'
+      ? 'Wet'
       : blacklistEntry
       ? 'Blacklisté sur ce serveur'
       : 'Banni définitivement';
