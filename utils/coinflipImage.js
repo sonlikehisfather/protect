@@ -1,6 +1,7 @@
 'use strict';
 
 const { Canvas } = require('skia-canvas');
+const { drawCasinoImageFrame } = require('./casinoImageFrame');
 
 function fmtCoins(n) {
   if (n == null) return '0';
@@ -355,17 +356,7 @@ async function generateCoinflipImage({ choice, result, win, amount, cote, netGai
   ctx.font = '15px sans-serif';
   ctx.fillText(`Solde : ${fmtCoins(finalCoins)} coins`, W / 2, resultY + (bonuses && bonuses.length ? 48 : 28));
 
-  ctx.save();
-  ctx.fillStyle = '#FFD700';
-  ctx.globalAlpha = 0.05;
-  ctx.font = 'bold 10px sans-serif';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('MIN: 10', 30, H - 15);
-  ctx.textAlign = 'right';
-  ctx.fillText('MAX: 50000', W - 30, H - 15);
-  ctx.restore();
-
+  drawCasinoImageFrame(ctx, W, H, accent);
   return await canvas.toBuffer('png');
 }
 

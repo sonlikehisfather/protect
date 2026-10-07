@@ -29,11 +29,33 @@ function calcMultiplier(rangeSize) {
   return Math.floor((ROLL_MAX / rangeSize) * HOUSE_EDGE * 100) / 100;
 }
 
+function parseRange(input) {
+  const rangeMatch = input.match(/^(\d+)\s*[-–]\s*(\d+)$/);
+  if (rangeMatch) {
+    const first = Number(rangeMatch[1]);
+    const second = Number(rangeMatch[2]);
+    return {
+      rangeMin: Math.min(first, second),
+      rangeMax: Math.max(first, second),
+    };
+  }
+
+  const thresholdMatch = input.match(/^(plus|moins)\s+(\d+)$/i);
+  if (!thresholdMatch) return null;
+
+  const threshold = Number(thresholdMatch[2]);
+  if (threshold < 0 || threshold >= ROLL_MAX) return null;
+
+  return thresholdMatch[1].toLowerCase() === 'plus'
+    ? { rangeMin: threshold + 1, rangeMax: ROLL_MAX - 1 }
+    : { rangeMin: 0, rangeMax: threshold - 1 };
+}
+
 exports.help = {
   name        : 'dice',
-  description : 'Dice ・ choisis ta plage, le bot tire un chiffre 0-99, plus ta plage est petite plus tu gagnes !',
-  use         : 'dice <mise|all>',
-  usage       : 'dice 1000',
+  description : 'Dice ・ choisis ta plage ou indique-la directement, le bot tire un chiffre 0-99.',
+  use         : 'dice <mise|all> [20-40|plus 60|moins 40]',
+  usage       : 'dice all 20-40',
   aliases     : ['de', 'des'],
   category    : 'casino',
   selfManaged : true,
@@ -65,6 +87,18 @@ exports.run = async (client, message, args) => {
     if (args[0] && args[0].toLowerCase() === 'all')
       return embed.replyError(message, `Tu n'as aucun coin a parier. Solde : **${embed.fmtCoins(user.coins)}** coins`);
     return embed.replyError(message, 'Tu dois parier un montant valide. Usage : `+dice <mise|all>`');
+  }
+
+  let chosenRange = null;
+  const rangeInput = args.slice(1).join(' ').trim();
+  if (rangeInput) {
+    chosenRange = parseRange(rangeInput);
+    if (!chosenRange ||
+        chosenRange.rangeMin < 0 ||
+        chosenRange.rangeMax >= ROLL_MAX ||
+        chosenRange.rangeMin > chosenRange.rangeMax) {
+      return embed.replyError(message, 'Plage invalide. Utilise `20-40`, `plus 60` ou `moins 40` avec des valeurs entre 0 et 99.');
+    }
   }
 
   const limitErr = checkCasinoLimits(message, 'dice', amount);
@@ -136,9 +170,16 @@ exports.run = async (client, message, args) => {
 
   let sent;
   try {
-    sent = V2_AVAILABLE
-      ? await message.reply(buildPickV2())
-      : await message.reply(buildPickLegacy());
+    if (chosenRange) {
+      sent = await message.reply({
+        content: `🎯 Dice ・ Mise : **${embed.fmtCoins(amount)}** coins ・ Plage : **${chosenRange.rangeMin}-${chosenRange.rangeMax}**\nTirage en cours...`,
+        allowedMentions: { parse: [] },
+      });
+    } else {
+      sent = V2_AVAILABLE
+        ? await message.reply(buildPickV2())
+        : await message.reply(buildPickLegacy());
+    }
   } catch (e) {
     console.error('[DICE] Reply error:', e?.message);
     return embed.replyError(message, 'Erreur lors de la création de la partie.');
@@ -148,12 +189,12 @@ exports.run = async (client, message, args) => {
 
   deductBet();
 
-  const collector = sent.createMessageComponentCollector({
+  const collector = chosenRange ? null : sent.createMessageComponentCollector({
     filter: i => i.customId === 'dice:pick',
     time: 60_000,
   });
 
-  collector.on('collect', async interaction => {
+  if (collector) collector.on('collect', async interaction => {
     try {
       if (interaction.user.id !== userId) {
         return interaction.reply({ content: "Ce n'est pas ta partie !", flags: MessageFlags.Ephemeral }).catch(() => {});
@@ -217,7 +258,7 @@ exports.run = async (client, message, args) => {
 
   const handleResult = async (rangeMin, rangeMax, modalSubmit) => {
     try {
-      collector.stop('done');
+      collector?.stop('done');
 
       const roll = Math.floor(Math.random() * ROLL_MAX);
       const rangeSize = rangeMax - rangeMin + 1;
@@ -286,6 +327,7 @@ exports.run = async (client, message, args) => {
         editPayload = {
           components: [c],
           flags: COMPONENTS_V2_FLAG,
+          content: null,
           files: [new AttachmentBuilder(imageBuffer, { name: 'dice_result.png' })],
         };
       } else if (imageBuffer) {
@@ -296,6 +338,7 @@ exports.run = async (client, message, args) => {
             timestamp: false,
           })],
           components: [],
+          content: null,
           files: [new AttachmentBuilder(imageBuffer, { name: 'dice_result.png' })],
         };
       } else if (embed.shouldUseV2(guildId, module.exports.help.name)) {
@@ -309,7 +352,7 @@ exports.run = async (client, message, args) => {
             : `× **Perdu...** -${embed.fmtCoins(amount)} coins\n`) +
           `\n▱ Solde : **${embed.fmtCoins(finalCoins)}** coins`
         ));
-        editPayload = { components: [c], flags: COMPONENTS_V2_FLAG };
+        editPayload = { components: [c], flags: COMPONENTS_V2_FLAG, content: null };
       } else {
         editPayload = {
           embeds: [embed.build(guildId, null, {
@@ -324,6 +367,7 @@ exports.run = async (client, message, args) => {
             timestamp: false,
           })],
           components: [],
+          content: null,
         };
       }
 
@@ -336,7 +380,11 @@ exports.run = async (client, message, args) => {
     }
   };
 
-  collector.on('end', (_, reason) => {
+  if (chosenRange) {
+    await handleResult(chosenRange.rangeMin, chosenRange.rangeMax, null);
+  }
+
+  if (collector) collector.on('end', (_, reason) => {
     if (reason === 'done') return;
     refundBet();
     const finalCoins = db.getCasinoUser(guildId, userId).coins;

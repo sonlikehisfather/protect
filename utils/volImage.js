@@ -1,6 +1,7 @@
 'use strict';
 
 const { Canvas } = require('skia-canvas');
+const { drawCasinoImageFrame } = require('./casinoImageFrame');
 
 function fmtCoins(n) {
   if (n == null) return '0';
@@ -1082,6 +1083,7 @@ async function generateVolImage({ targetName, stolenCoins, stolenXp, stealPercen
     ctx.fillText('Retente ta chance plus tard', W / 2, resultY + 28);
   }
 
+  drawCasinoImageFrame(ctx, W, H, accent);
   return await canvas.toBuffer('png');
 }
 

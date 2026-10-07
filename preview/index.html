@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Apercus des images Casino</title>
+  <style>
+    body { margin: 0; padding: 32px; background: #0b0d14; color: #f4f5f9; font: 16px system-ui, sans-serif; }
+    h1 { margin: 0 0 8px; }
+    p { color: #aeb3c2; margin: 0 0 24px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 20px; }
+    figure { margin: 0; padding: 12px; background: #151925; border: 1px solid #292f40; border-radius: 14px; }
+    img { display: block; width: 100%; height: auto; border-radius: 8px; }
+    figcaption { padding: 10px 2px 0; font-weight: 600; }
+    @media print {
+      @page { size: A4 landscape; margin: 10mm; }
+      body { padding: 0; background: #0b0d14; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      h1 { font-size: 18pt; }
+      p { margin-bottom: 5mm; font-size: 9pt; }
+      .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4mm; }
+      figure { padding: 2mm; border-radius: 2mm; break-inside: avoid; page-break-inside: avoid; }
+      img { width: 100%; height: 65mm; object-fit: contain; }
+      figcaption { padding: 2mm 1mm 0; font-size: 9pt; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Apercus des images Casino</h1>
+  <p>19 rendus des generateurs d'images du bot, dont plusieurs etats de jeu.</p>
+  <main class="grid">
+    <figure><a href="analytics.png"><img src="analytics.png" alt="Casino analytics"></a><figcaption>Casino analytics</figcaption></figure>
+    <figure><a href="blackjack_en_cours.png"><img src="blackjack_en_cours.png" alt="Blackjack en cours"></a><figcaption>Blackjack en cours</figcaption></figure>
+    <figure><a href="blackjack_resultat.png"><img src="blackjack_resultat.png" alt="Resultat Blackjack"></a><figcaption>Resultat Blackjack</figcaption></figure>
+    <figure><a href="chicken_en_cours.png"><img src="chicken_en_cours.png" alt="Chicken en cours"></a><figcaption>Chicken en cours</figcaption></figure>
+    <figure><a href="chicken_crash.png"><img src="chicken_crash.png" alt="Collision Chicken"></a><figcaption>Chicken - collision</figcaption></figure>
+    <figure><a href="chicken_victoire.png"><img src="chicken_victoire.png" alt="Victoire Chicken"></a><figcaption>Chicken - victoire</figcaption></figure>
+    <figure><a href="pile_ou_face.png"><img src="pile_ou_face.png" alt="Pile ou Face"></a><figcaption>Pile ou Face</figcaption></figure>
+    <figure><a href="comparaison.png"><img src="comparaison.png" alt="Comparaison de joueurs"></a><figcaption>Comparaison de joueurs</figcaption></figure>
+    <figure><a href="des.png"><img src="des.png" alt="Dice"></a><figcaption>Dice</figcaption></figure>
+    <figure><a href="mines_resultat.png"><img src="mines_resultat.png" alt="Resultat Mines"></a><figcaption>Resultat Mines</figcaption></figure>
+    <figure><a href="plinko.png"><img src="plinko.png" alt="Plinko"></a><figcaption>Plinko</figcaption></figure>
+    <figure><a href="roulette.png"><img src="roulette.png" alt="Roulette"></a><figcaption>Roulette</figcaption></figure>
+    <figure><a href="roulette_russe_en_cours.png"><img src="roulette_russe_en_cours.png" alt="Roulette russe en cours"></a><figcaption>Roulette russe en cours</figcaption></figure>
+    <figure><a href="roulette_russe_resultat.png"><img src="roulette_russe_resultat.png" alt="Resultat roulette russe"></a><figcaption>Resultat roulette russe</figcaption></figure>
+    <figure><a href="tower_en_cours.png"><img src="tower_en_cours.png" alt="Tower en cours"></a><figcaption>Tower en cours</figcaption></figure>
+    <figure><a href="tower_resultat.png"><img src="tower_resultat.png" alt="Ecran final Tower"></a><figcaption>Tower - ecran final</figcaption></figure>
+    <figure><a href="vol_reussi.png"><img src="vol_reussi.png" alt="Vol reussi"></a><figcaption>Vol reussi</figcaption></figure>
+    <figure><a href="vol_bloque.png"><img src="vol_bloque.png" alt="Vol bloque"></a><figcaption>Vol bloque</figcaption></figure>
+    <figure><a href="profil_casino.png"><img src="profil_casino.png" alt="Carte de profil Casino"></a><figcaption>Carte de profil Casino</figcaption></figure>
+  </main>
+</body>
+</html>

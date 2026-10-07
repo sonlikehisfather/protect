@@ -216,7 +216,8 @@ exports.run = async (client, message, args) => {
         diffKey, currentLane: won ? LANES - 1 : currentLane, chickenCol, allLaneCars,
         gameOver: true, won, cashedOut,
         amount, winAmount, netGain, finalCoins,
-        crashedCol: -1, crashedLane: -1,
+        crashedCol: won || cashedOut ? -1 : crashedCol,
+        crashedLane: won || cashedOut ? -1 : crashedLane,
       });
     } catch (e) {
       console.error('[CHICKEN] Result image error:', e?.message, e?.stack);

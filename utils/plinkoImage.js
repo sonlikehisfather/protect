@@ -1,6 +1,7 @@
 'use strict';
 
 const { Canvas } = require('skia-canvas');
+const { drawCasinoImageFrame } = require('./casinoImageFrame');
 
 function hexToRgba(hex, alpha) {
   const n = parseInt(hex.replace('#', ''), 16);
@@ -254,6 +255,7 @@ async function generatePlinkoImage({ path, finalSlot, mults, risk, amount, winAm
   ctx.textBaseline = 'top';
   ctx.fillText(resultLabel, W - 24, 18);
 
+  drawCasinoImageFrame(ctx, W, H, resultColor);
   return await canvas.toBuffer('png');
 }
 

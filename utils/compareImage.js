@@ -1,6 +1,7 @@
 'use strict';
 
 const { Canvas, loadImage } = require('skia-canvas');
+const { drawCasinoImageFrame } = require('./casinoImageFrame');
 
 const W = 1100;
 const H = 720;
@@ -277,6 +278,7 @@ async function generateCompareImage(user1, user2) {
   ctx.stroke();
   ctx.restore();
 
+  drawCasinoImageFrame(ctx, W, H, [user1.color, user2.color]);
   return await canvas.toBuffer('png');
 }
 

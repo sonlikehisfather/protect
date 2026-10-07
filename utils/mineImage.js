@@ -1,6 +1,7 @@
 'use strict';
 
 const { Canvas } = require('skia-canvas');
+const { drawCasinoImageFrame } = require('./casinoImageFrame');
 
 function fmtCoins(n) {
   if (n == null) return '0';
@@ -47,21 +48,6 @@ function drawCornerOrnaments(ctx, W, H, color, alpha = 0.12) {
   ctx.beginPath(); ctx.moveTo(W - m - cs, m); ctx.lineTo(W - m, m); ctx.lineTo(W - m, m + cs); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(m, H - m - cs); ctx.lineTo(m, H - m); ctx.lineTo(m + cs, H - m); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(W - m - cs, H - m); ctx.lineTo(W - m, H - m); ctx.lineTo(W - m, H - m - cs); ctx.stroke();
-  ctx.restore();
-}
-
-function drawSparkle(ctx, x, y, size, color, alpha = 1) {
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 1.2;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(x - size, y); ctx.lineTo(x + size, y);
-  ctx.moveTo(x, y - size); ctx.lineTo(x, y + size);
-  ctx.moveTo(x - size * 0.6, y - size * 0.6); ctx.lineTo(x + size * 0.6, y + size * 0.6);
-  ctx.moveTo(x - size * 0.6, y + size * 0.6); ctx.lineTo(x + size * 0.6, y - size * 0.6);
-  ctx.stroke();
   ctx.restore();
 }
 
@@ -348,37 +334,7 @@ async function generateMineImage({ bombs, revealed, bombCount, amount, winAmount
   ctx.textBaseline = 'middle';
   ctx.fillText(`Solde : ${fmtCoins(finalCoins)} coins`, W / 2, soldeY);
 
-  ctx.save();
-  ctx.fillStyle = accent;
-  ctx.globalAlpha = 0.05;
-  ctx.font = 'bold 10px sans-serif';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('MIN: 10', 30, H - 15);
-  ctx.textAlign = 'right';
-  ctx.fillText('MAX: 50000', W - 30, H - 15);
-  ctx.restore();
-
-  if (state === 'cashout' || state === 'cleared') {
-    for (let i = 0; i < 14; i++) {
-      const sx = GRID_X + Math.random() * GRID_W;
-      const sy = GRID_Y + Math.random() * GRID_W;
-      drawSparkle(ctx, sx, sy, 3 + Math.random() * 4, '#57F287', 0.2 + Math.random() * 0.25);
-    }
-    for (let i = 0; i < 6; i++) {
-      const angle = (i / 6) * Math.PI * 2;
-      const x = W / 2 + Math.cos(angle) * (GRID_W / 2 + 30);
-      const y = GRID_Y + GRID_W / 2 + Math.sin(angle) * (GRID_W / 2 + 30);
-      drawSparkle(ctx, x, y, 4, '#FFD700', 0.25);
-    }
-  } else if (state === 'dead') {
-    for (let i = 0; i < 10; i++) {
-      const sx = GRID_X + Math.random() * GRID_W;
-      const sy = GRID_Y + Math.random() * GRID_W;
-      drawSparkle(ctx, sx, sy, 3 + Math.random() * 2, '#ED4245', 0.15 + Math.random() * 0.2);
-    }
-  }
-
+  drawCasinoImageFrame(ctx, W, H, accent);
   return await canvas.toBuffer('png');
 }
 

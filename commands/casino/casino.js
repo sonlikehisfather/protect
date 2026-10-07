@@ -938,11 +938,15 @@ async function handleInteraction(interaction, id) {
       } else {
         count = parseInt(rawCount) || 1;
         if (count > user.draws) {
-          return interaction.reply({ ...embed.buildPayload(guildId, `Tu n\'as que **${user.draws}** tirage(s) restant(s).`, { title: '◈ Tirage' , components: [
+          const payload = embed.buildPayload(guildId, `Tu n\'as que **${user.draws}** tirage(s) restant(s).`, { title: '◈ Tirage' , components: [
               new ActionRowBuilder().addComponents(
                 new ButtonBuilder().setCustomId('cs_panel_draw_run:all').setLabel(`All (${user.draws})`).setStyle(ButtonStyle.Secondary),
               ),
-            ] }) });
+              ] });
+          return interaction.reply({
+            ...payload,
+            flags: (payload.flags ?? 0) | MessageFlags.Ephemeral,
+          });
         }
       }
 
@@ -985,7 +989,11 @@ async function handleInteraction(interaction, id) {
         ].filter(Boolean),
       });
 
-      return interaction.reply({ ...embed.buildPayload(guildId, `${rewardText}\n\n◇ Solde : **${embed.fmtCoins(updated.coins)}** coins  •  **${updated.draws}** tirage(s) restant(s)`, { title: header }) })
+      const payload = embed.buildPayload(guildId, `${rewardText}\n\n◇ Solde : **${embed.fmtCoins(updated.coins)}** coins  •  **${updated.draws}** tirage(s) restant(s)`, { title: header });
+      return interaction.reply({
+        ...payload,
+        flags: (payload.flags ?? 0) | MessageFlags.Ephemeral,
+      });
     }
 
     if (id === 'cs_panel_achievements') {
@@ -2244,9 +2252,17 @@ async function handlePanelNav(interaction) {
 async function handlePanelDraw(interaction, id) {
   const guildId = interaction.guild.id;
   const userId = interaction.user.id;
-  const count = parseInt(id.split(':')[1]) || 1;
-  await interaction.update(embed.wrapPayload(guildId, { flags: COMPONENTS_V2_FLAG, components: [_executeDraw(guildId, userId, count, interaction.guild)] }, 'casino')).catch((err) => {
-    console.log(`[CASINO-DRAW] Update failed: ${err?.message}`);
+  const rawCount = id.split(':')[1];
+  const count = rawCount === 'all'
+    ? db.getCasinoUser(guildId, userId).draws
+    : parseInt(rawCount, 10) || 1;
+  await interaction.deferUpdate().catch(() => {});
+  await interaction.followUp({
+    flags: COMPONENTS_V2_FLAG | MessageFlags.Ephemeral,
+    components: [_executeDraw(guildId, userId, count, interaction.guild)],
+    allowedMentions: { parse: [] },
+  }).catch((err) => {
+    console.log(`[CASINO-DRAW] Private result failed: ${err?.message}`);
   });
 }
 

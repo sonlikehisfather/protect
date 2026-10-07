@@ -230,7 +230,7 @@ exports.run = async (client, message, args) => {
     return { content: text, components: rows };
   };
 
-  const buildResult = async (won, finalFloor, finalMult, cashedOut) => {
+  const buildResult = async (won, finalFloor, finalMult, cashedOut, pickedTile = -1) => {
     let winAmount = 0;
     if (cashedOut && finalFloor > 0) winAmount = Math.floor(amount * finalMult);
     else if (won) winAmount = Math.floor(amount * finalMult);
@@ -265,7 +265,8 @@ exports.run = async (client, message, args) => {
     try {
       towerImage = await generateTowerImage({
         diffKey, floors: diff.floors, tiles: diff.tiles,
-        currentFloor: finalFloor, floorBombs, allFloorBombs, revealedFloor: -1, revealedPick: -1,
+        currentFloor: finalFloor, floorBombs, allFloorBombs,
+        revealedFloor: won || cashedOut ? -1 : finalFloor, revealedPick: pickedTile,
         gameOver: true, won, cashedOut, amount, winAmount, netGain, finalCoins,
       });
     } catch (e) {
@@ -410,7 +411,7 @@ exports.run = async (client, message, args) => {
         finished = true;
         await sent.edit(buildPlaying(currentFloor, floorBombs, tileIdx)).catch(() => {});
         await sleep(1500);
-        return sent.edit(await buildResult(false, currentFloor, floorMult(diff, currentFloor + 1), false)).catch(() => {});
+        return sent.edit(await buildResult(false, currentFloor, floorMult(diff, currentFloor + 1), false, tileIdx)).catch(() => {});
       }
 
       await sent.edit(buildPlaying(currentFloor, floorBombs, tileIdx)).catch(() => {});
@@ -421,7 +422,7 @@ exports.run = async (client, message, args) => {
         playing = false;
         finished = true;
         await sleep(1000);
-        return sent.edit(await buildResult(true, diff.floors - 1, floorMult(diff, diff.floors), false)).catch(() => {});
+        return sent.edit(await buildResult(true, diff.floors - 1, floorMult(diff, diff.floors), false, tileIdx)).catch(() => {});
       }
 
       floorBombs = pickBombs(diff.tiles, diff.bombs);

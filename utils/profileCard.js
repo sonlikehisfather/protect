@@ -3,6 +3,7 @@
 const { Canvas, loadImage } = require('skia-canvas');
 const { xpForLevel }              = require('../modules/levels');
 const db                          = require('../core/database');
+const { drawCasinoImageFrame }    = require('./casinoImageFrame');
 
 const W = 900;
 const H = 340;
@@ -438,6 +439,7 @@ async function generateProfileCard(member, casinoUser, realLevel, levelData, ran
 
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
+  drawCasinoImageFrame(ctx, W, H, color);
   return await canvas.toBuffer('png');
 }
 

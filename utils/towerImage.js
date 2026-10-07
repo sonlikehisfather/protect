@@ -1,6 +1,7 @@
 'use strict';
 
 const { Canvas } = require('skia-canvas');
+const { drawCasinoImageFrame } = require('./casinoImageFrame');
 
 function fmtCoins(n) {
   if (n == null) return '0';
@@ -54,21 +55,6 @@ function drawCornerOrnaments(ctx, W, H, color, alpha = 0.12) {
   ctx.beginPath(); ctx.moveTo(W - m - cs, m); ctx.lineTo(W - m, m); ctx.lineTo(W - m, m + cs); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(m, H - m - cs); ctx.lineTo(m, H - m); ctx.lineTo(m + cs, H - m); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(W - m - cs, H - m); ctx.lineTo(W - m, H - m); ctx.lineTo(W - m, H - m - cs); ctx.stroke();
-  ctx.restore();
-}
-
-function drawSparkle(ctx, x, y, size, color, alpha = 1) {
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 1.2;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(x - size, y); ctx.lineTo(x + size, y);
-  ctx.moveTo(x, y - size); ctx.lineTo(x, y + size);
-  ctx.moveTo(x - size * 0.6, y - size * 0.6); ctx.lineTo(x + size * 0.6, y + size * 0.6);
-  ctx.moveTo(x - size * 0.6, y + size * 0.6); ctx.lineTo(x + size * 0.6, y - size * 0.6);
-  ctx.stroke();
   ctx.restore();
 }
 
@@ -162,8 +148,8 @@ async function generateTowerImage({ diffKey, floors, tiles, currentFloor, floorB
     ctx.restore();
   }
 
-  const displayFloor = gameOver ? (won || cashedOut ? currentFloor : currentFloor + 1) : currentFloor + 1;
-  const displayMult = gameOver && (won || cashedOut) ? floorMultDisplay(diffKey, currentFloor) : floorMultDisplay(diffKey, currentFloor + 1);
+  const displayFloor = gameOver && cashedOut ? currentFloor : currentFloor + 1;
+  const displayMult = floorMultDisplay(diffKey, cashedOut ? currentFloor : currentFloor + 1);
 
   ctx.fillStyle = dc.accent;
   ctx.font = 'bold 18px sans-serif';
@@ -205,19 +191,6 @@ async function generateTowerImage({ diffKey, floors, tiles, currentFloor, floorB
   ctx.font = '12px sans-serif';
   ctx.fillText(`Sommet : x${maxMult.toFixed(2)} = ${fmtCoins(maxWin)} coins max`, W / 2, 158);
 
-  ctx.save();
-  ctx.fillStyle = dc.accent;
-  ctx.globalAlpha = 0.06;
-  ctx.font = 'bold 10px sans-serif';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('EASY x1.5', 30, H - 15);
-  ctx.textAlign = 'center';
-  ctx.fillText('MEDIUM x2', W / 2, H - 15);
-  ctx.textAlign = 'right';
-  ctx.fillText('HARD x3', W - 30, H - 15);
-  ctx.restore();
-
   const towerStartY = headerH;
   const tilesStartX = towerX + FLOOR_LABEL_W + 15;
 
@@ -234,7 +207,7 @@ async function generateTowerImage({ diffKey, floors, tiles, currentFloor, floorB
   for (let f = floors - 1; f >= 0; f--) {
     const fy = towerStartY + (floors - 1 - f) * (FLOOR_H + FLOOR_GAP);
     const isCurrent = f === currentFloor && !gameOver;
-    const isPassed = f < currentFloor || (gameOver && (won || cashedOut) && f < currentFloor);
+    const isPassed = f < currentFloor || (won && !cashedOut && f === currentFloor);
     const isFailed = gameOver && !won && !cashedOut && f === currentFloor;
 
     ctx.fillStyle = isPassed ? 'rgba(87,242,135,0.06)' : isCurrent ? 'rgba(255,255,255,0.04)' : isFailed ? 'rgba(237,66,69,0.06)' : 'rgba(255,255,255,0.015)';
@@ -434,29 +407,13 @@ async function generateTowerImage({ diffKey, floors, tiles, currentFloor, floorB
   if (gameOver) {
     ctx.fillStyle = '#555566';
     ctx.font = '12px sans-serif';
-    const coteInfo = won || cashedOut ? `x${floorMultDisplay(diffKey, currentFloor)}` : 'x0';
+    const coteInfo = won && !cashedOut
+      ? `x${floorMultDisplay(diffKey, currentFloor + 1)}`
+      : cashedOut ? `x${floorMultDisplay(diffKey, currentFloor)}` : 'x0';
     ctx.fillText(`${dc.label} ・ Cote : ${coteInfo} ・ ${tiles} tuiles/etage`, W / 2, resultY + 42);
-
-    if (won || cashedOut) {
-      for (let i = 0; i < 14; i++) {
-        const sx = 40 + Math.random() * (W - 80);
-        const sy = resultY - 10 + Math.random() * 50;
-        drawSparkle(ctx, sx, sy, 3 + Math.random() * 4, '#57F287', 0.2 + Math.random() * 0.25);
-      }
-      for (let i = 0; i < 6; i++) {
-        const sx = 40 + Math.random() * (W - 80);
-        const sy = resultY - 10 + Math.random() * 50;
-        drawSparkle(ctx, sx, sy, 3, '#FFD700', 0.2 + Math.random() * 0.2);
-      }
-    } else {
-      for (let i = 0; i < 10; i++) {
-        const sx = 40 + Math.random() * (W - 80);
-        const sy = resultY - 10 + Math.random() * 40;
-        drawSparkle(ctx, sx, sy, 3 + Math.random() * 2, '#ED4245', 0.15 + Math.random() * 0.2);
-      }
-    }
   }
 
+  drawCasinoImageFrame(ctx, W, H, accent);
   return await canvas.toBuffer('png');
 }
 

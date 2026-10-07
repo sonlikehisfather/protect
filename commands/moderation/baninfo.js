@@ -75,8 +75,8 @@ module.exports = {
     let statusText = wetEntry
       ? 'Wet'
       : blacklistEntry
-      ? 'Blacklisté sur ce serveur'
-      : 'Banni définitivement';
+      ? 'Blacklisté'
+      : 'Banni';
     let endText    = 'Aucune';
     let reasonText = activeBan?.reason || ban?.reason || banAudit?.reason || 'Aucune raison fournie';
     let modText    = 'Inconnu';

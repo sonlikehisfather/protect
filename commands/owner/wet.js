@@ -1,9 +1,14 @@
 'use strict';
 
 const {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
   ContainerBuilder,
   EmbedBuilder,
   MessageFlags,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
   TextDisplayBuilder,
 } = require('discord.js');
 
@@ -16,8 +21,8 @@ const COMPONENTS_V2_FLAG = MessageFlags?.IsComponentsV2 ?? (1 << 15);
 module.exports = {
   help: {
     name        : 'wet',
-    description : 'Wet un utilisateur.',
-    usage       : 'wet <@membre/ID> [raison] | unwet <@membre/ID>',
+    description : 'Afficher la wetlist ou wet un utilisateur.',
+    usage       : 'wet [@membre/ID] [raison] | unwet <@membre/ID>',
     aliases     : ['unwet'],
     category    : 'owner',
     selfManaged : true,
@@ -33,6 +38,10 @@ module.exports = {
       .trim()
       .split(/\s+/, 1)[0]
       .toLowerCase() === 'unwet';
+
+    if (!args[0] && !isUnwet) {
+      return _showList(message);
+    }
 
     const targetId = message.mentions.users.first()?.id
       ?? args[0]?.replace(/[<@!>]/g, '');
@@ -81,6 +90,89 @@ module.exports = {
     return _reply(message, _withDeleteWarning(result, deleted));
   },
 };
+
+async function _showList(message) {
+  const list = db.getWetlist();
+  if (!list.length) return _reply(message, 'La wetlist est vide.');
+
+  const pageSize = 10;
+  const totalPages = Math.ceil(list.length / pageSize);
+  let page = 0;
+
+  const buildPayload = (disabled = false) => {
+    const entries = list.slice(page * pageSize, (page + 1) * pageSize);
+    const body = [
+      `## ☰ Wetlist (${list.length})`,
+      '',
+      ...entries.map((entry, index) =>
+        `**${page * pageSize + index + 1}.** <@${entry.userId}> \`${entry.userId}\`\n-# ${(entry.reason || 'Aucune raison fournie').slice(0, 160)}`
+      ),
+      '',
+      `-# Page ${page + 1}/${totalPages}`,
+    ].join('\n');
+
+    const navRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('local:wet:prev')
+        .setLabel('←')
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(disabled || page === 0),
+      new ButtonBuilder()
+        .setCustomId('local:wet:next')
+        .setLabel('→')
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(disabled || page >= totalPages - 1),
+    );
+
+    if (embed.shouldUseV2(message.guild.id, module.exports.help.name)) {
+      const container = new ContainerBuilder();
+      container.addTextDisplayComponents(new TextDisplayBuilder().setContent(body));
+      container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
+      if (totalPages > 1) container.addActionRowComponents(navRow);
+      return {
+        embeds: [],
+        components: [container],
+        flags: COMPONENTS_V2_FLAG,
+        allowedMentions: { parse: [] },
+      };
+    }
+
+    return {
+      embeds: [embed.build(message.guild.id, null, {
+        title: `☰ Wetlist (${list.length})`,
+        description: entries.map((entry, index) =>
+          `**${page * pageSize + index + 1}.** <@${entry.userId}> \`${entry.userId}\`\n${(entry.reason || 'Aucune raison fournie').slice(0, 160)}`
+        ).join('\n\n'),
+        footer: { text: `Page ${page + 1}/${totalPages}` },
+        timestamp: false,
+      })],
+      components: totalPages > 1 ? [navRow] : [],
+      allowedMentions: { parse: [] },
+    };
+  };
+
+  const panel = await message.channel.send(buildPayload()).catch(() => null);
+  if (!panel || totalPages <= 1) return;
+
+  embed.registerPrivateInteraction(panel, message.author.id, 120_000);
+  const collector = panel.createMessageComponentCollector({
+    filter: interaction => interaction.user.id === message.author.id && interaction.message.id === panel.id,
+    idle: 60_000,
+    time: 120_000,
+  });
+
+  collector.on('collect', async interaction => {
+    if (interaction.customId === 'local:wet:prev') page = Math.max(0, page - 1);
+    if (interaction.customId === 'local:wet:next') page = Math.min(totalPages - 1, page + 1);
+    await interaction.deferUpdate().catch(() => {});
+    await panel.edit(buildPayload()).catch(() => {});
+  });
+
+  collector.on('end', () => {
+    embed.clearPrivateInteraction(panel);
+    panel.edit(buildPayload(true)).catch(() => {});
+  });
+}
 
 function _canUse(message) {
   const { author, guild, member } = message;

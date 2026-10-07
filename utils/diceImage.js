@@ -1,6 +1,7 @@
 'use strict';
 
 const { Canvas } = require('skia-canvas');
+const { drawCasinoImageFrame } = require('./casinoImageFrame');
 
 function fmtCoins(n) {
   if (n == null) return '0';
@@ -131,57 +132,11 @@ function drawSparkle(ctx, x, y, size, color, alpha = 1) {
   ctx.restore();
 }
 
-function drawDie(ctx, cx, cy, size, num, color) {
-  ctx.save();
-  ctx.shadowColor = 'rgba(0,0,0,0.4)';
-  ctx.shadowBlur = 8;
-  ctx.shadowOffsetY = 3;
-  const grad = ctx.createLinearGradient(cx - size, cy - size, cx + size, cy + size);
-  grad.addColorStop(0, '#2a2a3e');
-  grad.addColorStop(1, '#1a1a2e');
-  ctx.fillStyle = grad;
-  roundRect(ctx, cx - size, cy - size, size * 2, size * 2, size * 0.2);
-  ctx.fill();
-  ctx.restore();
-
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 2;
-  roundRect(ctx, cx - size, cy - size, size * 2, size * 2, size * 0.2);
-  ctx.stroke();
-
-  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-  ctx.lineWidth = 1;
-  roundRect(ctx, cx - size + 4, cy - size + 4, size * 2 - 8, size * 2 - 8, size * 0.15);
-  ctx.stroke();
-
-  const dotR = size * 0.12;
-  const positions = {
-    1: [[0, 0]],
-    2: [[-0.4, -0.4], [0.4, 0.4]],
-    3: [[-0.4, -0.4], [0, 0], [0.4, 0.4]],
-    4: [[-0.4, -0.4], [0.4, -0.4], [-0.4, 0.4], [0.4, 0.4]],
-    5: [[-0.4, -0.4], [0.4, -0.4], [0, 0], [-0.4, 0.4], [0.4, 0.4]],
-    6: [[-0.4, -0.4], [0.4, -0.4], [-0.4, 0], [0.4, 0], [-0.4, 0.4], [0.4, 0.4]],
-  };
-  const dots = positions[num] || [];
-  for (const [dx, dy] of dots) {
-    ctx.save();
-    ctx.shadowColor = color;
-    ctx.shadowBlur = 4;
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(cx + dx * size, cy + dy * size, dotR, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
-}
-
 async function generateDiceImage({ roll, rangeMin, rangeMax, rangeSize, mult, winChance, win, winAmount, amount, finalCoins }) {
   const canvas = new Canvas(W, H);
   const ctx = canvas.getContext('2d');
 
   const accent = win ? '#57F287' : '#ED4245';
-  const accentDark = win ? '#2d6b3f' : '#6b2d2d';
 
   const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
   bgGrad.addColorStop(0, '#0d1117');
@@ -252,21 +207,6 @@ async function generateDiceImage({ roll, rangeMin, rangeMax, rangeSize, mult, wi
     ctx.fill();
     ctx.restore();
   }
-
-  drawDie(ctx, 70, H - 35, 12, Math.floor(roll / 16) + 1, accent);
-  drawDie(ctx, 110, H - 35, 12, (roll % 6) + 1, accent);
-  drawDie(ctx, W - 70, H - 35, 12, Math.floor(roll / 25) + 1, accent);
-  drawDie(ctx, W - 110, H - 35, 12, (roll % 4) + 1, accent);
-
-  ctx.save();
-  ctx.fillStyle = accent;
-  ctx.globalAlpha = 0.05;
-  ctx.font = 'bold 10px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('MIN: 10', W / 2 - 60, H - 35);
-  ctx.fillText('MAX: 50000', W / 2 + 60, H - 35);
-  ctx.restore();
 
   const numY = 155;
 
@@ -361,11 +301,6 @@ async function generateDiceImage({ roll, rangeMin, rangeMax, rangeSize, mult, wi
   ctx.textBaseline = 'middle';
   if (win) {
     ctx.fillText(`✦ GAGNE !  +${fmtCoins(winAmount - amount)} coins (x${mult.toFixed(2)})`, W / 2, 375);
-    for (let i = 0; i < 14; i++) {
-      const sx = W / 2 - 140 + Math.random() * 280;
-      const sy = 355 + Math.random() * 30;
-      drawSparkle(ctx, sx, sy, 3 + Math.random() * 3, '#57F287', 0.25 + Math.random() * 0.3);
-    }
     for (let i = 0; i < 6; i++) {
       const angle = (i / 6) * Math.PI * 2;
       const x = W / 2 + Math.cos(angle) * 90;
@@ -374,13 +309,9 @@ async function generateDiceImage({ roll, rangeMin, rangeMax, rangeSize, mult, wi
     }
   } else {
     ctx.fillText(`× Perdu  -${fmtCoins(amount)} coins`, W / 2, 375);
-    for (let i = 0; i < 8; i++) {
-      const sx = W / 2 - 100 + Math.random() * 200;
-      const sy = 355 + Math.random() * 25;
-      drawSparkle(ctx, sx, sy, 3, '#ED4245', 0.15 + Math.random() * 0.15);
-    }
   }
 
+  drawCasinoImageFrame(ctx, W, H, accent);
   return await canvas.toBuffer('png');
 }
 

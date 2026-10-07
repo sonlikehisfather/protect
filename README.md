@@ -67,9 +67,16 @@ CLIENT_ID=id_de_l_application
 BUYER_ID=id_discord_du_buyer
 NODE_ENV=development
 DEV_GUILD_ID=id_du_serveur_de_test
+OPENROUTER_API_KEY=cle_api_openrouter
 ```
 
-`TOKEN`, `CLIENT_ID` et `BUYER_ID` sont obligatoires au démarrage. `DEV_GUILD_ID` est facultatif. Ne partage pas le fichier `.env` et ne committe jamais ses valeurs.
+`TOKEN`, `CLIENT_ID` et `BUYER_ID` sont obligatoires au démarrage. `DEV_GUILD_ID` est facultatif. `OPENROUTER_API_KEY` est nécessaire uniquement pour utiliser `+ask`; crée ta clé dans les [paramètres OpenRouter](https://openrouter.ai/settings/keys). Ne partage pas le fichier `.env` et ne committe jamais ses valeurs.
+
+### Commande `+ask`
+
+`+ask <question>` appelle le routeur de modèles gratuits `openrouter/free`. La commande est réservée aux buyers par défaut. Un buyer ou le propriétaire du serveur peut accorder l'accès à un membre ou un rôle avec `+setperm ask @membre` ou `+setperm ask @role`. Les réponses ont un délai minimal de 10 secondes par personne.
+
+Seul le texte fourni après `+ask` est transmis à OpenRouter; la commande n'envoie pas l'historique du salon. Le routage demande des fournisseurs qui refusent la collecte des données (`data_collection: deny`), ce qui peut réduire les modèles disponibles. La formule gratuite OpenRouter est soumise à ses limites, notamment 50 requêtes par jour sans crédits. Voir les [limites OpenRouter](https://openrouter.ai/docs/api_reference/limits) et le [routage selon les règles de données](https://openrouter.ai/docs/guides/routing/provider-selection).
 
 ### Variables facultatives de diagnostic
 

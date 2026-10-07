@@ -1,6 +1,7 @@
 'use strict';
 
 const { Canvas } = require('skia-canvas');
+const { drawCasinoImageFrame } = require('./casinoImageFrame');
 
 function fmtCoins(n) {
   if (n == null) return '0';
@@ -41,61 +42,6 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-function drawSparkle(ctx, x, y, size, color, alpha = 1) {
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 1.5;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(x - size, y); ctx.lineTo(x + size, y);
-  ctx.moveTo(x, y - size); ctx.lineTo(x, y + size);
-  ctx.moveTo(x - size * 0.6, y - size * 0.6); ctx.lineTo(x + size * 0.6, y + size * 0.6);
-  ctx.moveTo(x - size * 0.6, y + size * 0.6); ctx.lineTo(x + size * 0.6, y - size * 0.6);
-  ctx.stroke();
-  ctx.restore();
-}
-
-function drawStar(ctx, x, y, size, color, alpha = 1) {
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  for (let i = 0; i < 5; i++) {
-    const angle = (i * 2 * Math.PI / 5) - Math.PI / 2;
-    const px = x + Math.cos(angle) * size;
-    const py = y + Math.sin(angle) * size;
-    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-    const angle2 = angle + Math.PI / 5;
-    ctx.lineTo(x + Math.cos(angle2) * size * 0.4, y + Math.sin(angle2) * size * 0.4);
-  }
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-}
-
-function drawCoin(ctx, x, y, size, alpha = 1) {
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  const grad = ctx.createRadialGradient(x - size * 0.3, y - size * 0.3, size * 0.1, x, y, size);
-  grad.addColorStop(0, '#FFE066');
-  grad.addColorStop(0.6, '#FFD700');
-  grad.addColorStop(1, '#B8860B');
-  ctx.fillStyle = grad;
-  ctx.beginPath();
-  ctx.arc(x, y, size, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = '#B8860B';
-  ctx.lineWidth = 0.8;
-  ctx.stroke();
-  ctx.fillStyle = '#B8860B';
-  ctx.font = `bold ${size}px sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('$', x, y + 1);
-  ctx.restore();
-}
-
 function drawCornerOrnaments(ctx, W, H, color, alpha = 0.12) {
   ctx.save();
   ctx.globalAlpha = alpha;
@@ -130,12 +76,12 @@ function pickCars(numCols, numCars) {
   return { positions: cars, dirs };
 }
 
-const CAR_COLORS = ['#E74C3C', '#3498DB', '#F39C12', '#9B59B6', '#1ABC9C', '#E67E22', '#2ECC71', '#E91E63', '#00BCD4', '#FF5722'];
+const CAR_COLORS = ['#ed5a71', '#4b91dc', '#efab4a', '#9b7dec', '#45c6b2', '#ea7c5c', '#67c98d', '#e875a6', '#52bcd4', '#ed8357'];
 
-function drawCar(ctx, col, lane, laneY, direction, crashed, numCols) {
-  const cx = ROAD_X + col * COL_W + COL_W / 2;
+function drawCar(ctx, col, lane, laneY, direction, crashed, roadX, colWidth) {
+  const cx = roadX + col * colWidth + colWidth / 2;
   const cy = laneY + LANE_H / 2;
-  const cw = COL_W - 22;
+  const cw = colWidth - 22;
   const ch = LANE_H - 18;
   const x = cx - cw / 2;
   const y = cy - ch / 2;
@@ -158,12 +104,12 @@ function drawCar(ctx, col, lane, laneY, direction, crashed, numCols) {
   bodyGrad.addColorStop(0, color);
   bodyGrad.addColorStop(0.4, color);
   bodyGrad.addColorStop(1, '#1a1a2e');
-  ctx.fillStyle = crashed ? '#444' : bodyGrad;
+  ctx.fillStyle = crashed ? '#582737' : bodyGrad;
   roundRect(ctx, x, y, cw, ch, 8);
   ctx.fill();
 
-  ctx.strokeStyle = crashed ? '#222' : 'rgba(255,255,255,0.15)';
-  ctx.lineWidth = 1;
+  ctx.strokeStyle = crashed ? '#ff657f' : 'rgba(255,255,255,0.2)';
+  ctx.lineWidth = crashed ? 1.8 : 1;
   roundRect(ctx, x, y, cw, ch, 8);
   ctx.stroke();
   ctx.restore();
@@ -175,7 +121,7 @@ function drawCar(ctx, col, lane, laneY, direction, crashed, numCols) {
     ctx.translate(-cx, -cy);
   }
 
-  ctx.fillStyle = crashed ? 'rgba(80,80,80,0.3)' : 'rgba(100,180,255,0.35)';
+  ctx.fillStyle = crashed ? 'rgba(255,101,127,0.12)' : 'rgba(130,205,255,0.4)';
   roundRect(ctx, x + cw * 0.18, y + ch * 0.12, cw * 0.5, ch * 0.38, 4);
   ctx.fill();
   ctx.strokeStyle = 'rgba(255,255,255,0.15)';
@@ -254,7 +200,7 @@ function drawCar(ctx, col, lane, laneY, direction, crashed, numCols) {
 
   if (crashed) {
     ctx.save();
-    ctx.strokeStyle = '#FFD700';
+    ctx.strokeStyle = '#ff657f';
     ctx.lineWidth = 2.5;
     ctx.lineCap = 'round';
     const s = 10;
@@ -266,24 +212,11 @@ function drawCar(ctx, col, lane, laneY, direction, crashed, numCols) {
     ctx.stroke();
     ctx.restore();
 
-    for (let i = 0; i < 5; i++) {
-      const ang = Math.random() * Math.PI * 2;
-      const dist = 8 + Math.random() * 12;
-      const px = cx + Math.cos(ang) * dist;
-      const py = cy + Math.sin(ang) * dist;
-      ctx.save();
-      ctx.globalAlpha = 0.3 + Math.random() * 0.2;
-      ctx.fillStyle = '#FF6347';
-      ctx.beginPath();
-      ctx.arc(px, py, 1 + Math.random() * 2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    }
   }
 }
 
-function drawChicken(ctx, col, laneY, size, accent, moving, numCols) {
-  const cx = ROAD_X + col * COL_W + COL_W / 2;
+function drawChicken(ctx, col, laneY, size, accent, moving, roadX, colWidth) {
+  const cx = roadX + col * colWidth + colWidth / 2;
   const cy = laneY + LANE_H / 2;
 
   ctx.save();
@@ -406,18 +339,6 @@ function drawChicken(ctx, col, laneY, size, accent, moving, numCols) {
       ctx.lineTo(cx - size * 0.55 - off - 8, cy + yOff);
       ctx.stroke();
     }
-
-    ctx.save();
-    ctx.globalAlpha = 0.2;
-    ctx.fillStyle = accent;
-    for (let i = 0; i < 3; i++) {
-      const px = cx - size * 0.8 - 10 - i * 8;
-      const py = cy + (Math.random() - 0.5) * size * 0.4;
-      ctx.beginPath();
-      ctx.arc(px, py, 1.5 + Math.random(), 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.restore();
   }
 
   ctx.restore();
@@ -535,32 +456,6 @@ function drawTrafficLight(ctx, x, y, isRed) {
   ctx.restore();
 }
 
-function drawFirework(ctx, x, y, size, color) {
-  ctx.save();
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 1.5;
-  ctx.lineCap = 'round';
-  for (let i = 0; i < 8; i++) {
-    const angle = (i / 8) * Math.PI * 2;
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x + Math.cos(angle) * size, y + Math.sin(angle) * size);
-    ctx.stroke();
-  }
-  for (let i = 0; i < 6; i++) {
-    const angle = (i / 6) * Math.PI * 2 + 0.3;
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x + Math.cos(angle) * size * 0.6, y + Math.sin(angle) * size * 0.6);
-    ctx.stroke();
-  }
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.arc(x, y, 2, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-}
-
 function drawSmoke(ctx, x, y, size, alpha) {
   ctx.save();
   ctx.globalAlpha = alpha;
@@ -571,14 +466,6 @@ function drawSmoke(ctx, x, y, size, alpha) {
   ctx.beginPath();
   ctx.arc(x, y, size, 0, Math.PI * 2);
   ctx.fill();
-  ctx.restore();
-}
-
-function drawTireMark(ctx, x, y, w, h) {
-  ctx.save();
-  ctx.globalAlpha = 0.15;
-  ctx.fillStyle = '#1a1a1a';
-  ctx.fillRect(x, y, w, h);
   ctx.restore();
 }
 
@@ -601,6 +488,29 @@ function drawCrack(ctx, cx, cy, size) {
   ctx.restore();
 }
 
+function drawStatCard(ctx, x, y, w, label, value, accent) {
+  ctx.save();
+  ctx.fillStyle = 'rgba(17,24,39,0.92)';
+  roundRect(ctx, x, y, w, 46, 10);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.lineWidth = 1;
+  roundRect(ctx, x, y, w, 46, 10);
+  ctx.stroke();
+  ctx.fillStyle = accent;
+  roundRect(ctx, x + 10, y + 9, 3, 28, 1.5);
+  ctx.fill();
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#8290a8';
+  ctx.font = 'bold 9px sans-serif';
+  ctx.fillText(label, x + 22, y + 15);
+  ctx.fillStyle = '#f3f6fc';
+  ctx.font = 'bold 15px sans-serif';
+  ctx.fillText(value, x + 22, y + 32);
+  ctx.restore();
+}
+
 async function generateChickenImage({
   diffKey, currentLane, chickenCol, allLaneCars, gameOver, won, cashedOut,
   amount, winAmount, netGain, finalCoins, crashedCol, crashedLane
@@ -610,22 +520,29 @@ async function generateChickenImage({
   const accent = gameOver ? (won || cashedOut ? '#57F287' : '#ED4245') : diff.accent;
 
   const headerH = 70;
-  const infoH = 60;
+  const infoH = 58;
   const roadH = LANES * LANE_H;
   const footerH = 90;
   const H = headerH + infoH + roadH + footerH;
+  const roadX = ROAD_X;
+  const colWidth = ROAD_W / numCols;
 
   const canvas = new Canvas(W, H);
   const ctx = canvas.getContext('2d');
 
   const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
-  bgGrad.addColorStop(0, '#0d1117');
-  bgGrad.addColorStop(0.3, '#161b24');
-  bgGrad.addColorStop(0.7, '#161b24');
-  bgGrad.addColorStop(1, '#0d1117');
+  bgGrad.addColorStop(0, '#101629');
+  bgGrad.addColorStop(0.48, '#0b1220');
+  bgGrad.addColorStop(1, '#080d18');
   ctx.fillStyle = bgGrad;
   roundRect(ctx, 0, 0, W, H, 20);
   ctx.fill();
+
+  const glowGrad = ctx.createRadialGradient(W / 2, roadH / 2 + headerH, 20, W / 2, roadH / 2 + headerH, W * 0.7);
+  glowGrad.addColorStop(0, 'rgba(72,104,170,0.13)');
+  glowGrad.addColorStop(1, 'rgba(72,104,170,0)');
+  ctx.fillStyle = glowGrad;
+  ctx.fillRect(0, headerH, W, H - headerH);
 
   ctx.save();
   ctx.strokeStyle = accent;
@@ -641,153 +558,108 @@ async function generateChickenImage({
   ctx.stroke();
   ctx.restore();
 
-  drawCornerOrnaments(ctx, W, H, accent, 0.1);
+  drawCornerOrnaments(ctx, W, H, accent, 0.16);
 
   ctx.save();
-  ctx.fillStyle = diff.accent;
-  ctx.globalAlpha = 0.06;
+  ctx.fillStyle = 'rgba(255,255,255,0.025)';
   ctx.fillRect(0, 0, W, headerH);
   ctx.restore();
 
   ctx.save();
-  ctx.strokeStyle = accent;
-  ctx.globalAlpha = 0.1;
-  ctx.lineWidth = 1;
-  ctx.setLineDash([4, 4]);
-  ctx.beginPath();
-  ctx.moveTo(0, headerH);
-  ctx.lineTo(W, headerH);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.restore();
-
-  ctx.fillStyle = diff.accent;
-  ctx.font = 'bold 26px sans-serif';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('~ CHICKEN CROSSING', 30, 35);
-
-  ctx.save();
-  ctx.fillStyle = diff.accent;
-  ctx.globalAlpha = 0.1;
-  ctx.font = 'bold 11px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText(`${diff.label} MODE`, W / 2, 50);
-  ctx.restore();
-
-  ctx.fillStyle = '#8b95a7';
-  ctx.font = '14px sans-serif';
-  ctx.textAlign = 'right';
-  ctx.fillText(`Mise : ${fmtCoins(amount)} coins`, W - 30, 35);
-
-  ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+  ctx.strokeStyle = 'rgba(255,255,255,0.07)';
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(30, headerH);
-  ctx.lineTo(W - 30, headerH);
+  ctx.moveTo(20, headerH);
+  ctx.lineTo(W - 20, headerH);
   ctx.stroke();
-
-  const displayLane = gameOver && (won || cashedOut) ? (won ? LANES : currentLane) : (gameOver ? currentLane + 1 : currentLane + 1);
-  const displayMult = gameOver && (won || cashedOut) ? (won ? laneMultDisplay(diffKey, LANES) : laneMultDisplay(diffKey, currentLane)) : laneMultDisplay(diffKey, currentLane + 1);
-  const potentialWin = Math.floor(amount * (gameOver && (won || cashedOut) ? (won ? laneMultVal(diffKey, LANES) : laneMultVal(diffKey, currentLane)) : laneMultVal(diffKey, currentLane + 1)));
+  ctx.restore();
 
   ctx.save();
-  ctx.fillStyle = 'rgba(255,255,255,0.03)';
-  roundRect(ctx, 20, headerH + 8, W - 40, infoH - 16, 10);
+  ctx.shadowColor = diff.accent;
+  ctx.shadowBlur = 12;
+  ctx.fillStyle = diff.accent;
+  ctx.beginPath();
+  ctx.arc(42, 35, 17, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
-  ctx.lineWidth = 1;
-  roundRect(ctx, 20, headerH + 8, W - 40, infoH - 16, 10);
-  ctx.stroke();
   ctx.restore();
 
-  ctx.fillStyle = diff.accent;
-  ctx.font = 'bold 16px sans-serif';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(diff.label, 35, headerH + infoH / 2);
-
-  ctx.save();
-  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(100, headerH + 12);
-  ctx.lineTo(100, headerH + infoH - 12);
-  ctx.stroke();
-  ctx.restore();
-
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = '#101629';
   ctx.font = 'bold 15px sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText(`Route ${displayLane}/${LANES}`, W / 2 - 140, headerH + infoH / 2);
+  ctx.textBaseline = 'middle';
+  ctx.fillText('C', 42, 35);
+
+  ctx.fillStyle = diff.accent;
+  ctx.font = 'bold 23px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('CHICKEN RUN', 70, 31);
+  ctx.fillStyle = '#77839a';
+  ctx.font = 'bold 9px sans-serif';
+  ctx.fillText('CROSS THE ROAD  /  CLAIM THE MULTIPLIER', 71, 51);
 
   ctx.save();
-  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(W / 2 - 70, headerH + 12);
-  ctx.lineTo(W / 2 - 70, headerH + infoH - 12);
-  ctx.stroke();
+  ctx.fillStyle = diff.accent;
+  ctx.globalAlpha = 0.12;
+  roundRect(ctx, 430, 23, 105, 24, 12);
+  ctx.fill();
   ctx.restore();
-
-  ctx.fillStyle = accent;
-  ctx.fillText(`x${displayMult}`, W / 2 - 20, headerH + infoH / 2);
+  ctx.strokeStyle = diff.accent;
+  ctx.globalAlpha = 0.3;
+  ctx.lineWidth = 1;
+  roundRect(ctx, 430, 23, 105, 24, 12);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = diff.accent;
+  ctx.font = 'bold 10px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(`${diff.label} MODE`, 482, 35);
 
   ctx.save();
+  ctx.fillStyle = 'rgba(255,255,255,0.045)';
+  roundRect(ctx, 598, 13, 172, 44, 10);
+  ctx.fill();
   ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(W / 2 + 50, headerH + 12);
-  ctx.lineTo(W / 2 + 50, headerH + infoH - 12);
+  roundRect(ctx, 598, 13, 172, 44, 10);
   ctx.stroke();
+  ctx.fillStyle = '#77839a';
+  ctx.font = 'bold 9px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('MISE', 612, 27);
+  ctx.fillStyle = '#f3f6fc';
+  ctx.font = 'bold 14px sans-serif';
+  ctx.fillText(`${fmtCoins(amount)} coins`, 612, 44);
   ctx.restore();
 
-  ctx.fillStyle = '#ffffff';
-  ctx.fillText(`${fmtCoins(potentialWin)}`, W / 2 + 120, headerH + infoH / 2);
+  const displayLane = won ? LANES : cashedOut ? currentLane : currentLane + 1;
+  const displayMult = won ? laneMultDisplay(diffKey, LANES) : cashedOut ? laneMultDisplay(diffKey, currentLane) : gameOver ? '0.00' : laneMultDisplay(diffKey, currentLane + 1);
+  const displayedWin = gameOver ? winAmount : Math.floor(amount * laneMultVal(diffKey, Number(displayLane)));
+  const metricY = headerH + 6;
+  const metricGap = 10;
+  const metricW = (W - 40 - metricGap * 3) / 4;
 
-  ctx.fillStyle = '#555566';
-  ctx.font = '11px sans-serif';
-  ctx.textAlign = 'right';
-  const maxMult = laneMultVal(diffKey, LANES);
-  ctx.fillText(`Max x${maxMult.toFixed(2)}`, W - 35, headerH + infoH / 2);
+  drawStatCard(ctx, 20, metricY, metricW, 'DIFFICULTÉ', diff.label, diff.accent);
+  drawStatCard(ctx, 20 + metricW + metricGap, metricY, metricW, 'PROGRESSION', `${displayLane} / ${LANES} ROUTES`, '#53d8e8');
+  drawStatCard(ctx, 20 + (metricW + metricGap) * 2, metricY, metricW, 'COTE', `x${displayMult}`, '#b49aff');
+  drawStatCard(ctx, 20 + (metricW + metricGap) * 3, metricY, metricW, gameOver ? 'GAIN TOTAL' : 'GAIN POTENTIEL', `${fmtCoins(displayedWin)} coins`, '#f6c85f');
 
   const roadStartY = headerH + infoH;
 
   const grassGrad = ctx.createLinearGradient(0, roadStartY, 0, roadStartY + roadH);
-  grassGrad.addColorStop(0, '#1a3a1a');
-  grassGrad.addColorStop(0.5, '#152a15');
-  grassGrad.addColorStop(1, '#1a3a1a');
+  grassGrad.addColorStop(0, '#12312e');
+  grassGrad.addColorStop(0.5, '#102925');
+  grassGrad.addColorStop(1, '#0d2326');
   ctx.fillStyle = grassGrad;
   ctx.fillRect(0, roadStartY, ROAD_X, roadH);
   ctx.fillRect(ROAD_X + ROAD_W, roadStartY, W - ROAD_X - ROAD_W, roadH);
 
-  for (let i = 0; i < 20; i++) {
-    const px = Math.random() * ROAD_X;
-    const py = roadStartY + Math.random() * roadH;
-    ctx.save();
-    ctx.globalAlpha = 0.1 + Math.random() * 0.1;
-    ctx.fillStyle = '#2a5a2a';
-    ctx.fillRect(px, py, 2, 4);
-    ctx.restore();
-  }
-  for (let i = 0; i < 20; i++) {
-    const px = ROAD_X + ROAD_W + Math.random() * (W - ROAD_X - ROAD_W);
-    const py = roadStartY + Math.random() * roadH;
-    ctx.save();
-    ctx.globalAlpha = 0.1 + Math.random() * 0.1;
-    ctx.fillStyle = '#2a5a2a';
-    ctx.fillRect(px, py, 2, 4);
-    ctx.restore();
-  }
-
-  drawTree(ctx, 35, roadStartY + 30, 32);
-  drawTree(ctx, 35, roadStartY + roadH / 3, 28);
-  drawTree(ctx, 35, roadStartY + roadH * 2 / 3, 30);
-  drawTree(ctx, 35, roadStartY + roadH - 30, 32);
-  drawTree(ctx, W - 35, roadStartY + 30, 32);
-  drawTree(ctx, W - 35, roadStartY + roadH / 3, 28);
-  drawTree(ctx, W - 35, roadStartY + roadH * 2 / 3, 30);
-  drawTree(ctx, W - 35, roadStartY + roadH - 30, 32);
+  drawTree(ctx, 35, roadStartY + 30, 28);
+  drawTree(ctx, 35, roadStartY + roadH / 3, 24);
+  drawTree(ctx, 35, roadStartY + roadH * 2 / 3, 26);
+  drawTree(ctx, 35, roadStartY + roadH - 30, 28);
+  drawTree(ctx, W - 35, roadStartY + 30, 28);
+  drawTree(ctx, W - 35, roadStartY + roadH / 3, 24);
+  drawTree(ctx, W - 35, roadStartY + roadH * 2 / 3, 26);
+  drawTree(ctx, W - 35, roadStartY + roadH - 30, 28);
 
   drawBush(ctx, 60, roadStartY + roadH / 4, 10);
   drawBush(ctx, 60, roadStartY + roadH * 3 / 4, 10);
@@ -804,76 +676,19 @@ async function generateChickenImage({
 
   for (let l = 0; l < LANES; l++) {
     const laneY = roadStartY + (LANES - 1 - l) * LANE_H;
-    const isGrass = l > 0 && l % 3 === 0;
-
-    if (isGrass) {
-      const grassLaneGrad = ctx.createLinearGradient(0, laneY, 0, laneY + LANE_H);
-      grassLaneGrad.addColorStop(0, '#1a4a1a');
-      grassLaneGrad.addColorStop(0.5, '#1a3a1a');
-      grassLaneGrad.addColorStop(1, '#1a4a1a');
-      ctx.fillStyle = grassLaneGrad;
-      ctx.fillRect(ROAD_X, laneY, ROAD_W, LANE_H);
-
-      ctx.strokeStyle = 'rgba(255,255,255,0.06)';
-      ctx.lineWidth = 1;
-      ctx.setLineDash([4, 5]);
-      ctx.beginPath();
-      ctx.moveTo(ROAD_X, laneY);
-      ctx.lineTo(ROAD_X + ROAD_W, laneY);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(ROAD_X, laneY + LANE_H);
-      ctx.lineTo(ROAD_X + ROAD_W, laneY + LANE_H);
-      ctx.stroke();
-      ctx.setLineDash([]);
-
-      for (let i = 0; i < 5; i++) {
-        const bx = ROAD_X + 20 + Math.random() * (ROAD_W - 40);
-        const by = laneY + 8 + Math.random() * (LANE_H - 16);
-        drawBush(ctx, bx, by, 3 + Math.random() * 4);
-      }
-
-      for (let i = 0; i < 3; i++) {
-        const fx = ROAD_X + 30 + Math.random() * (ROAD_W - 60);
-        const fy = laneY + 10 + Math.random() * (LANE_H - 20);
-        const fcolors = ['#E91E63', '#FFD700', '#9C27B0', '#FF5722'];
-        drawFlower(ctx, fx, fy, 3, fcolors[Math.floor(Math.random() * fcolors.length)]);
-      }
-
-      ctx.save();
-      ctx.fillStyle = '#57F287';
-      ctx.globalAlpha = 0.08;
-      ctx.font = 'bold 10px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('SAFE ZONE', ROAD_X + ROAD_W / 2, laneY + LANE_H / 2);
-      ctx.restore();
-      continue;
-    }
 
     const roadGrad = ctx.createLinearGradient(0, laneY, 0, laneY + LANE_H);
-    roadGrad.addColorStop(0, '#2e2e3a');
-    roadGrad.addColorStop(0.3, '#282834');
-    roadGrad.addColorStop(0.7, '#282834');
-    roadGrad.addColorStop(1, '#2e2e3a');
+    roadGrad.addColorStop(0, '#1b263b');
+    roadGrad.addColorStop(0.45, '#202c43');
+    roadGrad.addColorStop(1, '#141d30');
     ctx.fillStyle = roadGrad;
-    ctx.fillRect(ROAD_X, laneY, ROAD_W, LANE_H);
+    ctx.fillRect(roadX, laneY, ROAD_W, LANE_H);
 
-    ctx.save();
-    ctx.globalAlpha = 0.03;
-    for (let i = 0; i < 8; i++) {
-      const px = ROAD_X + Math.random() * ROAD_W;
-      const py = laneY + Math.random() * LANE_H;
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(px, py, 1 + Math.random() * 2, 1);
-    }
-    ctx.restore();
-
-    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([12, 8]);
+    ctx.strokeStyle = 'rgba(161,180,220,0.23)';
+    ctx.lineWidth = 1.2;
+    ctx.setLineDash([7, 7]);
     for (let c = 1; c < numCols; c++) {
-      const lx = ROAD_X + c * COL_W;
+      const lx = roadX + c * colWidth;
       ctx.beginPath();
       ctx.moveTo(lx, laneY + 3);
       ctx.lineTo(lx, laneY + LANE_H - 3);
@@ -882,161 +697,138 @@ async function generateChickenImage({
     ctx.setLineDash([]);
 
     if (l > 0) {
-      ctx.strokeStyle = 'rgba(255,200,0,0.12)';
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(255,200,0,0.16)';
+      ctx.lineWidth = 1.2;
       ctx.beginPath();
-      ctx.moveTo(ROAD_X, laneY);
-      ctx.lineTo(ROAD_X + ROAD_W, laneY);
+      ctx.moveTo(roadX, laneY);
+      ctx.lineTo(roadX + ROAD_W, laneY);
       ctx.stroke();
     }
 
     if (l < LANES - 1) {
-      const nextIsGrass = (l + 1) > 0 && (l + 1) % 3 === 0;
-      if (!nextIsGrass) {
-        ctx.strokeStyle = 'rgba(255,200,0,0.08)';
-        ctx.lineWidth = 0.8;
-        ctx.beginPath();
-        ctx.moveTo(ROAD_X, laneY + LANE_H);
-        ctx.lineTo(ROAD_X + ROAD_W, laneY + LANE_H);
-        ctx.stroke();
-      }
+      ctx.strokeStyle = 'rgba(255,200,0,0.1)';
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(roadX, laneY + LANE_H);
+      ctx.lineTo(roadX + ROAD_W, laneY + LANE_H);
+      ctx.stroke();
     }
   }
 
-  ctx.strokeStyle = 'rgba(255,200,0,0.4)';
-  ctx.lineWidth = 3;
+  ctx.strokeStyle = 'rgba(255,200,0,0.55)';
+  ctx.lineWidth = 3.5;
   ctx.beginPath();
-  ctx.moveTo(ROAD_X, roadStartY);
-  ctx.lineTo(ROAD_X, roadStartY + roadH);
-  ctx.moveTo(ROAD_X + ROAD_W, roadStartY);
-  ctx.lineTo(ROAD_X + ROAD_W, roadStartY + roadH);
+  ctx.moveTo(roadX, roadStartY);
+  ctx.lineTo(roadX, roadStartY + roadH);
+  ctx.moveTo(roadX + ROAD_W, roadStartY);
+  ctx.lineTo(roadX + ROAD_W, roadStartY + roadH);
   ctx.stroke();
 
   ctx.save();
-  ctx.strokeStyle = 'rgba(255,200,0,0.15)';
+  ctx.strokeStyle = 'rgba(255,200,0,0.24)';
   ctx.lineWidth = 1;
   ctx.setLineDash([6, 4]);
   ctx.beginPath();
-  ctx.moveTo(ROAD_X - 5, roadStartY);
-  ctx.lineTo(ROAD_X - 5, roadStartY + roadH);
-  ctx.moveTo(ROAD_X + ROAD_W + 5, roadStartY);
-  ctx.lineTo(ROAD_X + ROAD_W + 5, roadStartY + roadH);
+  ctx.moveTo(roadX - 5, roadStartY);
+  ctx.lineTo(roadX - 5, roadStartY + roadH);
+  ctx.moveTo(roadX + ROAD_W + 5, roadStartY);
+  ctx.lineTo(roadX + ROAD_W + 5, roadStartY + roadH);
   ctx.stroke();
   ctx.setLineDash([]);
   ctx.restore();
 
-  drawTrafficLight(ctx, ROAD_X - 20, roadStartY + 20, !gameOver);
-  drawTrafficLight(ctx, ROAD_X + ROAD_W + 20, roadStartY + 20, !gameOver);
+  drawTrafficLight(ctx, roadX - 20, roadStartY + 20, !gameOver);
+  drawTrafficLight(ctx, roadX + ROAD_W + 20, roadStartY + 20, !gameOver);
 
   ctx.save();
-  ctx.fillStyle = '#57F287';
-  ctx.globalAlpha = 0.08;
-  ctx.font = 'bold 14px sans-serif';
+  ctx.fillStyle = '#b0fff0';
+  ctx.globalAlpha = 0.56;
+  ctx.font = 'bold 10px sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('START', ROAD_X + ROAD_W / 2, roadStartY + roadH - 12);
-
-  ctx.fillStyle = '#FFD700';
-  ctx.fillText('GOAL', ROAD_X + ROAD_W / 2, roadStartY + 14);
+  ctx.fillText('START', roadX + ROAD_W / 2, roadStartY + roadH + 5);
   ctx.restore();
 
-  ctx.save();
-  ctx.strokeStyle = 'rgba(255,215,0,0.2)';
-  ctx.lineWidth = 2;
-  ctx.setLineDash([6, 4]);
-  ctx.beginPath();
-  const goalY = roadStartY + 2;
-  for (let c = 0; c <= numCols; c++) {
-    const gx = ROAD_X + c * COL_W;
-    if (c === 0) ctx.moveTo(gx, goalY);
-    else ctx.lineTo(gx, goalY);
+  for (let i = 0; i < Math.ceil(ROAD_W / 12); i++) {
+    ctx.fillStyle = i % 2 === 0 ? '#ffe38a' : '#172033';
+    ctx.globalAlpha = 0.72;
+    ctx.fillRect(roadX + i * 12, roadStartY, Math.min(12, ROAD_W - i * 12), 7);
   }
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.restore();
+  ctx.globalAlpha = 1;
 
   for (let l = 0; l < LANES; l++) {
     const laneY = roadStartY + (LANES - 1 - l) * LANE_H;
-    const isGrass = l > 0 && l % 3 === 0;
-    if (isGrass) continue;
 
     const laneData = allLaneCars && allLaneCars[l] ? allLaneCars[l] : null;
     if (!laneData) continue;
 
-    const isPassed = l < currentLane;
+    const isPassed = l < currentLane || (gameOver && (won || cashedOut) && l === currentLane);
     const isCurrent = l === currentLane && !gameOver;
     const isFailed = gameOver && !won && !cashedOut && l === currentLane;
-    const showCars = isPassed || isCurrent || isFailed || gameOver;
+    const showCars = !isPassed && (isCurrent || isFailed || gameOver);
 
     if (isPassed) {
       ctx.save();
-      ctx.globalAlpha = 0.08;
-      ctx.fillStyle = '#57F287';
-      ctx.fillRect(ROAD_X, laneY, ROAD_W, LANE_H);
+      ctx.fillStyle = 'rgba(49,213,164,0.1)';
+      ctx.fillRect(roadX, laneY, ROAD_W, LANE_H);
       ctx.restore();
     }
 
     if (isCurrent) {
       ctx.save();
-      ctx.globalAlpha = 0.06;
-      ctx.fillStyle = accent;
-      ctx.fillRect(ROAD_X, laneY, ROAD_W, LANE_H);
+      ctx.fillStyle = 'rgba(180,154,255,0.11)';
+      ctx.fillRect(roadX, laneY, ROAD_W, LANE_H);
+      ctx.shadowColor = accent;
+      ctx.shadowBlur = 10;
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 2;
+      roundRect(ctx, roadX + 3, laneY + 3, ROAD_W - 6, LANE_H - 6, 7);
+      ctx.stroke();
       ctx.restore();
     }
 
     if (isFailed) {
       ctx.save();
-      ctx.globalAlpha = 0.1;
-      ctx.fillStyle = '#ED4245';
-      ctx.fillRect(ROAD_X, laneY, ROAD_W, LANE_H);
+      ctx.fillStyle = 'rgba(255,74,107,0.13)';
+      ctx.fillRect(roadX, laneY, ROAD_W, LANE_H);
+      ctx.strokeStyle = 'rgba(255,74,107,0.6)';
+      ctx.lineWidth = 2;
+      roundRect(ctx, roadX + 3, laneY + 3, ROAD_W - 6, LANE_H - 6, 7);
+      ctx.stroke();
       ctx.restore();
     }
 
     if (showCars) {
       for (const col of laneData.positions) {
         const isCrash = isFailed && col === crashedCol;
-        drawCar(ctx, col, l, laneY, laneData.dirs[col] || 1, isCrash, numCols);
-      }
-    }
-
-    if (isPassed) {
-      for (let i = 0; i < 3; i++) {
-        const sx = ROAD_X + 20 + Math.random() * (ROAD_W - 40);
-        const sy = laneY + 10 + Math.random() * (LANE_H - 20);
-        drawSparkle(ctx, sx, sy, 2 + Math.random() * 2, '#57F287', 0.15 + Math.random() * 0.1);
+        drawCar(ctx, col, l, laneY, laneData.dirs[col] || 1, isCrash, roadX, colWidth);
       }
     }
 
     if (isFailed && crashedCol >= 0) {
-      const cx = ROAD_X + crashedCol * COL_W + COL_W / 2;
+      const cx = roadX + crashedCol * colWidth + colWidth / 2;
       const cy = laneY + LANE_H / 2;
       drawCrack(ctx, cx, cy, 20);
       drawSmoke(ctx, cx - 15, cy - 10, 12, 0.3);
       drawSmoke(ctx, cx + 15, cy + 10, 10, 0.25);
       drawSmoke(ctx, cx, cy - 20, 14, 0.2);
-
-      for (let i = 0; i < 6; i++) {
-        const ang = Math.random() * Math.PI * 2;
-        const dist = 15 + Math.random() * 20;
-        drawSparkle(ctx, cx + Math.cos(ang) * dist, cy + Math.sin(ang) * dist, 3 + Math.random() * 2, '#FFD700', 0.3 + Math.random() * 0.2);
-      }
     }
 
     ctx.save();
-    ctx.fillStyle = isPassed ? 'rgba(87,242,135,0.6)' : isCurrent ? accent : isFailed ? '#ED4245' : '#444455';
+    ctx.fillStyle = isPassed ? '#62e7c3' : isCurrent ? accent : isFailed ? '#ff657f' : '#65718a';
     ctx.font = 'bold 10px sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    ctx.fillText(`L${l + 1}`, ROAD_X + 5, laneY + 10);
-    ctx.font = '9px sans-serif';
-    ctx.fillStyle = isPassed ? 'rgba(87,242,135,0.5)' : '#333344';
-    ctx.fillText(`x${laneMultDisplay(diffKey, l + 1)}`, ROAD_X + 5, laneY + LANE_H - 10);
+    ctx.fillText(isPassed ? `✓ ${l + 1}` : isCurrent ? `▶ ${l + 1}` : `L${l + 1}`, roadX + 8, laneY + 11);
+    ctx.font = 'bold 9px sans-serif';
+    ctx.fillStyle = isPassed ? 'rgba(98,231,195,0.8)' : '#8a96ad';
+    ctx.fillText(`x${laneMultDisplay(diffKey, l + 1)}`, roadX + 8, laneY + LANE_H - 10);
     ctx.restore();
   }
 
   if (!gameOver || won || cashedOut) {
     const chickenLaneY = roadStartY + (LANES - 1 - currentLane) * LANE_H;
-    drawChicken(ctx, chickenCol, chickenLaneY, 20, accent, !gameOver, numCols);
+    drawChicken(ctx, chickenCol, chickenLaneY, 23, accent, !gameOver, roadX, colWidth);
   }
 
   if (gameOver && !won && !cashedOut && crashedCol >= 0) {
@@ -1047,7 +839,7 @@ async function generateChickenImage({
     ctx.strokeStyle = '#ED4245';
     ctx.lineWidth = 4;
     ctx.lineCap = 'round';
-    const cx = ROAD_X + crashedCol * COL_W + COL_W / 2;
+    const cx = roadX + crashedCol * colWidth + colWidth / 2;
     const cy = crashY + LANE_H / 2;
     const s = 16;
     ctx.beginPath();
@@ -1059,137 +851,48 @@ async function generateChickenImage({
     ctx.restore();
   }
 
-  if (gameOver && (won || cashedOut)) {
-    const goalY = roadStartY;
-
-    for (let i = 0; i < 6; i++) {
-      const fx = ROAD_X + 30 + Math.random() * (ROAD_W - 60);
-      const fy = goalY + 10 + Math.random() * 40;
-      drawFirework(ctx, fx, fy, 15 + Math.random() * 10, ['#FFD700', '#57F287', '#FF1744', '#3498DB'][i % 4]);
-    }
-
-    for (let i = 0; i < 12; i++) {
-      const angle = (i / 12) * Math.PI * 2;
-      const x = ROAD_X + ROAD_W / 2 + Math.cos(angle) * 50;
-      const y = goalY + 25 + Math.sin(angle) * 35;
-      drawSparkle(ctx, x, y, 5 + Math.random() * 3, '#FFD700', 0.3 + Math.random() * 0.2);
-    }
-
-    for (let i = 0; i < 6; i++) {
-      const x = ROAD_X + 40 + Math.random() * (ROAD_W - 80);
-      const y = goalY + 15 + Math.random() * 30;
-      drawStar(ctx, x, y, 5 + Math.random() * 3, '#FFD700', 0.2 + Math.random() * 0.2);
-    }
-
-    for (let i = 0; i < 8; i++) {
-      const x = ROAD_X + 20 + Math.random() * (ROAD_W - 40);
-      const y = goalY + 20 + Math.random() * 40;
-      drawCoin(ctx, x, y, 4 + Math.random() * 2, 0.2 + Math.random() * 0.2);
-    }
-
-    ctx.save();
-    ctx.fillStyle = '#FFD700';
-    ctx.globalAlpha = 0.15;
-    ctx.font = 'bold 20px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(won ? 'VICTORY!' : 'CASH OUT!', ROAD_X + ROAD_W / 2, goalY + 30);
-    ctx.restore();
-  }
-
-  if (gameOver && !won && !cashedOut) {
-    for (let i = 0; i < 10; i++) {
-      const sx = ROAD_X + Math.random() * ROAD_W;
-      const sy = roadStartY + Math.random() * roadH;
-      drawSmoke(ctx, sx, sy, 8 + Math.random() * 6, 0.1 + Math.random() * 0.1);
-    }
-  }
-
-  for (let i = 0; i < 25; i++) {
-    const px = 30 + Math.random() * (W - 60);
-    const py = roadStartY + Math.random() * roadH;
-    ctx.save();
-    ctx.globalAlpha = 0.04 + Math.random() * 0.06;
-    ctx.fillStyle = accent;
-    ctx.beginPath();
-    ctx.arc(px, py, 1 + Math.random() * 2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
-
   const resultY = roadStartY + roadH + 15;
 
   ctx.save();
-  ctx.fillStyle = 'rgba(255,255,255,0.03)';
-  roundRect(ctx, 30, resultY - 5, W - 60, footerH - 20, 10);
+  ctx.fillStyle = 'rgba(17,24,39,0.96)';
+  roundRect(ctx, 20, resultY - 7, W - 40, footerH - 18, 12);
   ctx.fill();
-  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
-  ctx.lineWidth = 1;
-  roundRect(ctx, 30, resultY - 5, W - 60, footerH - 20, 10);
+  ctx.strokeStyle = 'rgba(255,255,255,0.09)';
+  ctx.lineWidth = 1.2;
+  roundRect(ctx, 20, resultY - 7, W - 40, footerH - 18, 12);
   ctx.stroke();
+  ctx.fillStyle = accent;
+  roundRect(ctx, 20, resultY + 3, 3, 34, 1.5);
+  ctx.fill();
   ctx.restore();
 
   ctx.fillStyle = accent;
-  ctx.font = 'bold 20px sans-serif';
+  ctx.font = 'bold 19px sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
   let resultText = '';
   if (gameOver) {
-    if (cashedOut) resultText = `~ Encaisse ! Route ${currentLane} ・ +${fmtCoins(netGain)} coins`;
-    else if (won) resultText = `~ SOMMET ! x${laneMultDisplay(diffKey, LANES)} ・ +${fmtCoins(netGain)} coins`;
-    else resultText = `CRASH ! Route ${crashedLane + 1} ・ -${fmtCoins(amount)} coins`;
+    if (cashedOut) resultText = `CASH OUT  /  ROUTE ${currentLane}  /  +${fmtCoins(netGain)} coins`;
+    else if (won) resultText = `FINISH LINE  /  x${laneMultDisplay(diffKey, LANES)}  /  +${fmtCoins(netGain)} coins`;
+    else resultText = `CRASH  /  ROUTE ${crashedLane + 1}  /  -${fmtCoins(amount)} coins`;
   } else {
-    resultText = 'Utilise les boutons pour bouger le poulet';
+    resultText = 'YOUR MOVE  /  Choisis la prochaine voie';
   }
   ctx.fillText(resultText, W / 2, resultY + 12);
 
-  ctx.fillStyle = '#8b95a7';
-  ctx.font = '14px sans-serif';
+  ctx.fillStyle = '#c2cadd';
+  ctx.font = '13px sans-serif';
   ctx.fillText(`Solde : ${fmtCoins(finalCoins)} coins`, W / 2, resultY + 35);
 
   if (gameOver) {
-    ctx.fillStyle = '#555566';
-    ctx.font = '11px sans-serif';
+    ctx.fillStyle = '#728099';
+    ctx.font = 'bold 9px sans-serif';
     const coteInfo = won ? `x${laneMultDisplay(diffKey, LANES)}` : cashedOut ? `x${laneMultDisplay(diffKey, currentLane)}` : 'x0';
-    ctx.fillText(`${diff.label} ・ Cote : ${coteInfo} ・ ${numCols} colonnes`, W / 2, resultY + 55);
-
-    if (won || cashedOut) {
-      for (let i = 0; i < 16; i++) {
-        const sx = 40 + Math.random() * (W - 80);
-        const sy = resultY - 5 + Math.random() * 50;
-        drawSparkle(ctx, sx, sy, 3 + Math.random() * 4, '#57F287', 0.2 + Math.random() * 0.25);
-      }
-      for (let i = 0; i < 8; i++) {
-        const sx = 40 + Math.random() * (W - 80);
-        const sy = resultY - 5 + Math.random() * 50;
-        drawSparkle(ctx, sx, sy, 3, '#FFD700', 0.2 + Math.random() * 0.2);
-      }
-      for (let i = 0; i < 4; i++) {
-        const sx = 40 + Math.random() * (W - 80);
-        const sy = resultY + Math.random() * 40;
-        drawStar(ctx, sx, sy, 4, '#FFD700', 0.15 + Math.random() * 0.15);
-      }
-    } else {
-      for (let i = 0; i < 12; i++) {
-        const sx = 40 + Math.random() * (W - 80);
-        const sy = resultY - 5 + Math.random() * 45;
-        drawSparkle(ctx, sx, sy, 3 + Math.random() * 2, '#ED4245', 0.15 + Math.random() * 0.2);
-      }
-    }
+    ctx.fillText(`${diff.label}  •  COTE ${coteInfo}  •  ${numCols} VOIES`, W / 2, resultY + 55);
   }
 
-  ctx.save();
-  ctx.fillStyle = accent;
-  ctx.globalAlpha = 0.05;
-  ctx.font = 'bold 10px sans-serif';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('MIN: 10', 30, H - 12);
-  ctx.textAlign = 'right';
-  ctx.fillText('MAX: 50000', W - 30, H - 12);
-  ctx.restore();
-
+  drawCasinoImageFrame(ctx, W, H, accent);
   return await canvas.toBuffer('png');
 }
 

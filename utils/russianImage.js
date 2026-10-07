@@ -1,6 +1,7 @@
 'use strict';
 
 const { Canvas } = require('skia-canvas');
+const { drawCasinoImageFrame } = require('./casinoImageFrame');
 
 function fmtCoins(n) {
   if (n == null) return '0';
@@ -29,61 +30,6 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.lineTo(x, y + r);
   ctx.quadraticCurveTo(x, y, x + r, y);
   ctx.closePath();
-}
-
-function drawSparkle(ctx, x, y, size, color, alpha = 1) {
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 1.5;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(x - size, y); ctx.lineTo(x + size, y);
-  ctx.moveTo(x, y - size); ctx.lineTo(x, y + size);
-  ctx.moveTo(x - size * 0.6, y - size * 0.6); ctx.lineTo(x + size * 0.6, y + size * 0.6);
-  ctx.moveTo(x - size * 0.6, y + size * 0.6); ctx.lineTo(x + size * 0.6, y - size * 0.6);
-  ctx.stroke();
-  ctx.restore();
-}
-
-function drawStar(ctx, x, y, size, color, alpha = 1) {
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  for (let i = 0; i < 5; i++) {
-    const angle = (i * 2 * Math.PI / 5) - Math.PI / 2;
-    const px = x + Math.cos(angle) * size;
-    const py = y + Math.sin(angle) * size;
-    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-    const angle2 = angle + Math.PI / 5;
-    ctx.lineTo(x + Math.cos(angle2) * size * 0.4, y + Math.sin(angle2) * size * 0.4);
-  }
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-}
-
-function drawCoin(ctx, x, y, size, alpha = 1) {
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  const grad = ctx.createRadialGradient(x - size * 0.3, y - size * 0.3, size * 0.1, x, y, size);
-  grad.addColorStop(0, '#FFE066');
-  grad.addColorStop(0.6, '#FFD700');
-  grad.addColorStop(1, '#B8860B');
-  ctx.fillStyle = grad;
-  ctx.beginPath();
-  ctx.arc(x, y, size, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = '#B8860B';
-  ctx.lineWidth = 0.8;
-  ctx.stroke();
-  ctx.fillStyle = '#B8860B';
-  ctx.font = `bold ${size}px sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('$', x, y + 1);
-  ctx.restore();
 }
 
 function drawCornerOrnaments(ctx, W, H, color, alpha = 0.12) {
@@ -498,32 +444,6 @@ function drawCrack(ctx, cx, cy, size) {
   ctx.restore();
 }
 
-function drawFirework(ctx, x, y, size, color) {
-  ctx.save();
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 1.5;
-  ctx.lineCap = 'round';
-  for (let i = 0; i < 10; i++) {
-    const angle = (i / 10) * Math.PI * 2;
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x + Math.cos(angle) * size, y + Math.sin(angle) * size);
-    ctx.stroke();
-  }
-  for (let i = 0; i < 8; i++) {
-    const angle = (i / 8) * Math.PI * 2 + 0.2;
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x + Math.cos(angle) * size * 0.5, y + Math.sin(angle) * size * 0.5);
-    ctx.stroke();
-  }
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.arc(x, y, 3, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-}
-
 function drawInfoPill(ctx, x, y, w, h, label, value, color) {
   ctx.save();
   ctx.fillStyle = 'rgba(255,255,255,0.04)';
@@ -681,48 +601,7 @@ async function generateRussianImage({
     drawBloodSplatter(ctx, W / 2 + 80, revolverY, 25, 0.4);
     drawBloodSplatter(ctx, W / 2 + 100, revolverY - 15, 15, 0.3);
 
-    for (let i = 0; i < 10; i++) {
-      const sx = W / 2 + 50 + Math.random() * 120;
-      const sy = revolverY - 30 + Math.random() * 60;
-      drawSparkle(ctx, sx, sy, 3 + Math.random() * 3, '#ED4245', 0.2 + Math.random() * 0.2);
-    }
-
     drawCrack(ctx, W / 2 + 70, revolverY, 30);
-  }
-
-  if (isCashout || isMaxSurvived) {
-    for (let i = 0; i < 5; i++) {
-      const fx = 100 + Math.random() * (W - 200);
-      const fy = headerH + 20 + Math.random() * (sceneH - 40);
-      drawFirework(ctx, fx, fy, 15 + Math.random() * 10, ['#FFD700', '#57F287', '#3498DB', '#FF1744'][i % 4]);
-    }
-
-    for (let i = 0; i < 10; i++) {
-      const sx = 80 + Math.random() * (W - 160);
-      const sy = headerH + 20 + Math.random() * (sceneH - 40);
-      drawSparkle(ctx, sx, sy, 4 + Math.random() * 3, '#FFD700', 0.2 + Math.random() * 0.2);
-    }
-
-    for (let i = 0; i < 6; i++) {
-      const sx = 80 + Math.random() * (W - 160);
-      const sy = headerH + 30 + Math.random() * (sceneH - 60);
-      drawStar(ctx, sx, sy, 5, '#FFD700', 0.15 + Math.random() * 0.15);
-    }
-
-    for (let i = 0; i < 8; i++) {
-      const sx = 80 + Math.random() * (W - 160);
-      const sy = headerH + 30 + Math.random() * (sceneH - 60);
-      drawCoin(ctx, sx, sy, 5 + Math.random() * 2, 0.2 + Math.random() * 0.2);
-    }
-
-    ctx.save();
-    ctx.fillStyle = '#FFD700';
-    ctx.globalAlpha = 0.15;
-    ctx.font = 'bold 22px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(isMaxSurvived ? 'SURVIVANT!' : 'CASH OUT!', W / 2, headerH + 40);
-    ctx.restore();
   }
 
   if (isPlaying) {
@@ -790,7 +669,8 @@ async function generateRussianImage({
     }
   }
 
-  const mult = MULTIPLIERS[pulled] ?? MULTIPLIERS[MULTIPLIERS.length - 1];
+  const multIndex = isCashout ? pulled - 1 : pulled;
+  const mult = MULTIPLIERS[multIndex] ?? MULTIPLIERS[MULTIPLIERS.length - 1];
   const potentialWin = Math.floor(amount * mult);
   const survivedCount = isDead ? pulled - 1 : pulled;
 
@@ -831,41 +711,7 @@ async function generateRussianImage({
     ctx.fillText(`Mise : ${fmtCoins(amount)} ・ ${survivedCount}/${MAX_CHAMBER - 1} tirs`, W / 2, resultY + 50);
   }
 
-  if (isCashout || isMaxSurvived) {
-    for (let i = 0; i < 16; i++) {
-      const sx = 40 + Math.random() * (W - 80);
-      const sy = resultY - 10 + Math.random() * 50;
-      drawSparkle(ctx, sx, sy, 3 + Math.random() * 4, '#57F287', 0.2 + Math.random() * 0.25);
-    }
-    for (let i = 0; i < 8; i++) {
-      const sx = 40 + Math.random() * (W - 80);
-      const sy = resultY - 10 + Math.random() * 50;
-      drawSparkle(ctx, sx, sy, 3, '#FFD700', 0.2 + Math.random() * 0.2);
-    }
-    for (let i = 0; i < 4; i++) {
-      const sx = 40 + Math.random() * (W - 80);
-      const sy = resultY + Math.random() * 40;
-      drawStar(ctx, sx, sy, 4, '#FFD700', 0.15 + Math.random() * 0.15);
-    }
-  } else if (isDead) {
-    for (let i = 0; i < 12; i++) {
-      const sx = 40 + Math.random() * (W - 80);
-      const sy = resultY - 10 + Math.random() * 45;
-      drawSparkle(ctx, sx, sy, 3 + Math.random() * 2, '#ED4245', 0.15 + Math.random() * 0.2);
-    }
-  }
-
-  ctx.save();
-  ctx.fillStyle = accent;
-  ctx.globalAlpha = 0.05;
-  ctx.font = 'bold 10px sans-serif';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('MIN: 10', 30, H - 12);
-  ctx.textAlign = 'right';
-  ctx.fillText('MAX: 50000', W - 30, H - 12);
-  ctx.restore();
-
+  drawCasinoImageFrame(ctx, W, H, accent);
   return await canvas.toBuffer('png');
 }
 

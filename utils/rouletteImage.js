@@ -1,6 +1,7 @@
 'use strict';
 
 const { Canvas } = require('skia-canvas');
+const { drawCasinoImageFrame } = require('./casinoImageFrame');
 
 function fmtCoins(n) {
   if (n == null) return '0';
@@ -209,35 +210,6 @@ async function generateRouletteImage({ result, choice, win, winAmount, amount, n
   ctx.textBaseline = 'middle';
   ctx.fillText('◉ ROULETTE', 30, 35);
 
-  ctx.save();
-  ctx.fillStyle = '#c0392b';
-  ctx.globalAlpha = 0.08;
-  ctx.beginPath();
-  ctx.arc(30, H - 30, 16, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#2c3e50';
-  ctx.beginPath();
-  ctx.arc(62, H - 30, 16, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#27ae60';
-  ctx.beginPath();
-  ctx.arc(94, H - 30, 16, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-
-  ctx.save();
-  ctx.globalAlpha = 0.15;
-  ctx.fillStyle = '#c0392b';
-  ctx.font = 'bold 9px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('R', 30, H - 30);
-  ctx.fillStyle = '#ffffff';
-  ctx.fillText('N', 62, H - 30);
-  ctx.fillStyle = '#ffffff';
-  ctx.fillText('0', 94, H - 30);
-  ctx.restore();
-
   ctx.fillStyle = '#8b95a7';
   ctx.font = '15px sans-serif';
   ctx.textAlign = 'right';
@@ -361,11 +333,6 @@ async function generateRouletteImage({ result, choice, win, winAmount, amount, n
   ctx.textBaseline = 'middle';
   if (win) {
     ctx.fillText(`✦ GAGNÉ !  +${fmtCoins(netGain)} coins`, W / 2, 487);
-    for (let i = 0; i < 12; i++) {
-      const sx = W / 2 - 140 + Math.random() * 280;
-      const sy = 470 + Math.random() * 35;
-      drawSparkle(ctx, sx, sy, 3 + Math.random() * 3, '#57F287', 0.25 + Math.random() * 0.3);
-    }
     for (let i = 0; i < 6; i++) {
       const angle = (i / 6) * Math.PI * 2;
       const x = wheelCX + Math.cos(angle) * (wheelR + 40);
@@ -374,11 +341,6 @@ async function generateRouletteImage({ result, choice, win, winAmount, amount, n
     }
   } else {
     ctx.fillText(`× Perdu  -${fmtCoins(amount)} coins`, W / 2, 487);
-    for (let i = 0; i < 6; i++) {
-      const sx = W / 2 - 100 + Math.random() * 200;
-      const sy = 470 + Math.random() * 25;
-      drawSparkle(ctx, sx, sy, 3, '#ED4245', 0.15 + Math.random() * 0.15);
-    }
   }
 
   if (bonuses && bonuses.length) {
@@ -387,17 +349,7 @@ async function generateRouletteImage({ result, choice, win, winAmount, amount, n
     ctx.fillText(`Bonus : ${bonuses.join(' ・ ')}`, W / 2, 505);
   }
 
-  ctx.save();
-  ctx.fillStyle = accent;
-  ctx.globalAlpha = 0.05;
-  ctx.font = 'bold 10px sans-serif';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('MIN: 10', 130, H - 30);
-  ctx.textAlign = 'right';
-  ctx.fillText('MAX: 50000', W - 30, H - 30);
-  ctx.restore();
-
+  drawCasinoImageFrame(ctx, W, H, accent);
   return await canvas.toBuffer('png');
 }
 

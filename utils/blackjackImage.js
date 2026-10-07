@@ -1,6 +1,7 @@
 'use strict';
 
 const { Canvas } = require('skia-canvas');
+const { drawCasinoImageFrame } = require('./casinoImageFrame');
 
 function fmtCoins(n) {
   if (n == null) return '0';
@@ -160,21 +161,30 @@ function drawCard(ctx, x, y, card, hidden = false) {
 
 function drawHand(ctx, hand, cx, y, hideSecond = false) {
   const totalW = hand.length * CARD_W + (hand.length - 1) * CARD_GAP;
-  const startX = cx - totalW / 2;
+  const scale = Math.min(1, (W - 100) / totalW);
+  const cardW = CARD_W * scale;
+  const cardGap = CARD_GAP * scale;
+  const cardH = CARD_H * scale;
+  const handW = hand.length * cardW + (hand.length - 1) * cardGap;
+  const startX = cx - handW / 2;
 
   ctx.save();
   ctx.fillStyle = 'rgba(0,0,0,0.15)';
-  roundRect(ctx, startX - 8, y - 6, totalW + 16, CARD_H + 12, 10);
+  roundRect(ctx, startX - 8 * scale, y - 6 * scale, handW + 16 * scale, cardH + 12 * scale, 10 * scale);
   ctx.fill();
   ctx.restore();
 
   for (let i = 0; i < hand.length; i++) {
     const hidden = hideSecond && i === 1;
-    drawCard(ctx, startX + i * (CARD_W + CARD_GAP), y, hand[i], hidden);
+    ctx.save();
+    ctx.translate(startX + i * (cardW + cardGap), y);
+    ctx.scale(scale, scale);
+    drawCard(ctx, 0, 0, hand[i], hidden);
+    ctx.restore();
   }
 
   const val = handValue(hand);
-  const labelY = y + CARD_H + 18;
+  const labelY = y + cardH + 18 * scale;
 
   ctx.save();
   ctx.shadowColor = 'rgba(0,0,0,0.5)';
@@ -219,40 +229,6 @@ function drawLabel(ctx, text, x, y, color = '#8b95a7') {
   ctx.fillText(text, x, y);
 }
 
-function drawChip(ctx, cx, cy, r, color1, color2) {
-  ctx.save();
-  ctx.shadowColor = 'rgba(0,0,0,0.4)';
-  ctx.shadowBlur = 6;
-  ctx.shadowOffsetY = 2;
-  const grad = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.3, r * 0.1, cx, cy, r);
-  grad.addColorStop(0, color1);
-  grad.addColorStop(1, color2);
-  ctx.fillStyle = grad;
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-
-  ctx.strokeStyle = color2;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.stroke();
-
-  ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-  ctx.lineWidth = 1;
-  ctx.setLineDash([4, 3]);
-  ctx.beginPath();
-  ctx.arc(cx, cy, r * 0.75, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.setLineDash([]);
-
-  ctx.fillStyle = 'rgba(255,255,255,0.15)';
-  ctx.beginPath();
-  ctx.arc(cx, cy, r * 0.5, 0, Math.PI * 2);
-  ctx.fill();
-}
-
 function drawCornerOrnaments(ctx, W, H, color, alpha = 0.12) {
   ctx.save();
   ctx.globalAlpha = alpha;
@@ -264,21 +240,6 @@ function drawCornerOrnaments(ctx, W, H, color, alpha = 0.12) {
   ctx.beginPath(); ctx.moveTo(W - m - cs, m); ctx.lineTo(W - m, m); ctx.lineTo(W - m, m + cs); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(m, H - m - cs); ctx.lineTo(m, H - m); ctx.lineTo(m + cs, H - m); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(W - m - cs, H - m); ctx.lineTo(W - m, H - m); ctx.lineTo(W - m, H - m - cs); ctx.stroke();
-  ctx.restore();
-}
-
-function drawSparkle(ctx, x, y, size, color, alpha = 1) {
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 1.2;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(x - size, y); ctx.lineTo(x + size, y);
-  ctx.moveTo(x, y - size); ctx.lineTo(x, y + size);
-  ctx.moveTo(x - size * 0.6, y - size * 0.6); ctx.lineTo(x + size * 0.6, y + size * 0.6);
-  ctx.moveTo(x - size * 0.6, y + size * 0.6); ctx.lineTo(x + size * 0.6, y - size * 0.6);
-  ctx.stroke();
   ctx.restore();
 }
 
@@ -335,16 +296,9 @@ async function generateBlackjackImage({ playerHand, dealerHand, gameOver, win, p
     ctx.restore();
   }
 
-  drawChip(ctx, 55, H - 35, 14, '#c0392b', '#7a1f15');
-  drawChip(ctx, 82, H - 35, 14, '#2c3e50', '#1a2530');
-  drawChip(ctx, 109, H - 35, 14, '#c0c0c0', '#808080');
-  drawChip(ctx, W - 55, H - 35, 14, '#27ae60', '#1a6b3a');
-  drawChip(ctx, W - 82, H - 35, 14, '#8e44ad', '#5a2a6b');
-  drawChip(ctx, W - 109, H - 35, 14, '#e67e22', '#a05a15');
-
   ctx.save();
   ctx.fillStyle = '#c0c0c0';
-  ctx.globalAlpha = 0.15;
+  ctx.globalAlpha = 0.45;
   ctx.font = 'bold 10px sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -449,39 +403,6 @@ async function generateBlackjackImage({ playerHand, dealerHand, gameOver, win, p
   drawLabel(ctx, '● TOI', W / 2, playerY - 8, '#c0c0c0');
   drawHand(ctx, playerHand, W / 2, playerY, false);
 
-  if (gameOver) {
-    if (win) {
-      for (let i = 0; i < 12; i++) {
-        const sx = W / 2 - 120 + Math.random() * 240;
-        const sy = playerY - 25 + Math.random() * 80;
-        drawSparkle(ctx, sx, sy, 3 + Math.random() * 4, '#57F287', 0.25 + Math.random() * 0.35);
-      }
-      for (let i = 0; i < 6; i++) {
-        const sx = W / 2 - 80 + Math.random() * 160;
-        const sy = dealerY - 15 + Math.random() * 40;
-        drawSparkle(ctx, sx, sy, 3, '#FFD700', 0.2 + Math.random() * 0.2);
-      }
-    } else if (bust || pVal > 21) {
-      for (let i = 0; i < 10; i++) {
-        const sx = W / 2 - 100 + Math.random() * 200;
-        const sy = playerY - 15 + Math.random() * 60;
-        drawSparkle(ctx, sx, sy, 3 + Math.random() * 2, '#ED4245', 0.2 + Math.random() * 0.25);
-      }
-    } else if (push) {
-      for (let i = 0; i < 6; i++) {
-        const sx = W / 2 - 80 + Math.random() * 160;
-        const sy = playerY - 15 + Math.random() * 50;
-        drawSparkle(ctx, sx, sy, 3, '#F1C40F', 0.2 + Math.random() * 0.2);
-      }
-    } else {
-      for (let i = 0; i < 8; i++) {
-        const sx = W / 2 - 90 + Math.random() * 180;
-        const sy = playerY - 15 + Math.random() * 55;
-        drawSparkle(ctx, sx, sy, 3, '#ED4245', 0.15 + Math.random() * 0.2);
-      }
-    }
-  }
-
   ctx.save();
   ctx.strokeStyle = 'rgba(255,255,255,0.08)';
   ctx.lineWidth = 1;
@@ -496,17 +417,7 @@ async function generateBlackjackImage({ playerHand, dealerHand, gameOver, win, p
   ctx.fillText('21', W / 2, 285);
   ctx.restore();
 
-  ctx.save();
-  ctx.fillStyle = accent;
-  ctx.globalAlpha = 0.05;
-  ctx.font = 'bold 10px sans-serif';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('MIN: 10', 30, H - 55);
-  ctx.textAlign = 'right';
-  ctx.fillText('MAX: 50000', W - 30, H - 55);
-  ctx.restore();
-
+  drawCasinoImageFrame(ctx, W, H, accent);
   return await canvas.toBuffer('png');
 }
 
