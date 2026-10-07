@@ -139,7 +139,7 @@ module.exports = {
             guildId,
             `**Utilisateurs bannis**\n` +
             `\`${bans.size}\`\n\n` +
-            `Cette action va débannir tous les membres actuellement bannis du serveur.`,
+            `Cette action va débannir tous les membres bannis du serveur, sauf ceux protégés par la blacklist ou la wetlist.`,
             {
               title     : 'Confirmer unbanall',
               timestamp : false
@@ -226,8 +226,13 @@ module.exports = {
 async function _runUnbanAll(client, message, guild, guildId, bans, deleteReply, deleteDelay) {
   let unbannedCount = 0;
   let failedCount   = 0;
+  let blacklistedCount = 0;
 
   for (const ban of bans.values()) {
+    if (db.isWet(ban.user.id) || db.isBlacklisted(guildId, ban.user.id)) {
+      blacklistedCount++;
+      continue;
+    }
 
     try {
 
@@ -265,6 +270,8 @@ async function _runUnbanAll(client, message, guild, guildId, bans, deleteReply, 
   const text =
     `**Utilisateurs bannis**\n` +
     `\`${bans.size}\`\n\n` +
+    `**Non débannis (blacklist/wet)**\n` +
+    `\`${blacklistedCount}\`\n\n` +
     `**Débannis**\n` +
     `\`${unbannedCount}\`\n\n` +
     `**Échecs**\n` +

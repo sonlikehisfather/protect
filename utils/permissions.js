@@ -52,7 +52,7 @@ function isGlobalBuyer(userId) {
 }
 
 
-function check(message, commandName) {
+function check(message, commandName, defaultPermission = null) {
 
   const { member, guild, channel } = message;
   if (!member || !guild) return false;
@@ -64,6 +64,7 @@ function check(message, commandName) {
 
   const required =
     db.getCmdPerm(guildId, commandName)
+    ?? defaultPermission
     ?? 'everyone';
 
   const cmdTargets = db.getCmdTargets(guildId, commandName);

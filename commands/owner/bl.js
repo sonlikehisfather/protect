@@ -19,181 +19,77 @@ const perms = require('../../utils/permissions');
 
 exports.help = {
   name       : 'bl',
-  description: 'Gérer la blacklist globale.',
+  description: 'Gérer la blacklist de ce serveur.',
   use        : 'bl [@membre/ID] [raison]',
   usage      : 'bl [@membre/ID] [raison]',
   aliases    : ['blacklist'],
-
+  defaultPermission: 'owner',
 };
 
 exports.run = async (client, message, args) => {
-
   const authorId = message.author.id;
   const guildId  = message.guild.id;
 
-
-  if (
-    !perms.isBuyer(authorId) &&
-    !perms.isOwner(guildId, authorId)
-  ) {
-
-    return embed.replyError(
-      message,
-      'Permission refusée.'
-    );
-
-  }
-
-
   if (!args[0]) {
-
     return _showList(message);
-
   }
 
-
-  if (
-    args[0].toLowerCase() === 'clear'
-  ) {
-
+  if (args[0].toLowerCase() === 'clear') {
     if (!perms.isBuyer(authorId)) {
-
-      return embed.replyError(
-        message,
-        'Commande réservée au buyer.'
-      );
-
+      return embed.replyError(message, 'Commande réservée au buyer.');
     }
 
-    if (args[1]?.toLowerCase() !== 'confirm') {
+    if (args[1]?.toLowerCase() !== 'confirm')
+      return embed.replyError(message, 'Confirme avec : +bl clear confirm');
 
-      return embed.replyError(
-        message,
-        'Confirme avec : +bl clear confirm'
-      );
-
-    }
-
-    db.clearBlacklist();
-
-    return embed.reply(
-      message,
-      'Blacklist vidée.'
-    );
-
+    db.clearBlacklist(guildId);
+    return embed.reply(message, 'Blacklist de ce serveur vidée.');
   }
 
   const target =
     message.mentions.users.first()
-    ?? await client.users
-      .fetch(args[0])
-      .catch(() => null);
+    ?? await client.users.fetch(args[0]).catch(() => null);
 
-  if (!target) {
-
-    return embed.replyError(
-      message,
-      'Utilisateur introuvable.'
-    );
-
-  }
-
+  if (!target) return embed.replyError(message, 'Utilisateur introuvable.');
   if (target.id === client.user.id) {
-    return embed.replyError(
-      message,
-      'Impossible de blacklister le bot.'
-    );
+    return embed.replyError(message, 'Impossible de blacklister le bot.');
   }
 
-  if (perms.isProtected(target.id, message.guild.id, null)) {
-
-    return embed.replyError(
-      message,
-      'T’as essayé de blacklister un utilisateur protégé ?'
-    );
-
-  }
+  const targetMember = message.guild.members.cache.get(target.id) ?? null;
+  if (perms.isProtected(target.id, guildId, targetMember))
+    return embed.replyError(message, 'T’as essayé de blacklister un utilisateur protégé ?');
 
   const reason =
     args.slice(1).join(' ')
     || 'Aucune raison fournie';
 
-  const existing =
-    db.getBlacklistEntry(target.id);
+  if (db.getBlacklistEntry(guildId, target.id))
+    return embed.replyError(message, `${target.globalName ?? target.username} est déjà blacklisté sur ce serveur.`);
 
-  if (existing) {
-
-    return embed.replyError(
-      message,
-      `${target.globalName ?? target.username} est déjà blacklisté.`
-    );
-
-  }
-
-  const guilds = [...client.guilds.cache.values()];
-  const progressDescription =
-    `**Membre :** <@${target.id}> (\`${target.id}\`)\n` +
-    `**Raison :** ${reason}\n\n` +
-    `Blacklist globale en cours sur ${guilds.length} serveur(s)...`;
-  const panel = await message.channel.send(
-    _statusPayload(guildId, `Blacklist de ${target.username}`, progressDescription)
-  ).catch(() => null);
-
-  if (!panel) {
-    return embed.replyError(message, 'Impossible d’afficher le suivi de la blacklist.');
+  try {
+    await message.guild.members.ban(target.id, { reason: `Blacklist - ${reason}` });
+  } catch (error) {
+    return embed.replyError(message, `Le bannissement sur ce serveur a échoué : ${_banFailureReason(error)}.`);
   }
 
   try {
-    db.addBlacklist(target.id, reason, authorId);
+    db.addBlacklist(guildId, target.id, reason, authorId);
   } catch {
-    const failure =
-      `**Membre :** <@${target.id}> (\`${target.id}\`)\n` +
-      `**Raison :** ${reason}\n\n` +
-      `Impossible d’enregistrer cette entrée dans la blacklist globale.`;
-    await panel.edit(_statusPayload(guildId, 'Blacklist non enregistrée', failure)).catch(() => {});
-    return;
+    return embed.replyError(
+      message,
+      `${target.globalName ?? target.username} a été banni sur ce serveur, mais l’enregistrement de la blacklist a échoué.`
+    );
   }
 
-  let banned = 0;
-  const protectedGuilds = [];
-  const failed = [];
-
-  for (const guild of guilds) {
-    if (perms.isProtected(target.id, guild.id, null)) {
-      protectedGuilds.push(_protectionReason(target.id, guild.id));
-    } else {
-      try {
-        await guild.members.ban(target.id, { reason: `Blacklist - ${reason}` });
-        banned++;
-      } catch (error) {
-        failed.push(_banFailureReason(error));
-      }
-    }
-    await _wait(300);
-  }
-
-  const reasonCounts = new Map();
-  for (const reason of [...protectedGuilds, ...failed]) {
-    reasonCounts.set(reason, (reasonCounts.get(reason) ?? 0) + 1);
-  }
-  const reasonSummary = [...reasonCounts]
-    .map(([reason, count]) => `• ${count} serveur(s) : ${reason}`)
-    .join('\n') || 'Aucun.';
-  const resultDescription =
-    `**Membre :** <@${target.id}> (\`${target.id}\`)\n` +
-    `**Raison :** ${reason}\n` +
-    `**Banni avec succès :** ${banned}/${guilds.length} serveur(s)\n` +
-    `**Non banni :** ${protectedGuilds.length + failed.length} serveur(s)\n\n` +
-    `**Motifs :**\n${reasonSummary}`;
-
-  return panel.edit(_statusPayload(guildId, 'Blacklist globale terminée', resultDescription))
-    .catch(() => {});
-
+  return embed.reply(
+    message,
+    `${target.globalName ?? target.username} a été blacklisté uniquement sur **${message.guild.name}**.\n**Raison :** ${reason}`
+  );
 };
 
 async function _showList(message) {
-  const list = db.getBlacklist();
   const guildId = message.guild.id;
+  const list = db.getBlacklist(guildId);
 
   if (!list.length) {
     return embed.reply(message, 'Blacklist vide.');
@@ -278,35 +174,6 @@ async function _showList(message) {
   });
 }
 
-function _statusPayload(guildId, title, description) {
-  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
-    try {
-      const container = new ContainerBuilder();
-      container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${title}\n\n${description}`));
-      return {
-        embeds          : [],
-        components      : [container],
-        flags           : COMPONENTS_V2_FLAG,
-        allowedMentions : { parse: [] },
-      };
-    } catch {}
-  }
-
-  return {
-    embeds          : [embed.build(guildId, description, { title, timestamp: false })],
-    components      : [],
-    allowedMentions : { parse: [] },
-  };
-}
-
-function _protectionReason(userId, guildId) {
-  if (db.isProtectedUser(guildId, userId)) return 'utilisateur protégé sur ce serveur';
-  if (perms.isBuyer(userId)) return 'compte buyer protégé';
-  if (userId === process.env.CLIENT_ID) return 'il s’agit du bot';
-  if (perms.isOwner(guildId, userId)) return 'owner du serveur';
-  return 'protégé par une règle de protection du serveur';
-}
-
 function _banFailureReason(error) {
   const code = Number(error?.code ?? error?.rawError?.code);
   if (code === 50013 || error?.status === 403) {
@@ -315,8 +182,4 @@ function _banFailureReason(error) {
   if (code === 50001) return 'le bot n’a pas accès au serveur';
   if (code) return `erreur Discord (${code})`;
   return 'erreur inattendue lors du bannissement';
-}
-
-function _wait(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
 }

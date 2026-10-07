@@ -4,6 +4,7 @@ const permsCmd = require('./perms');
 const db       = require('../../core/database');
 const embed    = require('../../utils/embed');
 const perms    = require('../../utils/permissions');
+const { getCommandPermissionGroup } = require('../../utils/commandPermissionGroups');
 
 exports.help = {
   name        : 'delperm',
@@ -39,6 +40,7 @@ exports.run = async (client, message, args) => {
   }
 
   const cmdName = first.replace(/^\+/, '');
+  const configuredCmdName = client.commands.get(cmdName)?.help?.name?.toLowerCase() || cmdName;
   if (!client.commands.has(cmdName)) {
     return embed.replyError(message, `Commande \`${cmdName}\` introuvable.`);
   }
@@ -53,11 +55,14 @@ exports.run = async (client, message, args) => {
     return embed.replyError(message, 'Cible introuvable. Mentionnez un rôle ou un membre.');
   }
 
-  db.removeCmdTarget(guildId, cmdName, target.id);
+  const removedCommands = getCommandPermissionGroup(configuredCmdName);
+  for (const commandName of removedCommands) {
+    db.removeCmdTarget(guildId, commandName, target.id);
+  }
 
   return embed.reply(
     message,
-    `**${target.label}** n'a plus accès à \`${prefix}${cmdName}\`.`
+    `**${target.label}** n'a plus accès à ${removedCommands.map(name => `\`${prefix}${name}\``).join(', ')}.`
   );
 };
 

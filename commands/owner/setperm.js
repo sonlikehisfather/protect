@@ -4,6 +4,7 @@ const permsCmd = require('./perms');
 const db       = require('../../core/database');
 const embed    = require('../../utils/embed');
 const perms    = require('../../utils/permissions');
+const { getCommandPermissionGroup } = require('../../utils/commandPermissionGroups');
 
 exports.help = {
   name        : 'setperm',
@@ -55,11 +56,14 @@ exports.run = async (client, message, args) => {
     return embed.replyError(message, 'Cible introuvable. Mentionnez un rôle ou un membre.');
   }
 
-  db.addCmdTarget(guildId, configuredCmdName, target.id, target.type);
+  const grantedCommands = getCommandPermissionGroup(configuredCmdName);
+  for (const commandName of grantedCommands) {
+    db.addCmdTarget(guildId, commandName, target.id, target.type);
+  }
 
   return embed.reply(
     message,
-    `**${target.label}** peut maintenant utiliser \`${prefix}${configuredCmdName}\`.`
+    `**${target.label}** peut maintenant utiliser ${grantedCommands.map(name => `\`${prefix}${name}\``).join(', ')}.`
   );
 };
 

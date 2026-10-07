@@ -14,6 +14,7 @@ exports.help = {
 
 exports.run = async (client, message, args) => {
   const authorId = message.author.id;
+  const guildId  = message.guild.id;
 
 
   if (!perms.isBuyer(authorId)) {
@@ -28,32 +29,24 @@ exports.run = async (client, message, args) => {
     return embed.replyError(message, 'Utilisateur introuvable.');
   }
 
-  const entry = db.getBlacklistEntry(target.id);
+  if (db.isWet(target.id)) {
+    return embed.replyError(message, `${target.username} est wet et ne peut être débanni qu’avec \`unwet\`.`);
+  }
+
+  const entry = db.getBlacklistEntry(guildId, target.id);
 
   if (!entry) {
     return embed.replyError(message, `${target.username} n'est pas dans la blacklist.`);
   }
 
-  db.removeBlacklist(target.id);
+  db.removeBlacklist(guildId, target.id);
 
-  let unbanned = 0;
-
-  for (const guild of client.guilds.cache.values()) {
-    const ok = await guild.bans.remove(target.id, 'Blacklist retirée (force)')
-      .then(() => true)
-      .catch(() => false);
-
-    if (ok) unbanned++;
-
-    await _wait(300);
-  }
+  const unbanned = await message.guild.bans.remove(target.id, 'Blacklist retirée (force)')
+    .then(() => true)
+    .catch(() => false);
 
   return embed.reply(
     message,
-    `${target.username} retiré de force de la blacklist. Débanni de ${unbanned} serveur(s).`
+    `${target.username} retiré de la blacklist de ce serveur. ${unbanned ? 'Débanni ici.' : 'Le débannissement a échoué, il reste banni ici.'}`
   );
 };
-
-function _wait(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}

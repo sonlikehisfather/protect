@@ -3877,6 +3877,37 @@ up(db) {
     },
   },
 
+  {
+    version: 118,
+    up(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS guild_blacklist (
+          guildId   TEXT    NOT NULL,
+          userId    TEXT    NOT NULL,
+          reason    TEXT,
+          addedBy   TEXT    NOT NULL,
+          addedAt   INTEGER NOT NULL DEFAULT (unixepoch()),
+          deletedAt INTEGER,
+          PRIMARY KEY (guildId, userId)
+        );
+      `);
+    },
+  },
+
+  {
+    version: 119,
+    up(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS wetlist (
+          userId    TEXT PRIMARY KEY,
+          reason    TEXT,
+          addedBy   TEXT NOT NULL,
+          addedAt   INTEGER NOT NULL DEFAULT (unixepoch())
+        );
+      `);
+    },
+  },
+
 ];
 
 
@@ -6169,28 +6200,48 @@ const db = {
   },
 
 
-  getBlacklist() {
-    return getDb().prepare('SELECT * FROM blacklist WHERE deletedAt IS NULL ORDER BY addedAt DESC').all();
+  getBlacklist(guildId) {
+    return getDb().prepare('SELECT * FROM guild_blacklist WHERE guildId = ? AND deletedAt IS NULL ORDER BY addedAt DESC').all(guildId);
   },
 
-  getBlacklistEntry(userId) {
-    return getDb().prepare('SELECT * FROM blacklist WHERE userId = ? AND deletedAt IS NULL').get(userId);
+  getBlacklistEntry(guildId, userId) {
+    return getDb().prepare('SELECT * FROM guild_blacklist WHERE guildId = ? AND userId = ? AND deletedAt IS NULL').get(guildId, userId);
   },
 
-  addBlacklist(userId, reason, addedBy) {
-    getDb().prepare('INSERT OR REPLACE INTO blacklist (userId, reason, addedBy, addedAt, deletedAt) VALUES (?, ?, ?, unixepoch(), NULL)').run(userId, reason, addedBy);
+  addBlacklist(guildId, userId, reason, addedBy) {
+    getDb().prepare('INSERT OR REPLACE INTO guild_blacklist (guildId, userId, reason, addedBy, addedAt, deletedAt) VALUES (?, ?, ?, ?, unixepoch(), NULL)').run(guildId, userId, reason, addedBy);
   },
 
-  removeBlacklist(userId) {
-    getDb().prepare('UPDATE blacklist SET deletedAt = unixepoch() WHERE userId = ?').run(userId);
+  removeBlacklist(guildId, userId) {
+    getDb().prepare('UPDATE guild_blacklist SET deletedAt = unixepoch() WHERE guildId = ? AND userId = ? AND deletedAt IS NULL').run(guildId, userId);
   },
 
-  clearBlacklist() {
-    getDb().prepare('UPDATE blacklist SET deletedAt = unixepoch() WHERE deletedAt IS NULL').run();
+  clearBlacklist(guildId) {
+    getDb().prepare('UPDATE guild_blacklist SET deletedAt = unixepoch() WHERE guildId = ? AND deletedAt IS NULL').run(guildId);
   },
 
-  isBlacklisted(userId) {
-    return !!getDb().prepare('SELECT 1 FROM blacklist WHERE userId = ? AND deletedAt IS NULL').get(userId);
+  isBlacklisted(guildId, userId) {
+    return !!getDb().prepare('SELECT 1 FROM guild_blacklist WHERE guildId = ? AND userId = ? AND deletedAt IS NULL').get(guildId, userId);
+  },
+
+  getWetlist() {
+    return getDb().prepare('SELECT * FROM wetlist ORDER BY addedAt DESC').all();
+  },
+
+  getWetEntry(userId) {
+    return getDb().prepare('SELECT * FROM wetlist WHERE userId = ?').get(userId) ?? null;
+  },
+
+  addWet(userId, reason, addedBy) {
+    getDb().prepare('INSERT INTO wetlist (userId, reason, addedBy, addedAt) VALUES (?, ?, ?, unixepoch())').run(userId, reason, addedBy);
+  },
+
+  removeWet(userId) {
+    return getDb().prepare('DELETE FROM wetlist WHERE userId = ?').run(userId).changes > 0;
+  },
+
+  isWet(userId) {
+    return !!getDb().prepare('SELECT 1 FROM wetlist WHERE userId = ?').get(userId);
   },
 
   getProtectedUsers(guildId) {

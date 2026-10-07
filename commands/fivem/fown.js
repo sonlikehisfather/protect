@@ -58,14 +58,14 @@ async function _list(message, guildId) {
   const fowners = db.getFivemOwners(guildId);
   const owners = db.getOwners(guildId);
   const buyers = db.getGlobalBuyers();
-  const blacklistCount = db.getBlacklist().length;
+  const blacklistCount = db.getBlacklist(guildId).length;
 
   const text = [
     `Buyer principal: <@${perms.getSuperAdminId()}>`,
     `Buyers: ${buyers.length ? buyers.map(id => `<@${id}>`).join(', ') : 'Aucun'}`,
     `Owners serveur: ${owners.length ? owners.map(id => `<@${id}>`).join(', ') : 'Aucun'}`,
     `Owners FiveM: ${fowners.length ? fowners.map(id => `<@${id}>`).join(', ') : 'Aucun'}`,
-    `Blacklist globale: ${blacklistCount}`,
+    `Blacklist: ${blacklistCount}`,
   ].join('\n');
 
   return reply(message, text, {

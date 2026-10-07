@@ -21,14 +21,21 @@ module.exports = {
     try {
       const config = db.getGuildConfig(guildId);
 
-      if (db.isBlacklisted(member.user.id) && !perms.isProtected(member.user.id, guildId, member)) {
-        const entry = db.getBlacklistEntry(member.user.id);
+      if (db.isWet(member.user.id)) {
+        const entry = db.getWetEntry(member.user.id);
+        const reason = entry?.reason ? `Wet - ${entry.reason}` : 'Wet';
+        await member.ban({ reason });
+        return;
+      }
+
+      if (db.isBlacklisted(guildId, member.user.id)) {
+        const entry = db.getBlacklistEntry(guildId, member.user.id);
 
         const reason = entry?.reason
-          ? `Blacklist globale - ${entry.reason}`
-          : 'Blacklist globale';
+          ? `Blacklist - ${entry.reason}`
+          : 'Blacklist';
 
-        await member.ban({ reason }).catch(() => {});
+        await member.ban({ reason });
         return;
       }
 

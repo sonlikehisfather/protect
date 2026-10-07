@@ -1,6 +1,7 @@
 'use strict';
 
 const {
+  AuditLogEvent,
   ContainerBuilder,
   TextDisplayBuilder,
   MessageFlags,
@@ -48,8 +49,10 @@ module.exports = {
     }
 
     const ban = await guild.bans.fetch(userId).catch(() => null);
+    const wetEntry = db.getWetEntry(userId);
+    const blacklistEntry = db.getBlacklistEntry(guildId, userId);
 
-    if (!ban) {
+    if (!ban && !wetEntry && !blacklistEntry) {
       const sent = await embed.replyError(
         message,
         'Cet utilisateur n’est pas banni.',
@@ -60,16 +63,29 @@ module.exports = {
       return;
     }
 
+    const targetUser = ban?.user ?? await client.users.fetch(userId).catch(() => null);
+
     const activeBan = db.getActiveSanction
       ? db.getActiveSanction(guildId, userId, 'ban')
       : null;
+    const banAudit = !wetEntry && !blacklistEntry
+      ? await _findBanAuditEntry(guild, userId)
+      : null;
 
-    let statusText = 'Banni définitivement';
+    let statusText = wetEntry
+      ? 'Wet (ban global)'
+      : blacklistEntry
+      ? 'Blacklisté sur ce serveur'
+      : 'Banni définitivement';
     let endText    = 'Aucune';
-    let reasonText = ban.reason || 'Aucune raison fournie';
+    let reasonText = activeBan?.reason || ban?.reason || banAudit?.reason || 'Aucune raison fournie';
     let modText    = 'Inconnu';
 
-    if (activeBan) {
+    if (wetEntry) {
+      reasonText = wetEntry.reason || 'Aucune raison fournie';
+    } else if (blacklistEntry) {
+      reasonText = blacklistEntry.reason || 'Aucune raison fournie';
+    } else if (activeBan) {
       if (activeBan.reason) {
         reasonText = activeBan.reason;
       }
@@ -88,24 +104,54 @@ module.exports = {
       }
     }
 
+    if (!wetEntry && !blacklistEntry) {
+      if (!activeBan?.reason && banAudit?.reason) {
+        reasonText = banAudit.reason;
+      }
+      if (!activeBan?.moderatorId && banAudit?.executor?.id) {
+        modText = await _resolveModeratorTag(client, guild, banAudit.executor.id);
+      }
+    }
+
     const isTmp  = statusText === 'Banni temporairement';
-    const banDateText = activeBan?.createdAt
+    const specialEntry = wetEntry ?? blacklistEntry;
+    const banDateLabel = wetEntry
+      ? 'Wet depuis'
+      : blacklistEntry
+      ? 'Blacklisté depuis'
+      : 'Banni le';
+    const banDateText = wetEntry?.addedAt
+      ? `<t:${wetEntry.addedAt}:f>`
+      : blacklistEntry?.addedAt
+      ? `<t:${blacklistEntry.addedAt}:f>`
+      : activeBan?.createdAt
       ? `<t:${activeBan.createdAt}:f>`
+      : banAudit?.createdTimestamp
+      ? `<t:${Math.floor(banAudit.createdTimestamp / 1000)}:f>`
       : 'Inconnue';
 
     const lines  = [
-      `## <@${ban.user.id}> \`${ban.user.id}\``,
+      `## <@${userId}> \`${userId}\``,
       '',
       `**Statut** › ${statusText}`,
-      `**Banni le** › ${banDateText}`,
-      `**Modérateur** › ${modText}`,
+      `**${banDateLabel}** › ${banDateText}`,
     ];
+
+    if (!specialEntry) lines.push(`**Modérateur** › ${modText}`);
 
     if (isTmp) {
       lines.push(`**Expiration** › ${endText}`);
     }
 
-    const tsFooter = activeBan?.createdAt ? `-# <t:${activeBan.createdAt}:f>` : null;
+    const tsFooter = wetEntry?.addedAt
+      ? `-# Wet depuis <t:${wetEntry.addedAt}:f>`
+      : blacklistEntry?.addedAt
+      ? `-# Blacklisté depuis <t:${blacklistEntry.addedAt}:f>`
+      : activeBan?.createdAt
+      ? `-# <t:${activeBan.createdAt}:f>`
+      : banAudit?.createdTimestamp
+      ? `-# <t:${Math.floor(banAudit.createdTimestamp / 1000)}:f>`
+      : null;
     lines.push('', `> ${_truncate(reasonText)}`);
     if (tsFooter) lines.push('', tsFooter);
 
@@ -128,19 +174,22 @@ module.exports = {
 
     if (!payload) {
       const fields = [
-        { name: 'Statut',      value: statusText,            inline: true },
-        { name: 'Modérateur',  value: modText,               inline: true },
+        { name: 'Statut', value: statusText, inline: true },
       ];
+      if (!specialEntry) fields.push({ name: 'Modérateur', value: modText, inline: true });
+      if (wetEntry?.addedAt) fields.push({ name: 'Wet depuis', value: `<t:${wetEntry.addedAt}:f>`, inline: true });
+      else if (blacklistEntry?.addedAt) fields.push({ name: 'Blacklisté depuis', value: `<t:${blacklistEntry.addedAt}:f>`, inline: true });
+      else if (banDateText !== 'Inconnue') fields.push({ name: 'Banni le', value: banDateText, inline: true });
       if (isTmp) fields.push({ name: 'Expiration', value: endText, inline: true });
       fields.push({ name: 'Raison', value: _truncate(reasonText), inline: false });
 
       payload = {
         embeds: [embed.build(guildId, null, {
-          authorName : `${ban.user.username}`,
-          authorIcon : ban.user.displayAvatarURL({ size: 64, extension: 'png' }),
+          authorName : targetUser?.username ?? userId,
+          authorIcon : targetUser?.displayAvatarURL({ size: 64, extension: 'png' }),
           color      : '#ED4245',
           fields,
-          footer     : { text: ban.user.id },
+          footer     : { text: userId },
           timestamp  : false,
         })],
         allowedMentions: { repliedUser: false },
@@ -169,6 +218,18 @@ async function _resolveModeratorTag(client, guild, moderatorId) {
   if (user) return user.tag;
 
   return `<@${moderatorId}> (\`${moderatorId}\`)`;
+}
+
+async function _findBanAuditEntry(guild, userId) {
+  const auditLogs = await guild.fetchAuditLogs({
+    type : AuditLogEvent.MemberBanAdd,
+    limit: 100,
+  }).catch(() => null);
+  if (!auditLogs) return null;
+
+  return [...auditLogs.entries.values()]
+    .filter(entry => entry.target?.id === userId)
+    .sort((a, b) => b.createdTimestamp - a.createdTimestamp)[0] ?? null;
 }
 
 function _truncate(text, max = 300) {

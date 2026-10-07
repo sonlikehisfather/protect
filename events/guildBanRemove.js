@@ -5,7 +5,6 @@ const db           = require('../core/database');
 const embed        = require('../utils/embed');
 const logger       = require('../utils/logger');
 const errorHandler = require('../utils/errorHandler');
-const perms        = require('../utils/permissions');
 
 module.exports = {
   name : 'guildBanRemove',
@@ -15,16 +14,20 @@ module.exports = {
     const guildId = ban.guild.id;
 
     try {
-      if (db.isBlacklisted(ban.user.id) && !perms.isProtected(ban.user.id, guildId, null)) {
-        const entry = db.getBlacklistEntry(ban.user.id);
+      if (db.isWet(ban.user.id)) {
+        const entry = db.getWetEntry(ban.user.id);
+        const reason = entry?.reason ? `Wet - ${entry.reason}` : 'Wet';
+        await ban.guild.members.ban(ban.user.id, { reason });
+      }
+
+      if (db.isBlacklisted(guildId, ban.user.id)) {
+        const entry = db.getBlacklistEntry(guildId, ban.user.id);
 
         const reason = entry?.reason
-          ? `Blacklist globale - ${entry.reason}`
-          : 'Blacklist globale';
+          ? `Blacklist - ${entry.reason}`
+          : 'Blacklist';
 
-        await ban.guild.members
-          .ban(ban.user.id, { reason })
-          .catch(() => {});
+        await ban.guild.members.ban(ban.user.id, { reason });
       }
 
       const fields = [

@@ -326,7 +326,7 @@ module.exports = {
         return;
       }
 
-      if (!selfManaged && !perms.check(message, cmdName)) {
+      if (!selfManaged && !perms.check(message, cmdName, command.help?.defaultPermission)) {
         const sent = await embed.replyError(
           message,
           "Vous n'avez pas la permission d'utiliser cette commande.",

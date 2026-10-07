@@ -54,6 +54,28 @@ module.exports = {
       return;
     }
 
+    if (db.isWet(userId)) {
+      const sent = await embed.replyError(
+        message,
+        'Cet utilisateur est wet et ne peut être débanni qu’avec `unwet`.',
+        { timestamp: false }
+      ).catch(() => null);
+
+      if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
+      return;
+    }
+
+    if (db.isBlacklisted(guildId, userId)) {
+      const sent = await embed.replyError(
+        message,
+        'Cet utilisateur est blacklisté sur ce serveur et ne peut pas être débanni.',
+        { timestamp: false }
+      ).catch(() => null);
+
+      if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
+      return;
+    }
+
     if (perms.isProtected(userId, guildId)) {
       const sent = await embed.replyError(
         message,

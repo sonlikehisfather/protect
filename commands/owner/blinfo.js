@@ -23,13 +23,9 @@ exports.help = {
 };
 
 exports.run = async (client, message, args) => {
-  const authorId = message.author.id;
   const guildId  = message.guild.id;
 
-  if (
-    !perms.isBuyer(authorId) &&
-    !perms.isOwner(guildId, authorId)
-  ) {
+  if (!_canView(message)) {
     return embed.replyError(message, 'Permission refusée.');
   }
 
@@ -41,7 +37,7 @@ exports.run = async (client, message, args) => {
     return embed.replyError(message, 'Utilisateur introuvable.');
   }
 
-  const entry = db.getBlacklistEntry(target.id);
+  const entry = db.getBlacklistEntry(guildId, target.id);
 
   if (!entry) {
     return embed.replyError(message, `${target.username} n'est pas dans la blacklist.`);
@@ -93,3 +89,14 @@ exports.run = async (client, message, args) => {
 
   return message.channel.send(payload).catch(() => {});
 };
+
+function _canView(message) {
+  const { author, guild, member } = message;
+  if (perms.isBuyer(author.id) || perms.isOwner(guild.id, author.id)) return true;
+
+  const roleIds = member.roles.cache.map(role => role.id);
+  return db.getCmdTargets(guild.id, 'bl').some(target =>
+    (target.targetType === 'user' && target.targetId === author.id) ||
+    (target.targetType === 'role' && roleIds.includes(target.targetId))
+  );
+}

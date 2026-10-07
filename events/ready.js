@@ -433,16 +433,18 @@ async function _liftSanction(client, sanction) {
     }
 
     if (sanction.type === 'ban' || sanction.type === 'tempban') {
-      await guild.bans.remove(
-        sanction.userId,
-        'Ban temporaire expire'
-      ).catch((err) => {
-        errorHandler.handle(err, {
-          source  : 'liftSanctionUnban',
-          guildId : sanction.guildId,
-          userId  : sanction.userId,
+      if (!db.isWet(sanction.userId) && !db.isBlacklisted(guild.id, sanction.userId)) {
+        await guild.bans.remove(
+          sanction.userId,
+          'Ban temporaire expire'
+        ).catch((err) => {
+          errorHandler.handle(err, {
+            source  : 'liftSanctionUnban',
+            guildId : sanction.guildId,
+            userId  : sanction.userId,
+          });
         });
-      });
+      }
     }
 
     db.expireSanction(sanction.id);
