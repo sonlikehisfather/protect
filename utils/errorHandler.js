@@ -3,6 +3,7 @@
 
 const { EmbedBuilder } = require('discord.js');
 const db = require('../core/database');
+const embedUtils = require('./embed');
 
 
 let _client  = null;
@@ -87,7 +88,11 @@ async function handle(error, context = {}) {
     if (!channel) return;
 
     const embed = buildErrorEmbed(error, message, stack, source, context, level);
-    await channel.send({ embeds: [embed] });
+    await channel.send(embedUtils.embedToPayload(context.guildId, embed, {
+      allowedMentions: { parse: [] },
+      forceV2: true,
+      withoutColor: true,
+    }));
     _lastSent = Date.now();
 
   } catch (innerError) {

@@ -64,7 +64,7 @@ async function _cleanOne(client, message, user) {
 
     const deleted = await _deleteMessagesInChannel(client, dm);
 
-    await status?.edit({ ...embed.embedToPayload(message.guild.id, embed.build(message.guild.id, `DM avec <@${user.id}> nettoyé ・ **${deleted}** message(s) supprimé(s).`, { color: '#57F287', timestamp: false })) }).catch(() => {});
+    await status?.edit({ ...embed.embedToPayload(message.guild.id, embed.build(message.guild.id, `DM avec <@${user.id}> nettoyé ・ **${deleted}** message(s) supprimé(s).`, { timestamp: false })) }).catch(() => {});
 
   } catch (err) {
     await status?.edit({ ...embed.embedToPayload(message.guild.id, embed.build(message.guild.id, `Erreur lors du nettoyage : ${err.message}`, { color: '#ED4245', timestamp: false })) }).catch(() => {});

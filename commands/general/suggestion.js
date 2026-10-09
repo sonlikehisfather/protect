@@ -190,9 +190,11 @@ function _log(guild, config, guildId, title, fields) {
   if (!config?.suggestionLogChannel) return;
   const logCh = guild.channels.cache.get(config.suggestionLogChannel);
   if (!logCh?.isTextBased()) return;
-  logCh.send({
-    ...embed.embedToPayload(guildId, embed.log(guildId, title, fields), { allowedMentions: { parse: [] } }),
-  }).catch(() => {});
+  logCh.send(embed.embedToPayload(guildId, embed.log(guildId, title, fields), {
+    allowedMentions: { parse: [] },
+    forceV2: true,
+    withoutColor: true,
+  })).catch(() => {});
 }
 
 

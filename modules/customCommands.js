@@ -874,7 +874,11 @@ async function _dispatchLog(client, guildId, custom, logEmbed) {
       const ch = client.channels.cache.get(custom.logChannelId)
         || await client.channels.fetch(custom.logChannelId).catch(() => null);
       if (ch && typeof ch.send === 'function') {
-        const ok = await ch.send({ embeds: [logEmbed], allowedMentions: { parse: [] } }).catch(() => null);
+        const ok = await ch.send(embed.embedToPayload(guildId, logEmbed, {
+          allowedMentions: { parse: [] },
+          forceV2: true,
+          withoutColor: true,
+        })).catch(() => null);
         if (ok) return;
       }
     } catch {}

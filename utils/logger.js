@@ -107,7 +107,8 @@ async function send(client, guildId, type, embedBuilt, options = null) {
 
     const payload = embed.embedToPayload(guildId, normalized, {
       allowedMentions: { parse: [] },
-      forceV2: type !== 'ticketlog',
+      forceV2: true,
+      withoutColor: true,
     });
 
     return await channel.send(payload).catch(() => null);

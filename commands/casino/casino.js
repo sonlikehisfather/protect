@@ -1737,11 +1737,11 @@ function sendCasinoLog(guild, cfg, channelType, opts) {
   const container = new ContainerBuilder();
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent(parts.join('\n')));
 
-  logCh.send(embed.wrapPayload(logCh.guild?.id, {
+  logCh.send({
     components      : [container],
     flags           : COMPONENTS_V2_FLAG,
     allowedMentions : { parse: [] },
-  }, 'casino')).catch(() => {});
+  }).catch(() => {});
 }
 
 exports.sendCasinoLog = sendCasinoLog;

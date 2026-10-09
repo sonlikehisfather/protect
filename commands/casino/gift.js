@@ -11,7 +11,7 @@ const {
 } = require('discord.js');
 const db    = require('../../core/database');
 const embed = require('../../utils/embed');
-const { checkCasinoChannel, checkCasinoLimits, setCooldown } = require('./casino');
+const { checkCasinoChannel, checkCasinoLimits, setCooldown, sendCasinoLog } = require('./casino');
 
 const COMPONENTS_V2_FLAG = MessageFlags?.IsComponentsV2 ?? (1 << 15);
 const V2_AVAILABLE = typeof ContainerBuilder === 'function' && typeof TextDisplayBuilder === 'function';
@@ -40,112 +40,109 @@ exports.run = async (client, message, args) => {
 
   const limitErr = checkCasinoLimits(message, 'gift');
   if (limitErr) return embed.replyError(message, limitErr);
-  setCooldown(guildId, message.author.id, 'gift');
 
-  const cfg        = db.getCasinoConfig(guildId);
-  const giftMin    = cfg.giftMin ?? 100;
-  const giftMax    = cfg.giftMax ?? 1000;
-  const winnerIdx  = Math.floor(Math.random() * 3);
-  const prize      = Math.floor(Math.random() * (giftMax - giftMin + 1)) + giftMin;
+  const cfg = db.getCasinoConfig(guildId);
+  const giftMin = Number(cfg.giftMin ?? 100);
+  const giftMax = Number(cfg.giftMax ?? 1000);
+  if (!Number.isSafeInteger(giftMin) || !Number.isSafeInteger(giftMax) || giftMin < 1 || giftMax < giftMin) {
+    return embed.replyError(message, 'La récompense du Gift est mal configurée. Contacte un administrateur.');
+  }
 
-  const makeRow = (disabled = false, revealWinner = false) =>
+  const useV2 = V2_AVAILABLE && embed.shouldUseV2(guildId, module.exports.help.name);
+  const winnerIdx = Math.floor(Math.random() * 3);
+  const prize = Math.floor(Math.random() * (giftMax - giftMin + 1)) + giftMin;
+  const makeRow = (disabled = false, revealResult = false) =>
     new ActionRowBuilder().addComponents(
       [0, 1, 2].map(i =>
         new ButtonBuilder()
           .setCustomId(`gift:${i}`)
-          .setLabel(revealWinner && i === winnerIdx ? `+${embed.fmtCoins(prize)}` : '\u200b')
+          .setLabel(revealResult
+            ? (i === winnerIdx ? `+${embed.fmtCoins(prize)}` : 'Vide')
+            : '?')
           .setStyle(BTN_COLORS[i])
           .setDisabled(disabled)
       )
     );
 
-  const giftText = `**<@${message.author.id}>** lance un cadeau mystere ・ **1 bouton sur 3** cache une recompense !`;
+  const giftText = `**<@${message.author.id}>** lance un cadeau mystère ・ **1 bouton sur 3** cache une récompense !`;
+  const buildPayload = (
+    text,
+    { disabled = false, revealResult = false, ephemeral = false, includeButtons = true } = {}
+  ) => {
+    const row = includeButtons ? makeRow(disabled, revealResult) : null;
+    const flags = (useV2 ? COMPONENTS_V2_FLAG : 0) | (ephemeral ? MessageFlags.Ephemeral : 0);
 
-  let msg;
-  if (embed.shouldUseV2(guildId, module.exports.help.name)) {
-    const container = new ContainerBuilder();
-    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(giftText));
-    container.addActionRowComponents(makeRow());
-    msg = await message.reply({ components: [container], flags: COMPONENTS_V2_FLAG }).catch(() => null);
-  } else {
-    msg = await message.reply({ content: giftText, components: [makeRow()] }).catch(() => null);
-  }
+    if (useV2) {
+      const container = new ContainerBuilder();
+      container.addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
+      if (row) container.addActionRowComponents(row);
+      return { components: [container], flags };
+    }
 
-  if (!msg) return;
+    const payload = { content: text };
+    if (row) payload.components = [row];
+    if (flags) payload.flags = flags;
+    return payload;
+  };
 
-  const clicked  = new Set();
+  const msg = await message.reply(buildPayload(giftText));
+  setCooldown(guildId, message.author.id, 'gift');
+
+  const clicked = new Set();
+  let winnerUserId = null;
   const collector = msg.createMessageComponentCollector({
-    filter: i => i.customId.startsWith('gift:'),
+    filter: i => /^gift:[0-2]$/.test(i.customId),
     time:   GIFT_TIMEOUT,
   });
 
   collector.on('collect', async i => {
+    if (winnerUserId) {
+      return i.reply({ content: 'Cette partie est déjà terminée.', flags: MessageFlags.Ephemeral })
+        .catch(err => console.error('[GIFT] Impossible de répondre après la fin :', err));
+    }
+
     if (clicked.has(i.user.id)) {
-      return i.reply({ content: 'Tu as déjà cliqué !', flags: MessageFlags.Ephemeral }).catch(() => {});
+      return i.reply({ content: 'Tu as déjà cliqué !', flags: MessageFlags.Ephemeral })
+        .catch(err => console.error('[GIFT] Impossible de répondre au clic répété :', err));
     }
     clicked.add(i.user.id);
 
-    const btnIdx = parseInt(i.customId.split(':')[1]);
-    const isWin  = btnIdx === winnerIdx;
+    const btnIdx = Number(i.customId.slice('gift:'.length));
+    const isWin = btnIdx === winnerIdx;
 
     if (isWin) {
+      winnerUserId = i.user.id;
+      collector.stop('won');
       db.addCasinoCoins(guildId, i.user.id, prize, 'win');
-      const { sendCasinoLog } = require('./casino');
       sendCasinoLog(message.guild, cfg, 'logChannelGames', {
         icon  : '✸',
         title : 'Gift',
-
         user  : i.user.id,
         lines : [
-          `Cadeau trouve par <@${i.user.id}>`,
-          `Gagne **+${embed.fmtCoins(prize)}** coins`,
+          `Cadeau trouvé par <@${i.user.id}>`,
+          `Gagné **+${embed.fmtCoins(prize)}** coins`,
         ],
       });
-      if (embed.shouldUseV2(guildId, module.exports.help.name)) {
-        const winContainer = new ContainerBuilder();
-        winContainer.addTextDisplayComponents(new TextDisplayBuilder().setContent(
-          `## Cadeau trouve !\n\n> **<@${i.user.id}>** a trouve le cadeau ・ **+${embed.fmtCoins(prize)} coins** !`
-        ));
-        await i.reply({ components: [winContainer], flags: COMPONENTS_V2_FLAG }).catch(() => {});
-      } else {
-        await i.reply({
-          content: `**<@${i.user.id}>** a trouve le cadeau ・ **+${embed.fmtCoins(prize)} coins** !`,
-        }).catch(() => {});
-      }
-      collector.stop('won');
+      await i.reply(buildPayload(
+        `## Cadeau trouvé !\n\n> **<@${i.user.id}>** a trouvé le cadeau ・ **+${embed.fmtCoins(prize)} coins** !`,
+        { includeButtons: false }
+      )).catch(err => console.error('[GIFT] Impossible d’annoncer le gagnant :', err));
     } else {
-      if (embed.shouldUseV2(guildId, module.exports.help.name)) {
-        const loseContainer = new ContainerBuilder();
-        loseContainer.addTextDisplayComponents(new TextDisplayBuilder().setContent(
-          `> **<@${i.user.id}>** a rate ・ ce bouton etait vide.`
-        ));
-        await i.reply({ components: [loseContainer], flags: [COMPONENTS_V2_FLAG, MessageFlags.Ephemeral] }).catch(() => {});
-      } else {
-        await i.reply({
-          content: `**<@${i.user.id}>** a rate ・ ce bouton etait vide.`,
-          flags: MessageFlags.Ephemeral,
-        }).catch(() => {});
-      }
+      await i.reply(buildPayload(
+        `> **<@${i.user.id}>** a raté ・ ce bouton était vide.`,
+        { ephemeral: true, includeButtons: false }
+      )).catch(err => console.error('[GIFT] Impossible d’annoncer le résultat :', err));
     }
   });
 
   collector.on('end', async (_, reason) => {
     const expired = reason === 'time';
-    if (embed.shouldUseV2(guildId, module.exports.help.name)) {
-      const endText = expired
-        ? `Le cadeau a expire ・ personne n'a trouve ! *(+${embed.fmtCoins(prize)} coins perdus)*`
+    const endText = expired
+      ? `Le cadeau a expiré ・ personne ne l'a trouvé. La récompense de **+${embed.fmtCoins(prize)} coins** n'a pas été attribuée.`
+      : winnerUserId
+        ? `## Cadeau trouvé !\n\n> **<@${winnerUserId}>** a trouvé le cadeau ・ **+${embed.fmtCoins(prize)} coins** !`
         : giftText;
-      const container = new ContainerBuilder();
-      container.addTextDisplayComponents(new TextDisplayBuilder().setContent(endText));
-      container.addActionRowComponents(makeRow(true, true));
-      await msg.edit({ components: [container], flags: COMPONENTS_V2_FLAG }).catch(() => {});
-    } else {
-      await msg.edit({
-        content: expired
-          ? `Le cadeau a expire ・ personne n'a trouve ! *(+${embed.fmtCoins(prize)} coins perdus)*`
-          : msg.content,
-        components: [makeRow(true, true)],
-      }).catch(() => {});
-    }
+    await msg.edit(buildPayload(endText, { disabled: true, revealResult: true }))
+      .catch(err => console.error('[GIFT] Impossible de clôturer la partie :', err));
   });
 };

@@ -410,16 +410,15 @@ async function _openThread(client, user, preResolved = null) {
       : null;
 
     if (logChannel?.isTextBased()) {
-      await _safeSend(logChannel, {
-        embeds: [
-          _makeUserEmbed(
-            config,
-            user,
-            'Modmail ouvert',
-            `Utilisateur : ${user} (${user.id})\nSalon : ${channel}`
-          ),
-        ],
-      });
+      await _safeSend(logChannel, embed.embedToPayload(guild.id, _makeUserEmbed(
+        config,
+        user,
+        'Modmail ouvert',
+        `Utilisateur : ${user} (${user.id})\nSalon : ${channel}`
+      ), {
+        forceV2: true,
+        withoutColor: true,
+      }));
     }
 
     await _safeSend(user, {
@@ -667,16 +666,17 @@ async function closeFromChannel(client, message, reason = null) {
 
   if (logChannel?.isTextBased()) {
     await _safeSend(logChannel, {
-      embeds: [
-        _makeEmbed(
-          config,
-          'Modmail fermé',
-          `Utilisateur : ${user ? `${user} (${user.id})` : modmail.userId}\n` +
-          `Staff : ${message.author} (${message.author.id})\n` +
-          `Raison : ${reason || 'Aucune raison'}\n\n` +
-          'Transcript : fichier joint ci-dessous.'
-        ),
-      ],
+      ...embed.embedToPayload(guild.id, _makeEmbed(
+        config,
+        'Modmail fermé',
+        `Utilisateur : ${user ? `${user} (${user.id})` : modmail.userId}\n` +
+        `Staff : ${message.author} (${message.author.id})\n` +
+        `Raison : ${reason || 'Aucune raison'}\n\n` +
+        'Transcript : fichier joint ci-dessous.'
+      ), {
+        forceV2: true,
+        withoutColor: true,
+      }),
       files: transcriptFile ? [transcriptFile] : [],
     });
   }

@@ -37,7 +37,7 @@ exports.help = {
   description : 'Pose une question à la boule magique.',
   use         : '8ball <question>',
   usage       : '8ball <question>',
-  aliases     : ['ask', 'boule'],
+  aliases     : ['boule'],
   category    : 'games',
 };
 

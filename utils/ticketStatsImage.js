@@ -1,24 +1,11 @@
 'use strict';
 
-const { Canvas } = require('skia-canvas');
+const { Canvas, loadImage } = require('skia-canvas');
 const embed = require('./embed');
 
-const W = 1000;
-const H = 360;
-
-function fmtTimeSecs(secs) {
-  if (secs == null) return 'N/A';
-  secs = Math.round(secs);
-  if (secs < 60) return `${secs} s`;
-  if (secs < 3600) return `${Math.round(secs / 60)} min`;
-  if (secs < 86400) return `${Math.round(secs / 3600)} h`;
-  return `${Math.round(secs / 86400)} j`;
-}
-
-function fmtStars(avg) {
-  if (avg == null) return 'Aucune évaluation';
-  return `${Number(avg).toFixed(1)}/5`;
-}
+const W = 1100;
+const H = 520;
+const SCALE = 2;
 
 function drawRoundedRect(ctx, x, y, w, h, r) {
   ctx.beginPath();
@@ -30,225 +17,202 @@ function drawRoundedRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-async function generateTicketStatsImage({ guildId, guildName = null, guildIconUrl = null, total = 0, rated = 0, avgRating = null, avgClose = null }) {
-  const canvas = new Canvas(W * 2, H * 2);
+function fitText(ctx, text, maxWidth) {
+  const value = String(text);
+  if (ctx.measureText(value).width <= maxWidth) return value;
+
+  let shortened = value;
+  while (shortened.length && ctx.measureText(`${shortened}…`).width > maxWidth) {
+    shortened = shortened.slice(0, -1);
+  }
+  return `${shortened}…`;
+}
+
+function formatNumber(value) {
+  return new Intl.NumberFormat('fr-FR').format(Math.max(0, Number(value) || 0));
+}
+
+function formatDuration(seconds) {
+  if (seconds == null || !Number.isFinite(Number(seconds))) return 'N/D';
+  const value = Math.max(0, Math.round(Number(seconds)));
+  if (value < 60) return `${value} s`;
+  if (value < 3600) return `${Math.round(value / 60)} min`;
+  if (value < 86400) return `${Math.round(value / 3600)} h`;
+  return `${Math.round(value / 86400)} j`;
+}
+
+function drawStar(ctx, centerX, centerY, radius, filled) {
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const r = i % 2 === 0 ? radius : radius * 0.46;
+    const angle = -Math.PI / 2 + (i * Math.PI / 5);
+    const x = centerX + Math.cos(angle) * r;
+    const y = centerY + Math.sin(angle) * r;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.fillStyle = filled ? '#F6C96B' : 'rgba(255,255,255,0.12)';
+  ctx.fill();
+}
+
+async function generateTicketStatsImage({
+  guildId,
+  guildName = null,
+  guildIconUrl = null,
+  total = 0,
+  rated = 0,
+  avgRating = null,
+  avgClose = null,
+}) {
+  const canvas = new Canvas(W * SCALE, H * SCALE);
   const ctx = canvas.getContext('2d');
-  ctx.scale(2, 2);
+  ctx.scale(SCALE, SCALE);
 
-  const color = embed.getGuildColor(guildId) || '#2B2D31';
-
-  // Background
-  const bg = ctx.createLinearGradient(0, 0, 0, H);
-  bg.addColorStop(0, '#0f1720');
-  bg.addColorStop(1, '#071018');
+  const accent = embed.getGuildColor(guildId) || '#5865F2';
+  const bg = ctx.createLinearGradient(0, 0, W, H);
+  bg.addColorStop(0, '#111827');
+  bg.addColorStop(1, '#080D17');
   ctx.fillStyle = bg;
-  drawRoundedRect(ctx, 0, 0, W, H, 18);
+  drawRoundedRect(ctx, 0, 0, W, H, 26);
   ctx.fill();
 
-  // Header
-  ctx.fillStyle = '#ffffff';
-  ctx.font = '700 28px Inter, system-ui, sans-serif';
+  const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, 620);
+  glow.addColorStop(0, `${accent}35`);
+  glow.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.lineWidth = 1;
+  drawRoundedRect(ctx, 1, 1, W - 2, H - 2, 25);
+  ctx.stroke();
+
+  const headerX = 56;
+  const headerY = 48;
+  const iconSize = 58;
+  let titleX = headerX;
+
+  if (guildIconUrl) {
+    const icon = await loadImage(guildIconUrl).catch(() => null);
+    if (icon) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(headerX + iconSize / 2, headerY + iconSize / 2, iconSize / 2, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.drawImage(icon, headerX, headerY, iconSize, iconSize);
+      ctx.restore();
+      titleX += iconSize + 18;
+    }
+  }
+
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
-  const headerX = 30;
-  const headerY = 22;
+  ctx.fillStyle = '#F8FAFC';
+  ctx.font = '700 29px Inter, system-ui, sans-serif';
+  ctx.fillText('Statistiques des tickets', titleX, headerY + 2);
 
-  // Guild icon (optional)
-  let iconSize = 64;
-  if (guildIconUrl) {
-    try {
-      const { loadImage } = require('skia-canvas');
-      const img = await loadImage(guildIconUrl);
-      // soft shadow backing
-      const ix = headerX;
-      const iy = headerY;
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(ix + iconSize / 2, iy + iconSize / 2, iconSize / 2 + 4, 0, Math.PI * 2);
-      ctx.closePath();
-      ctx.fillStyle = 'rgba(0,0,0,0.45)';
-      ctx.fill();
-      ctx.restore();
+  ctx.fillStyle = '#9CA9BA';
+  ctx.font = '400 15px Inter, system-ui, sans-serif';
+  ctx.fillText(
+    fitText(ctx, guildName ? `Vue d’ensemble · ${guildName}` : 'Vue d’ensemble du serveur', W - titleX - 70),
+    titleX,
+    headerY + 41
+  );
 
-      // clipped icon
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(ix + iconSize / 2, iy + iconSize / 2, iconSize / 2, 0, Math.PI * 2);
-      ctx.closePath();
-      ctx.clip();
-      ctx.drawImage(img, ix, iy, iconSize, iconSize);
-      ctx.restore();
+  const totalCount = Math.max(0, Number(total) || 0);
+  const ratedCount = Math.max(0, Number(rated) || 0);
+  const ratingValue = avgRating == null ? null : Math.min(5, Math.max(0, Number(avgRating) || 0));
+  const cards = [
+    { label: 'TICKETS FERMÉS', value: formatNumber(totalCount), note: 'Tickets traités', color: '#8BA4FF' },
+    { label: 'AVIS REÇUS', value: formatNumber(ratedCount), note: 'Retours enregistrés', color: '#6DD6B0' },
+    { label: 'NOTE MOYENNE', value: ratingValue == null ? '—' : `${ratingValue.toFixed(1).replace('.', ',')}/5`, note: ratingValue == null ? 'Aucun avis pour le moment' : 'Satisfaction moyenne', color: '#F6C96B' },
+    { label: 'TEMPS DE RÉSOLUTION', value: formatDuration(avgClose), note: 'Durée moyenne de fermeture', color: '#72C7E8' },
+  ];
 
-      // subtle border
-      ctx.beginPath();
-      ctx.arc(ix + iconSize / 2, iy + iconSize / 2, iconSize / 2, 0, Math.PI * 2);
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = 'rgba(255,255,255,0.06)';
-      ctx.stroke();
-    } catch {}
-  }
+  const marginX = 56;
+  const gap = 16;
+  const cardY = 158;
+  const cardH = 214;
+  const cardW = (W - marginX * 2 - gap * 3) / 4;
 
-  const titleX = headerX + (guildIconUrl ? iconSize + 16 : 0);
-  ctx.fillText('Statistiques des tickets', titleX, headerY + 6);
+  cards.forEach((card, index) => {
+    const x = marginX + index * (cardW + gap);
+    ctx.fillStyle = 'rgba(255,255,255,0.045)';
+    drawRoundedRect(ctx, x, cardY, cardW, cardH, 18);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.075)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
 
-  ctx.font = '400 14px Inter, system-ui, sans-serif';
-  ctx.fillStyle = '#9aa6b2';
-  ctx.fillText(guildName ? `Synthèse — ${guildName}` : 'Synthèse du serveur', titleX, headerY + 36);
+    ctx.fillStyle = card.color;
+    drawRoundedRect(ctx, x + 20, cardY + 22, 4, 18, 2);
+    ctx.fill();
 
-  // Card
-  const cx = 28;
-  const cy = 110;
-  const cardW = W - 56;
-  const cardH = 200;
-  ctx.save();
-  ctx.shadowColor = 'rgba(0,0,0,0.6)';
-  ctx.shadowBlur = 18;
-  ctx.shadowOffsetY = 6;
-  ctx.fillStyle = '#0e1620';
-  drawRoundedRect(ctx, cx, cy, cardW, cardH, 12);
-  ctx.fill();
-  ctx.restore();
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = '#AAB5C4';
+    ctx.font = '600 12px Inter, system-ui, sans-serif';
+    ctx.fillText(card.label, x + 34, cardY + 24);
 
-  // Inner content
-  const pad = 28;
-  const leftX = cx + pad;
-  const centerX = cx + cardW / 2;
-  const rightX = cx + cardW - pad;
+    ctx.fillStyle = '#F8FAFC';
+    ctx.font = index === 3 ? '700 34px Inter, system-ui, sans-serif' : '700 42px Inter, system-ui, sans-serif';
+    ctx.fillText(fitText(ctx, card.value, cardW - 40), x + 20, cardY + 75);
 
-  // Three columns: total | rated+rating | avgClose
-  ctx.fillStyle = '#9aa6b2';
-  ctx.font = '600 16px Inter, system-ui, sans-serif';
-  ctx.fillText('Tickets fermés', leftX, cy + 14);
-  ctx.font = '700 44px Inter, system-ui, sans-serif';
-  ctx.fillStyle = '#ffffff';
-  ctx.fillText(String(total), leftX, cy + 40);
+    ctx.fillStyle = '#8290A3';
+    ctx.font = '400 13px Inter, system-ui, sans-serif';
+    ctx.fillText(fitText(ctx, card.note, cardW - 40), x + 20, cardY + 130);
 
-  const midX = centerX - 80;
-  ctx.fillStyle = '#9aa6b2';
-  ctx.font = '600 16px Inter, system-ui, sans-serif';
-  ctx.fillText('Tickets évalués', midX, cy + 14);
-  ctx.font = '700 36px Inter, system-ui, sans-serif';
-  ctx.fillStyle = '#ffffff';
-  ctx.fillText(String(rated), midX, cy + 40);
-
-  // Rating block centered under middle metric
-  const ratingCenterX = centerX + 6;
-  ctx.fillStyle = '#8f9ba8';
-  ctx.font = '600 13px Inter, system-ui, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'alphabetic';
-  ctx.fillText('Note moyenne', ratingCenterX, cy + 80);
-
-  const starSize = 16;
-  const starGap = 6;
-  const starsRowW = (starSize * 5) + (starGap * 4);
-  const starsX = ratingCenterX - (starsRowW / 2);
-  const starsY = cy + 102;
-  const fullStars = avgRating == null ? 0 : Math.floor(avgRating);
-  const frac = avgRating == null ? 0 : (avgRating - fullStars);
-  function drawStar(cxS, cyS, r, filled) {
-    const spikes = 5;
-    const outer = r;
-    const inner = r * 0.5;
-    ctx.save();
-    ctx.beginPath();
-    let rot = Math.PI / 2 * 3;
-    for (let i = 0; i < spikes; i++) {
-      const ox = cxS + Math.cos(rot) * outer;
-      const oy = cyS + Math.sin(rot) * outer;
-      ctx.lineTo(ox, oy);
-      rot += Math.PI / spikes;
-      const ix = cxS + Math.cos(rot) * inner;
-      const iy = cyS + Math.sin(rot) * inner;
-      ctx.lineTo(ix, iy);
-      rot += Math.PI / spikes;
+    if (index === 2 && ratingValue != null) {
+      const starsY = cardY + 174;
+      for (let star = 0; star < 5; star++) {
+        drawStar(ctx, x + 27 + star * 25, starsY, 8, ratingValue >= star + 0.5);
+      }
     }
-    ctx.closePath();
-    if (filled) {
-      ctx.fillStyle = '#ffd166';
-      ctx.fill();
-    } else {
-      ctx.fillStyle = 'rgba(255,255,255,0.06)';
-      ctx.fill();
-    }
-    ctx.restore();
-  }
+  });
 
-  for (let i = 0; i < 5; i++) {
-    const sx = starsX + i * (starSize + starGap);
-    const filled = i < fullStars || (i === fullStars && frac >= 0.5);
-    drawStar(sx + starSize / 2, starsY, starSize / 2, filled);
-  }
+  const responsePct = totalCount > 0 ? Math.min(1, ratedCount / totalCount) : 0;
+  const progressX = marginX;
+  const progressY = 420;
+  const progressW = W - marginX * 2;
 
-  // Keep numeric rating centered under stars
-  ctx.font = '700 14px Inter, system-ui, sans-serif';
-  ctx.fillStyle = '#e6edf3';
-  ctx.textAlign = 'center';
+  ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
-  const avgText = avgRating == null ? 'Aucune évaluation' : `${Number(avgRating).toFixed(1)}/5`;
-  ctx.fillText(avgText, ratingCenterX, starsY + 12);
+  ctx.fillStyle = '#E5EAF2';
+  ctx.font = '600 15px Inter, system-ui, sans-serif';
+  ctx.fillText('Taux de réponse aux évaluations', progressX, progressY);
 
-  ctx.fillStyle = '#9aa6b2';
-  ctx.font = '600 16px Inter, system-ui, sans-serif';
-  ctx.fillText('Durée moyenne', rightX - 160, cy + 14);
-  ctx.font = '700 28px Inter, system-ui, sans-serif';
-  ctx.fillStyle = '#7dd3fc';
-  ctx.fillText(fmtTimeSecs(avgClose), rightX - 160, cy + 40);
-
-  // Progress bar (rated / total) with glow
-  const barX = leftX;
-  const barY = cy + cardH - 48;
-  const pillW = 98;
-  const pillGap = 12;
-  const barW = cardW - pad * 2 - pillW - pillGap;
-  const barH = 14;
-  ctx.fillStyle = 'rgba(255,255,255,0.06)';
-  drawRoundedRect(ctx, barX, barY, barW, barH, 8);
-  ctx.fill();
-
-  const pct = total > 0 ? (rated / total) : 0;
-  const fillWRaw = Math.round(barW * Math.min(1, Math.max(0, pct)));
-  const fillW = pct > 0 ? Math.max(8, fillWRaw) : 0;
-
-  // glow
-  ctx.save();
-  ctx.shadowColor = 'rgba(87,242,135,0.45)';
-  ctx.shadowBlur = 18;
-  const grad = ctx.createLinearGradient(barX, 0, barX + barW, 0);
-  grad.addColorStop(0, '#57F287');
-  grad.addColorStop(0.6, '#2ecc71');
-  grad.addColorStop(1, '#27ae60');
-  ctx.fillStyle = grad;
-  drawRoundedRect(ctx, barX, barY, fillW, barH, 8);
-  ctx.fill();
-  ctx.restore();
-
-  // subtle top highlight
-  ctx.fillStyle = 'rgba(255,255,255,0.06)';
-  drawRoundedRect(ctx, barX + 2, barY + 1, Math.max(0, fillW - 4), 4, 4);
-  ctx.fill();
-
-  // percent pill to the right of the bar (kept inside card bounds)
-  const pillX = barX + barW + pillGap;
-  const pillY = barY - 6;
-  const pillH = 26;
-  ctx.fillStyle = 'rgba(255,255,255,0.04)';
-  drawRoundedRect(ctx, pillX, pillY, pillW, pillH, 14);
-  ctx.fill();
-  ctx.font = '600 12px Inter, system-ui, sans-serif';
-  ctx.fillStyle = '#cbd6dd';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(`${Math.round(pct * 100)}% évalués`, pillX + pillW / 2, pillY + pillH / 2);
-
-  // Footer timestamp
-  ctx.font = '12px Inter, system-ui, sans-serif';
-  ctx.fillStyle = '#88939a';
   ctx.textAlign = 'right';
-  const ts = new Date();
-  ctx.fillText(`Généré le ${ts.toLocaleString('fr-FR')}`, cx + cardW - 10, H - 12);
+  ctx.fillStyle = '#CBD5E1';
+  ctx.font = '600 15px Inter, system-ui, sans-serif';
+  ctx.fillText(`${Math.round(responsePct * 100)} %`, progressX + progressW, progressY);
 
-  return await canvas.toBuffer('png');
+  const barY = progressY + 31;
+  ctx.fillStyle = 'rgba(255,255,255,0.09)';
+  drawRoundedRect(ctx, progressX, barY, progressW, 9, 5);
+  ctx.fill();
+  if (responsePct > 0) {
+    const barGradient = ctx.createLinearGradient(progressX, 0, progressX + progressW, 0);
+    barGradient.addColorStop(0, '#687CF5');
+    barGradient.addColorStop(1, '#74D6BA');
+    ctx.fillStyle = barGradient;
+    drawRoundedRect(ctx, progressX, barY, Math.max(9, progressW * responsePct), 9, 5);
+    ctx.fill();
+  }
+
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#778497';
+  ctx.font = '400 12px Inter, system-ui, sans-serif';
+  ctx.fillText(`${formatNumber(ratedCount)} avis sur ${formatNumber(totalCount)} tickets fermés`, marginX, 484);
+
+  ctx.textAlign = 'right';
+  ctx.fillText(
+    `Généré le ${new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}`,
+    W - marginX,
+    484
+  );
+
+  return canvas.toBuffer('png');
 }
 
 module.exports = { generateTicketStatsImage };

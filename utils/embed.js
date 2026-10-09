@@ -489,7 +489,7 @@ function buildV2Container(guildId, description = '', options = {}) {
 }
 
 
-function _embedBuilderToContainer(embedBuilder) {
+function _embedBuilderToContainer(embedBuilder, { withoutColor = false } = {}) {
   const data = embedBuilder?.data || embedBuilder || {};
   const container = new ContainerBuilder();
   const parts = [];
@@ -521,7 +521,7 @@ function _embedBuilderToContainer(embedBuilder) {
     container.addMediaGalleryComponents(gallery);
   }
 
-  if (data.color) {
+  if (data.color && !withoutColor) {
     try { container.setAccentColor(data.color); } catch {}
   }
 
@@ -530,19 +530,25 @@ function _embedBuilderToContainer(embedBuilder) {
 
 
 function embedToPayload(guildId, embedBuilder, options = {}) {
-  const { allowedMentions: customAllowed, components, forceV2, ...rest } = options;
+  const { allowedMentions: customAllowed, components, forceV2, withoutColor, ...rest } = options;
   const cmdName = options._cmdName || null;
 
-  if ((forceV2 || shouldUseV2(guildId, cmdName)) && _V2_AVAILABLE) {
+  if (forceV2 && !_V2_AVAILABLE) {
+    throw new Error('Components V2 is not available in this Discord.js version.');
+  }
+
+  if (forceV2 || shouldUseV2(guildId, cmdName)) {
     try {
-      const container = _embedBuilderToContainer(embedBuilder);
+      const container = _embedBuilderToContainer(embedBuilder, { withoutColor });
       const payload = {
         components : components ? [container, ...components] : [container],
         flags      : _V2_FLAG,
         allowedMentions: customAllowed ?? { parse: [] },
       };
       return payload;
-    } catch {}
+    } catch (err) {
+      if (forceV2) throw err;
+    }
   }
 
   const payload = {

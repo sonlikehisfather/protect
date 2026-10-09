@@ -121,15 +121,16 @@ async function _onLevelUp(client, message, newLevel, guildId, config) {
       if (guildConfig?.levelLogChannel) {
         const logChannel = message.guild.channels.cache.get(guildConfig.levelLogChannel);
         if (logChannel?.isTextBased()) {
-          await logChannel.send({
-            embeds: [embed.build(guildId, null, {
+          await logChannel.send(embed.embedToPayload(guildId, embed.build(guildId, null, {
               title       : 'Niveau gagné',
               description : `${message.author} a atteint le niveau **${newLevel}**`,
               color       : '#FEE75C',
               timestamp   : true,
-            })],
-            allowedMentions: { parse: [] },
-          }).catch(() => {});
+            }), {
+              allowedMentions: { parse: [] },
+              forceV2: true,
+              withoutColor: true,
+            })).catch(() => {});
         }
       }
     } catch {}

@@ -7,17 +7,23 @@ const {
   ButtonBuilder,
   ButtonStyle,
   StringSelectMenuBuilder,
+  StringSelectMenuOptionBuilder,
   ChannelType,
   AttachmentBuilder,
   EmbedBuilder,
+  ContainerBuilder,
+  MessageFlags,
+  SeparatorBuilder,
+  TextDisplayBuilder,
 } = require('discord.js');
 
 const db           = require('../core/database');
 const embed        = require('../utils/embed');
-const logger       = require('../utils/logger');
 const errorHandler = require('../utils/errorHandler');
 const permissions  = require('../utils/permissions');
 const { safeSetTimeout } = require('../utils/safeTimers');
+
+const COMPONENTS_V2_FLAG = MessageFlags?.IsComponentsV2 ?? (1 << 15);
 
 
 function _hasTicketBypass(member, guildId) {
@@ -676,10 +682,10 @@ async function handleClose(client, ctx, reason = null) {
         { name: `transcript-${channel.name}.txt` }
       );
 
-      const transcriptPayload = {
-        content : `Transcript du ticket ${channel.name}`,
-        files   : [attachment],
-      };
+      const transcriptPayload = _buildTicketLogPayload(
+        { title: `Transcript du ticket ${channel.name}` },
+        { files: [attachment] }
+      );
 
       if (logChannel && typeof logChannel.send === 'function') {
         await logChannel.send(transcriptPayload).catch(() => {});
@@ -722,13 +728,26 @@ async function handleClose(client, ctx, reason = null) {
   }
 }
 
-async function _sendRatingDm(client, ticket, guildId) {
-  const { ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = require('discord.js');
+function _buildRatingCard(title, description, details) {
+  const container = new ContainerBuilder()
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(`## ${title}\n${description}`)
+    );
 
+  if (details) {
+    container
+      .addSeparatorComponents(new SeparatorBuilder().setSpacing(1))
+      .addTextDisplayComponents(new TextDisplayBuilder().setContent(details));
+  }
+
+  return container;
+}
+
+async function _sendRatingDm(client, ticket, guildId) {
   const ratingRow = new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
       .setCustomId(`ticket_rating:${ticket.id}`)
-      .setPlaceholder('Choisir une note...')
+      .setPlaceholder('Choisis ta note de 1 à 5')
       .addOptions(
         new StringSelectMenuOptionBuilder().setLabel('⭐ Très mauvais').setValue('1').setDescription('1/5'),
         new StringSelectMenuOptionBuilder().setLabel('⭐⭐ Mauvais').setValue('2').setDescription('2/5'),
@@ -750,92 +769,168 @@ async function _sendRatingDm(client, ticket, guildId) {
   const openedAt = ticket.createdAt
     ? `<t:${ticket.createdAt}:F>`
     : 'Inconnu';
-
-  const ratingEmbed = embed.build(guildId, null, {
-    title  : `Évaluation ・ Ticket #${ticket.id}`,
-    fields : [
-      { name: 'Serveur',       value: guildName,                     inline: true },
-      { name: 'Ouvert le',     value: openedAt,                      inline: true },
-      { name: 'Pris en charge', value: claimedBy,                    inline: true },
-    ],
-    color    : '#5865F2',
-    timestamp: false,
-  });
-
-  const descriptionEmbed = embed.build(guildId, 'Ton ticket a été fermé. Comment évalues-tu le support reçu ?', {
-    timestamp: false,
-  });
+  const details = [
+    `**Serveur**\n${guildName}`,
+    `**Ticket**\n#${ticket.id}`,
+    `**Pris en charge**\n${claimedBy}`,
+    `**Ouvert le**\n${openedAt}`,
+  ].join('\n\n');
+  const ratingCard = _buildRatingCard(
+    '⭐ Ton avis compte !',
+    'Ton ticket est fermé. Comment évalues-tu le support reçu ?',
+    details
+  );
 
   const user = await client.users.fetch(ticket.userId).catch(() => null);
   if (!user) return;
 
-  const dmMsg = await user.send({
-    embeds    : [ratingEmbed, descriptionEmbed],
-    components: [ratingRow],
+  await user.send({
+    components      : [ratingCard, ratingRow],
+    flags           : COMPONENTS_V2_FLAG,
+    allowedMentions : { parse: [] },
   }).catch(() => null);
+}
 
-  if (!dmMsg) return;
+async function handleRating(interaction) {
+  const match = /^ticket_rating:(\d+)$/.exec(interaction.customId);
+  if (!match) return;
 
-  const collector = dmMsg.createMessageComponentCollector({ time: 24 * 60 * 60 * 1000 });
-
-  collector.on('collect', async interaction => {
-    collector.stop();
-
-    const fresh = db.getTicket(ticket.channelId);
-    if (fresh && fresh.status !== 'closed') {
-      await interaction.update({
-        embeds    : [embed.build(guildId, 'Ce ticket a été rouvert, l\'évaluation est annulée.', { color: '#ED4245', timestamp: false })],
-        components: [],
-      }).catch(() => {});
-      return;
-    }
-
-    const rating = parseInt(interaction.values[0], 10);
-    db.setTicketRating(ticket.id, rating, null);
-
-    const stars  = '⭐'.repeat(rating);
-    const labels = ['', 'Très mauvais', 'Mauvais', 'Correct', 'Bien', 'Excellent'];
-
-    const thankEmbed = embed.build(guildId, null, {
-      title  : 'Merci pour ton évaluation !',
-      fields : [
-        { name: 'Ticket',         value: `#${ticket.id}`,               inline: true },
-        { name: 'Note',           value: `${stars} ・ ${labels[rating]}`, inline: true },
-        { name: 'Pris en charge', value: claimedBy,                      inline: true },
-      ],
-      color    : '#57F287',
-      timestamp: false,
+  const ticketId = Number(match[1]);
+  const ticket = db.getTicketById(ticketId);
+  if (!ticket) {
+    return interaction.update({
+      components: [_buildRatingCard(
+        'Évaluation annulée',
+        'Ce ticket n’existe plus ; aucune note n’a été enregistrée.',
+        null
+      )],
+      flags: COMPONENTS_V2_FLAG,
     });
+  }
 
+  if (interaction.user.id !== ticket.userId) {
+    return interaction.reply({ content: 'Cette évaluation ne vous est pas destinée.', flags: 64 });
+  }
+
+  if (ticket.status !== 'closed') {
+    return interaction.update({
+      components: [_buildRatingCard(
+        'Évaluation annulée',
+        'Ce ticket a été rouvert ; tu pourras l’évaluer lorsqu’il sera de nouveau fermé.',
+        null
+      )],
+      flags: COMPONENTS_V2_FLAG,
+    });
+  }
+
+  const rating = Number(interaction.values[0]);
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+    return interaction.reply({ content: 'Note invalide. Choisis une note entre 1 et 5.', flags: 64 });
+  }
+
+  const saved = db.setTicketRating(ticket.id, rating, null);
+  const stars  = '⭐'.repeat(rating);
+  const labels = ['', 'Très mauvais', 'Mauvais', 'Correct', 'Bien', 'Excellent'];
+
+  if (!saved) {
+    const latest = db.getTicketById(ticket.id);
+    const reopened = latest?.status !== 'closed';
+    return interaction.update({
+      components: [_buildRatingCard(
+        reopened ? 'Évaluation annulée' : 'Merci, tu as déjà répondu !',
+        reopened
+          ? 'Ce ticket a été rouvert ; aucune note n’a été enregistrée.'
+          : 'Une seule évaluation est autorisée par ticket. Ta première note a bien été conservée.',
+        null
+      )],
+      flags: COMPONENTS_V2_FLAG,
+    });
+  }
+
+  const guildConfig = db.getGuildConfig(ticket.guildId);
+  const ratingChannelId = guildConfig?.ticketRatingChannel;
+  const guild = interaction.client.guilds.cache.get(ticket.guildId);
+  const claimedBy = ticket.claimedBy ? `<@${ticket.claimedBy}>` : 'Non assigné';
+  const openedAt = ticket.createdAt ? `<t:${ticket.createdAt}:F>` : 'Inconnu';
+  const details = [
+    `**Ticket**\n#${ticket.id}`,
+    `**Ta note**\n${stars} ・ **${labels[rating]}** (${rating}/5)`,
+    `**Pris en charge**\n${claimedBy}`,
+  ].join('\n\n');
+
+  try {
     await interaction.update({
-      embeds    : [thankEmbed],
-      components: [],
-    }).catch(() => {});
+      components: [_buildRatingCard(
+        'Merci pour ton retour !',
+        'Ton évaluation a bien été enregistrée.',
+        details
+      )],
+      flags: COMPONENTS_V2_FLAG,
+    });
+  } catch (err) {
+    await errorHandler.handle(err, {
+      source: 'tickets.handleRating.confirmation',
+      guildId: ticket.guildId,
+      userId: ticket.userId,
+      ticketId: ticket.id,
+    });
+  }
 
-    if (ratingChannelId) {
-      const ratingChannel = guild?.channels.cache.get(ratingChannelId);
-      if (ratingChannel?.isTextBased()) {
-        const logEmbed = embed.build(guildId, null, {
-          title  : `Évaluation reçue ・ Ticket #${ticket.id}`,
-          fields : [
-            { name: 'Membre',         value: `<@${ticket.userId}>`,        inline: true },
-            { name: 'Note',           value: `${stars} ・ ${labels[rating]}`, inline: true },
-            { name: 'Pris en charge', value: claimedBy,                      inline: true },
-            { name: 'Serveur',        value: guildName,                      inline: true },
-            { name: 'Ouvert le',      value: openedAt,                       inline: true },
-          ],
-          color    : '#57F287',
-          timestamp: false,
-        });
-        await ratingChannel.send({ embeds: [logEmbed] }).catch(() => {});
-      }
-    }
-  });
+  if (!ratingChannelId) return;
 
-  collector.on('end', async (_, reason) => {
-    if (reason !== 'time') return;
-    await dmMsg.edit({ components: [] }).catch(() => {});
-  });
+  let ratingGuild;
+  let ratingChannel;
+  try {
+    ratingGuild = guild ?? await interaction.client.guilds.fetch(ticket.guildId);
+    ratingChannel = await ratingGuild.channels.fetch(ratingChannelId);
+  } catch (err) {
+    errorHandler.handle(err, {
+      source: 'tickets.sendRatingLog.fetchChannel',
+      guildId: ticket.guildId,
+      channelId: ratingChannelId,
+    });
+    return;
+  }
+
+  if (!ratingChannel?.isTextBased() || ratingChannel.guildId !== ticket.guildId) {
+    errorHandler.handle(new Error('Le salon configuré pour les évaluations est introuvable ou n’est pas textuel.'), {
+      source: 'tickets.sendRatingLog.invalidChannel',
+      guildId: ticket.guildId,
+      channelId: ratingChannelId,
+    });
+    return;
+  }
+
+  const me = ratingGuild.members.me ?? await ratingGuild.members.fetchMe().catch(() => null);
+  const channelPerms = me ? ratingChannel.permissionsFor(me) : null;
+  if (!channelPerms?.has('ViewChannel') || !channelPerms?.has('SendMessages') || !channelPerms?.has('EmbedLinks')) {
+    errorHandler.handle(new Error('Le bot n’a pas les permissions nécessaires dans le salon des évaluations.'), {
+      source: 'tickets.sendRatingLog.missingPermissions',
+      guildId: ticket.guildId,
+      channelId: ratingChannelId,
+    });
+    return;
+  }
+
+  try {
+    await ratingChannel.send(_buildTicketLogPayload({
+      title: `Évaluation reçue ・ Ticket #${ticket.id}`,
+      fields: [
+        { name: 'Membre', value: `<@${ticket.userId}>` },
+        { name: 'Note', value: `${stars} ・ ${labels[rating]}` },
+        { name: 'Pris en charge', value: claimedBy },
+        { name: 'Serveur', value: ratingGuild.name },
+        { name: 'Ouvert le', value: openedAt },
+      ],
+    }));
+  } catch (err) {
+    errorHandler.handle(err, {
+      source: 'tickets.sendRatingLog.send',
+      guildId: ticket.guildId,
+      channelId: ratingChannelId,
+      ticketId: ticket.id,
+    });
+  }
 }
 
 async function handleCloseModal(client, interaction) {
@@ -1041,12 +1136,13 @@ function _safeReply(interaction, payload) {
 
 async function sendTicketLog(client, guild, ticket, logEmbed) {
   try {
+    const payload = _buildTicketLogPayload(logEmbed);
     if (ticket.optionId) {
       const option = db.getTicketOption(ticket.optionId);
       if (option?.logChannelId) {
         const ch = await _resolveLogChannel(guild, option.logChannelId);
         if (ch) {
-          await ch.send({ embeds: [logEmbed], allowedMentions: { parse: [] } }).catch(() => {});
+          await ch.send(payload);
           return ch;
         }
       }
@@ -1057,7 +1153,7 @@ async function sendTicketLog(client, guild, ticket, logEmbed) {
       if (panel?.logChannelId) {
         const ch = await _resolveLogChannel(guild, panel.logChannelId);
         if (ch) {
-          await ch.send({ embeds: [logEmbed], allowedMentions: { parse: [] } }).catch(() => {});
+          await ch.send(payload);
           return ch;
         }
       }
@@ -1067,16 +1163,59 @@ async function sendTicketLog(client, guild, ticket, logEmbed) {
     if (config?.ticketLogChannel) {
       const ch = await _resolveLogChannel(guild, config.ticketLogChannel);
       if (ch) {
-        await ch.send({ embeds: [logEmbed], allowedMentions: { parse: [] } }).catch(() => {});
+        await ch.send(payload);
         return ch;
       }
     }
 
-    await logger.send(client, guild.id, 'modlog', logEmbed).catch(() => {});
+    if (config?.modLogChannel) {
+      const ch = await _resolveLogChannel(guild, config.modLogChannel);
+      if (ch) {
+        await ch.send(payload);
+        return ch;
+      }
+    }
+
     return null;
-  } catch {
+  } catch (err) {
+    errorHandler.handle(err, {
+      source: 'tickets.sendTicketLog',
+      guildId: guild.id,
+      ticketId: ticket.id ?? null,
+    });
     return null;
   }
+}
+
+function _buildTicketLogPayload(logEmbed, extra = {}) {
+  const data = logEmbed?.data ?? logEmbed ?? {};
+  const parts = [];
+
+  if (data.title) parts.push(`## ${data.title}`);
+  if (data.description) parts.push(String(data.description));
+
+  if (Array.isArray(data.fields)) {
+    for (const field of data.fields) {
+      parts.push(`**${String(field.name || 'Détail')}**\n${String(field.value || '—')}`);
+    }
+  }
+
+  if (data.footer?.text) parts.push(`-# ${data.footer.text}`);
+  if (data.timestamp) {
+    const timestamp = Math.floor(new Date(data.timestamp).getTime() / 1000);
+    if (Number.isFinite(timestamp)) parts.push(`-# <t:${timestamp}:F>`);
+  }
+
+  const content = parts.join('\n\n').slice(0, 4000) || '## Journal du ticket';
+  const container = new ContainerBuilder()
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(content));
+
+  return {
+    ...extra,
+    components: [container],
+    flags: COMPONENTS_V2_FLAG,
+    allowedMentions: { parse: [] },
+  };
 }
 
 async function _resolveLogChannel(guild, channelId) {
@@ -1146,10 +1285,10 @@ async function closeOnMemberLeave(client, guild, ticket) {
         { name: `transcript-${channel?.name || ticket.channelId}.txt` }
       );
 
-      const transcriptPayload = {
-        content : `Transcript du ticket ${channel?.name || ticket.channelId}`,
-        files   : [attachment],
-      };
+      const transcriptPayload = _buildTicketLogPayload(
+        { title: `Transcript du ticket ${channel?.name || ticket.channelId}` },
+        { files: [attachment] }
+      );
 
       if (logChannel && typeof logChannel.send === 'function') {
         await logChannel.send(transcriptPayload).catch(() => {});
@@ -1341,10 +1480,10 @@ async function processInactiveTickets(client) {
             { name: `transcript-${channel.name}.txt` }
           );
 
-          const transcriptPayload = {
-            content : `Transcript du ticket ${channel.name}`,
-            files   : [attachment],
-          };
+          const transcriptPayload = _buildTicketLogPayload(
+            { title: `Transcript du ticket ${channel.name}` },
+            { files: [attachment] }
+          );
 
           if (logChannel && typeof logChannel.send === 'function') {
             await logChannel.send(transcriptPayload).catch(() => {});
@@ -1391,6 +1530,7 @@ module.exports = {
   handleClaim,
   handleClose,
   handleCloseModal,
+  handleRating,
   handleAutoClaimMessage,
   closeOnMemberLeave,
   sendTicketLog,

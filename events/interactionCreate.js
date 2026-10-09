@@ -643,6 +643,10 @@ async function _handleSelectMenu(client, interaction) {
   const id = interaction.customId;
   console.log(`[SELECT-MENU] Received: ${id}, type=${interaction.componentType}, user=${interaction.user.id}`);
 
+  if (id.startsWith('ticket_rating:')) {
+    return tickets.handleRating(interaction);
+  }
+
   if (id.startsWith('rr:')) {
     return;
   }
@@ -893,7 +897,7 @@ async function _handleSelectMenu(client, interaction) {
   }
 
 
-  if (id.startsWith('tp_') || id.startsWith('tpe:') || id === 'to_config_menu' || id.startsWith('to_select_') || id.startsWith('ticket_rating:')) {
+  if (id.startsWith('tp_') || id.startsWith('tpe:') || id === 'to_config_menu' || id.startsWith('to_select_')) {
     return;
   }
 
@@ -2180,10 +2184,11 @@ async function _handleFormulaireSubmit(interaction) {
     }
   );
 
-  const sentLog = await logChannel.send({
-    embeds          : [formEmbed],
-    allowedMentions : { parse: [] },
-  }).catch(() => null);
+  const sentLog = await logChannel.send(embed.embedToPayload(guildId, formEmbed, {
+    allowedMentions: { parse: [] },
+    forceV2: true,
+    withoutColor: true,
+  })).catch(() => null);
 
   if (!sentLog) {
     return interaction.reply({

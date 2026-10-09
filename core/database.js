@@ -5565,7 +5565,11 @@ const db = {
   },
 
   setTicketRating(ticketId, rating, comment) {
-    getDb().prepare('UPDATE tickets SET rating = ?, ratingComment = ? WHERE id = ?').run(rating, comment ?? null, ticketId);
+    return getDb().prepare(`
+      UPDATE tickets
+      SET rating = ?, ratingComment = ?
+      WHERE id = ? AND status = 'closed' AND rating IS NULL
+    `).run(rating, comment ?? null, ticketId).changes > 0;
   },
   getTicketStats(guildId) {
     const db = getDb();
@@ -7238,7 +7242,7 @@ const db = {
       'boostEmbedChannelId',
       'suggestionLogChannel',
       'suggestionPendingChannel', 'suggestionValidatedChannel',
-      'ticketLogChannel',
+      'ticketLogChannel', 'ticketRatingChannel',
       'modmailChannel', 'modmailLogChannel',
       'ticketCategory',
     ];
