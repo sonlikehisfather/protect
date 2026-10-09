@@ -916,6 +916,54 @@ function buildDrawRow(disabled = false, drawsLeft = 0) {
   ];
 }
 
+async function ensureCasinoAccessRole(interaction, cfg) {
+  if (!cfg.roleRequired) return null;
+
+  let member;
+  try {
+    member = await interaction.guild.members.fetch(interaction.user.id);
+  } catch (err) {
+    console.error('[CASINO] Failed to fetch member for access role:', err?.message);
+    return 'Impossible de vérifier ton rôle casino. Réessaie ou contacte un administrateur.';
+  }
+
+  let role;
+  try {
+    role = await interaction.guild.roles.fetch(cfg.roleRequired);
+  } catch (err) {
+    console.error('[CASINO] Failed to fetch configured access role:', err?.message);
+    return 'Le rôle casino configuré est introuvable. Contacte un administrateur.';
+  }
+  if (!role || role.id === interaction.guild.id || role.managed) {
+    console.error(`[CASINO] Invalid configured access role: ${cfg.roleRequired}`);
+    return 'Le rôle casino configuré est invalide. Contacte un administrateur.';
+  }
+  if (member.roles.cache.has(role.id)) return null;
+
+  let botMember = interaction.guild.members.me;
+  if (!botMember) {
+    try {
+      botMember = await interaction.guild.members.fetchMe();
+    } catch (err) {
+      console.error('[CASINO] Failed to fetch bot member for role assignment:', err?.message);
+      return 'Impossible de vérifier les permissions du bot pour attribuer le rôle casino.';
+    }
+  }
+  if (!botMember.permissions.has(PermissionFlagsBits.ManageRoles) ||
+      role.position >= botMember.roles.highest.position) {
+    console.error(`[CASINO] Bot cannot assign configured access role: ${role.id}`);
+    return 'Le bot ne peut pas attribuer le rôle casino. Vérifie sa permission **Gérer les rôles** et sa position dans la hiérarchie.';
+  }
+
+  try {
+    await member.roles.add(role, 'Casino profile access');
+    return null;
+  } catch (err) {
+    console.error('[CASINO] Failed to add configured access role:', err?.message);
+    return 'Discord a refusé l’attribution du rôle casino. Vérifie les permissions du bot et réessaie.';
+  }
+}
+
 async function handleInteraction(interaction, id) {
   try {
     if (id !== 'cs_panel_profile') {
@@ -1006,17 +1054,9 @@ async function handleInteraction(interaction, id) {
 
     if (id === 'cs_panel_profile') {
       const cfg = db.getCasinoConfig(guildId);
-      if (cfg.roleRequired && !interaction.member.roles.cache.has(cfg.roleRequired)) {
-        try {
-          await interaction.member.roles.add(cfg.roleRequired).catch(err => {
-            console.error('[CASINO] Failed to add required role:', err?.message);
-          });
-        } catch (err) {
-          console.error('[CASINO] Role add exception:', err?.message);
-        }
-      }
       await interaction.deferReply({ flags: MessageFlags.Ephemeral }).catch(() => {});
       const user        = db.getCasinoUser(guildId, userId);
+      const roleError   = await ensureCasinoAccessRole(interaction, cfg);
       const levelData   = db.getLevel(guildId, userId);
       const levelConfig = db.getGuildConfig(guildId);
       const realLevel   = levelConfig?.levelCumul ? levelFromXp(levelData?.xp ?? 0) : (levelData?.level ?? 1);
@@ -1026,11 +1066,21 @@ async function handleInteraction(interaction, id) {
         const { generateProfileCard } = require('../../utils/profileCard');
         const buffer = await generateProfileCard(interaction.member, user, realLevel, levelData, rank, equipped, guildId, userId);
         const attachment = new AttachmentBuilder(buffer, { name: 'profile.png' });
-        return interaction.editReply({ files: [attachment] }).catch(() => {});
+        await interaction.editReply({ files: [attachment] }).catch(err => {
+          console.error('[CASINO] Failed to display profile card:', err?.message);
+        });
       } catch (cardErr) {
         console.error('[PROFILE-CARD] Error generating card:', cardErr?.message);
-        return interaction.editReply({ embeds: [buildCasinoPage(guildId, userId, 'profile')] }).catch(() => {});
+        await interaction.editReply({ embeds: [buildCasinoPage(guildId, userId, 'profile')] }).catch(err => {
+          console.error('[CASINO] Failed to display profile:', err?.message);
+        });
       }
+      if (roleError) {
+        await interaction.followUp({ content: roleError, flags: MessageFlags.Ephemeral }).catch(err => {
+          console.error('[CASINO] Failed to notify about access role:', err?.message);
+        });
+      }
+      return;
     }
 
     const page = id === 'cs_panel_shop' ? 'shop'
@@ -2220,21 +2270,36 @@ async function handlePanelNav(interaction) {
   const page = interaction.values?.[0] || 'home';
 
   if (page === 'profile') {
+    await interaction.deferUpdate().catch(err => {
+      console.error('[CASINO] Failed to acknowledge profile navigation:', err?.message);
+    });
     const user = db.getCasinoUser(guildId, userId);
+    const roleError = await ensureCasinoAccessRole(interaction, db.getCasinoConfig(guildId));
     const levelData = db.getLevel(guildId, userId);
     const levelConfig = db.getGuildConfig(guildId);
     const realLevel = levelConfig?.levelCumul ? levelFromXp(levelData.xp) : levelData.level;
     const rank = getRankFromLevel(realLevel);
     const equipped = db.getEquippedItemDetails(guildId, userId);
     try {
-      await interaction.deferUpdate().catch(() => {});
       const { generateProfileCard } = require('../../utils/profileCard');
       const buffer = await generateProfileCard(interaction.member, user, realLevel, levelData, rank, equipped, guildId, userId);
       const attachment = new AttachmentBuilder(buffer, { name: 'profile.png' });
-      await interaction.followUp({ files: [attachment], flags: MessageFlags.Ephemeral }).catch(() => {});
+      await interaction.followUp({ files: [attachment], flags: MessageFlags.Ephemeral }).catch(err => {
+        console.error('[PROFILE-CARD] Nav delivery failed:', err?.message);
+      });
     } catch (cardErr) {
       console.error('[PROFILE-CARD] Nav error:', cardErr?.message);
-      await interaction.update(embed.wrapPayload(guildId, { flags: COMPONENTS_V2_FLAG, components: [_buildProfilePage(guildId, userId)] }, 'casino')).catch(() => {});
+      await interaction.followUp(embed.wrapPayload(guildId, {
+        flags: MessageFlags.Ephemeral | COMPONENTS_V2_FLAG,
+        components: [_buildProfilePage(guildId, userId)],
+      }, 'casino')).catch(err => {
+        console.error('[CASINO] Failed to display fallback profile:', err?.message);
+      });
+    }
+    if (roleError) {
+      await interaction.followUp({ content: roleError, flags: MessageFlags.Ephemeral }).catch(err => {
+        console.error('[CASINO] Failed to notify about access role:', err?.message);
+      });
     }
     return;
   }

@@ -3908,6 +3908,23 @@ up(db) {
     },
   },
 
+  {
+    version: 120,
+    up(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS voice_activity_daily (
+          guildId TEXT NOT NULL,
+          userId  TEXT NOT NULL,
+          day     TEXT NOT NULL,
+          seconds INTEGER NOT NULL DEFAULT 0,
+          PRIMARY KEY (guildId, userId, day)
+        );
+        CREATE INDEX IF NOT EXISTS idx_voice_activity_daily_guild_day
+          ON voice_activity_daily(guildId, day);
+      `);
+    },
+  },
+
 ];
 
 
@@ -4353,6 +4370,54 @@ function prepareStatements(db) {
       GROUP BY userId
       ORDER BY total DESC
       LIMIT ?
+    `),
+    getGuildActivityStats : db.prepare(`
+      WITH guild_users AS (
+        SELECT userId FROM msgcount WHERE guildId = ?
+        UNION
+        SELECT userId FROM voice_stats WHERE guildId = ?
+      ),
+      message_totals AS (
+        SELECT userId,
+               SUM(count) AS total,
+               SUM(CASE WHEN day >= date('now', '-6 days') THEN count ELSE 0 END) AS recent
+        FROM msgcount
+        WHERE guildId = ?
+        GROUP BY userId
+      ),
+      voice_totals AS (
+        SELECT userId,
+               totalSeconds + CASE
+                 WHEN joinedAt IS NOT NULL THEN MAX(0, unixepoch() - joinedAt)
+                 ELSE 0
+               END AS totalSeconds
+        FROM voice_stats
+        WHERE guildId = ?
+      ),
+      recent_voice_totals AS (
+        SELECT userId, SUM(seconds) AS seconds
+        FROM voice_activity_daily
+        WHERE guildId = ?
+          AND day >= date('now', '-6 days')
+        GROUP BY userId
+      ),
+      active_recent_voice AS (
+        SELECT userId,
+               MAX(0, unixepoch() - MAX(joinedAt, unixepoch(date('now', '-6 days')))) AS seconds
+        FROM voice_stats
+        WHERE guildId = ?
+          AND joinedAt IS NOT NULL
+      )
+      SELECT guild_users.userId,
+             COALESCE(messages.total, 0) AS totalMessages,
+             COALESCE(messages.recent, 0) AS recentMessages,
+             COALESCE(voice.totalSeconds, 0) AS voiceSeconds,
+             COALESCE(recent_voice.seconds, 0) + COALESCE(active_voice.seconds, 0) AS recentVoiceSeconds
+      FROM guild_users
+      LEFT JOIN message_totals AS messages ON messages.userId = guild_users.userId
+      LEFT JOIN voice_totals AS voice ON voice.userId = guild_users.userId
+      LEFT JOIN recent_voice_totals AS recent_voice ON recent_voice.userId = guild_users.userId
+      LEFT JOIN active_recent_voice AS active_voice ON active_voice.userId = guild_users.userId
     `),
 
     insertStreak : db.prepare(`
@@ -7637,8 +7702,31 @@ const db = {
   },
 
   voiceLeave(guildId, userId) {
-    getDb();
-    _stmts.voiceLeave.run(guildId, userId);
+    const d = getDb();
+    d.transaction(() => {
+      const session = _stmts.getVoiceStats.get(guildId, userId);
+      const joinedAt = Number(session?.joinedAt);
+      const endedAt = Math.floor(Date.now() / 1000);
+
+      if (Number.isFinite(joinedAt) && joinedAt > 0 && endedAt > joinedAt) {
+        const addDailySeconds = d.prepare(`
+          INSERT INTO voice_activity_daily (guildId, userId, day, seconds)
+          VALUES (?, ?, ?, ?)
+          ON CONFLICT(guildId, userId, day) DO UPDATE SET
+            seconds = voice_activity_daily.seconds + excluded.seconds
+        `);
+        let cursor = joinedAt;
+        while (cursor < endedAt) {
+          const day = new Date(cursor * 1000).toISOString().slice(0, 10);
+          const nextDay = Math.floor(Date.parse(`${day}T00:00:00.000Z`) / 1000) + 86400;
+          const segmentEnd = Math.min(endedAt, nextDay);
+          addDailySeconds.run(guildId, userId, day, segmentEnd - cursor);
+          cursor = segmentEnd;
+        }
+      }
+
+      _stmts.voiceLeave.run(guildId, userId);
+    })();
   },
 
   voiceMove(guildId, userId, channelId) {
@@ -7919,6 +8007,12 @@ const db = {
     getDb();
     const since = new Date(Date.now() - days * 86400_000).toISOString().slice(0, 10);
     return _stmts.getTopMsgs.all(guildId, since, Math.min(limit, 25));
+  },
+
+  getGuildActivityStats(guildId) {
+    if (!guildId) return [];
+    getDb();
+    return _stmts.getGuildActivityStats.all(guildId, guildId, guildId, guildId, guildId, guildId);
   },
 
   transaction(fn) {
