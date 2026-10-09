@@ -154,6 +154,9 @@ module.exports = {
         interaction.isMentionableSelectMenu?.()
       ) {
         const cid = interaction.customId || '';
+        if (cid.startsWith('autokick:')) {
+          return;
+        }
         if (cid.startsWith('cccomp:') && customCommandsRuntime?.executeComponentAction) {
           return await customCommandsRuntime.executeComponentAction(client, interaction);
         }
@@ -225,6 +228,10 @@ async function _handleSlash(client, interaction) {
 
 async function _handleButton(client, interaction) {
   const id = interaction.customId;
+
+  if (id.startsWith('autokick:')) {
+    return;
+  }
 
   if (id.startsWith('local:report:')) {
     return;
@@ -646,6 +653,10 @@ async function _handleSelectMenu(client, interaction) {
   const id = interaction.customId;
   console.log(`[SELECT-MENU] Received: ${id}, type=${interaction.componentType}, user=${interaction.user.id}`);
 
+  if (id.startsWith('autokick:')) {
+    return;
+  }
+
   if (id.startsWith('local:report:') || id.startsWith('local:reportset:')) {
     return;
   }
@@ -933,6 +944,10 @@ async function _handleSelectMenu(client, interaction) {
 async function _handleModal(client, interaction) {
   const id = interaction.customId;
   const guildId = interaction.guild?.id;
+
+  if (id.startsWith('autokick:')) {
+    return;
+  }
 
   // Presence modals are handled by command-local awaitModalSubmit.
   if (id.startsWith('fp:modal:')) {

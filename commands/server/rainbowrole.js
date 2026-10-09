@@ -183,6 +183,18 @@ function _formatRole(row, guild) {
   return `${roleName} • ${status} • \`${row.interval}s\``;
 }
 
+function _formatInterval(seconds) {
+  if (seconds % 3600 === 0) {
+    const hours = seconds / 3600;
+    return `${hours} h`;
+  }
+  if (seconds % 60 === 0) {
+    const minutes = seconds / 60;
+    return `${minutes} min`;
+  }
+  return `${seconds} s`;
+}
+
 module.exports = {
   help: {
     name        : 'rainbowrole',
@@ -209,7 +221,7 @@ module.exports = {
       view: 'main',
     };
 
-    const intervalOptions = [10, 15, 30, 60, 120, 300];
+    const intervalOptions = [10, 15, 30, 60, 120, 300, 600, 1800, 3600, 10800, 21600, 43200, 86400];
     const modeOptions = [
       { value: 'rainbow', label: '◈ Arc-en-ciel', description: 'Couleurs vives qui changent radicalement' },
       { value: 'gradient', label: '◑ Dégradé', description: 'Deux couleurs complémentaires en transition' },
@@ -238,7 +250,7 @@ module.exports = {
           const statusDot = row.active ? '◆' : '◇';
           const modeLbl = modeOptions.find((m) => m.value === row.mode)?.label || row.mode;
           const arrow = isSelected ? '**»**' : '\u00a0\u00a0';
-          lines.push(`${arrow} ${statusDot} ${roleName} ・ ${modeLbl} ・ \`${row.interval}s\``);
+          lines.push(`${arrow} ${statusDot} ${roleName} ・ ${modeLbl} ・ \`${_formatInterval(row.interval)}\``);
         }
       }
 
@@ -251,7 +263,7 @@ module.exports = {
           const colorPreview = selectedRow.color ? `\`${selectedRow.color}\`` : '`・`';
           details.push('');
           details.push(`${stateIcon}`);
-          details.push(`› Intervalle : \`${selectedRow.interval}s\``);
+          details.push(`› Intervalle : \`${_formatInterval(selectedRow.interval)}\``);
           details.push(`› Style : ${modeLbl}`);
           details.push(`› Dernière couleur : ${colorPreview}`);
         } else {
@@ -279,9 +291,9 @@ module.exports = {
 
       intervalSelect.addOptions(
         intervalOptions.map((seconds) => ({
-          label: seconds < 60 ? `${seconds} secondes` : `${seconds / 60} minute${seconds / 60 > 1 ? 's' : ''}`,
+          label: _formatInterval(seconds),
           value: String(seconds),
-          description: `Changer la couleur toutes les ${seconds}s`,
+          description: `Changer la couleur toutes les ${_formatInterval(seconds)}`,
           default: selectedRow?.interval === seconds,
         }))
       );
@@ -384,7 +396,7 @@ module.exports = {
           const role = guild.roles.cache.get(r.roleId);
           const roleName = role ? `**${role.name}**` : `**Rôle ${r.roleId}**`;
           const status = r.active ? '[ACTIF]' : '[DESACTIVÉ]';
-          return `${roleName}\n  └ mode: \`${r.mode}\` • intervalle: \`${r.interval}s\` • ${status}`;
+          return `${roleName}\n  └ mode: \`${r.mode}\` • intervalle: \`${_formatInterval(r.interval)}\` • ${status}`;
         });
 
         const selectOptions = options.slice(0, 25);
@@ -746,7 +758,7 @@ module.exports = {
     }
 
     if (active) {
-      messageText += ` Changement de couleur toutes les ${interval} secondes.`;
+      messageText += ` Changement de couleur toutes les ${_formatInterval(interval)}.`;
     } else {
       messageText += ' Cette configuration est désactivée.';
     }

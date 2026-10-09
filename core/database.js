@@ -3925,6 +3925,29 @@ up(db) {
     },
   },
 
+  {
+    version: 121,
+    up(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS autokick_entries (
+          guildId   TEXT    NOT NULL,
+          userId    TEXT    NOT NULL,
+          reason    TEXT,
+          addedBy   TEXT    NOT NULL,
+          addedAt   INTEGER NOT NULL DEFAULT (unixepoch()),
+          PRIMARY KEY (guildId, userId)
+        );
+        CREATE INDEX IF NOT EXISTS idx_autokick_entries_guild_added
+          ON autokick_entries(guildId, addedAt DESC);
+
+        CREATE TABLE IF NOT EXISTS autokick_config (
+          guildId TEXT PRIMARY KEY,
+          enabled INTEGER NOT NULL DEFAULT 1
+        );
+      `);
+    },
+  },
+
 ];
 
 
@@ -6286,6 +6309,43 @@ const db = {
 
   getBlacklistEntry(guildId, userId) {
     return getDb().prepare('SELECT * FROM guild_blacklist WHERE guildId = ? AND userId = ? AND deletedAt IS NULL').get(guildId, userId);
+  },
+
+  getAutoKickEntries(guildId) {
+    return getDb().prepare(
+      'SELECT guildId, userId, reason, addedBy, addedAt FROM autokick_entries WHERE guildId = ? ORDER BY addedAt DESC, userId ASC'
+    ).all(guildId);
+  },
+
+  getAutoKickEntry(guildId, userId) {
+    return getDb().prepare(
+      'SELECT guildId, userId, reason, addedBy, addedAt FROM autokick_entries WHERE guildId = ? AND userId = ?'
+    ).get(guildId, userId) ?? null;
+  },
+
+  addAutoKickEntry(guildId, userId, reason, addedBy) {
+    return getDb().prepare(
+      'INSERT OR REPLACE INTO autokick_entries (guildId, userId, reason, addedBy, addedAt) VALUES (?, ?, ?, ?, unixepoch())'
+    ).run(guildId, userId, reason, addedBy);
+  },
+
+  removeAutoKickEntry(guildId, userId) {
+    return getDb().prepare(
+      'DELETE FROM autokick_entries WHERE guildId = ? AND userId = ?'
+    ).run(guildId, userId).changes > 0;
+  },
+
+  isAutoKickEnabled(guildId) {
+    const row = getDb().prepare(
+      'SELECT enabled FROM autokick_config WHERE guildId = ?'
+    ).get(guildId);
+    return row ? Number(row.enabled) === 1 : true;
+  },
+
+  setAutoKickEnabled(guildId, enabled) {
+    return getDb().prepare(
+      'INSERT OR REPLACE INTO autokick_config (guildId, enabled) VALUES (?, ?)'
+    ).run(guildId, enabled ? 1 : 0);
   },
 
   addBlacklist(guildId, userId, reason, addedBy) {

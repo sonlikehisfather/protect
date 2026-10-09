@@ -109,6 +109,75 @@ module.exports = {
         }
       }
 
+      const autoKickEntry = db.getAutoKickEntry(guildId, member.id);
+      if (autoKickEntry && db.isAutoKickEnabled(guildId)) {
+        if (
+          perms.isProtected(member.id, guildId, member) ||
+          perms.isAngelProtected(member.id, guildId)
+        ) {
+          return;
+        }
+
+        if (!member.kickable) {
+          errorHandler.handle(new Error('AutoKick impossible : le bot ne peut pas expulser cet utilisateur.'), {
+            source: 'autokick.notKickable',
+            guildId,
+            userId: member.id,
+          });
+          return;
+        }
+
+        const reason = `AutoKick - ${autoKickEntry.reason || 'Utilisateur inscrit dans la liste AutoKick'}`;
+        try {
+          await member.kick(reason);
+        } catch (err) {
+          errorHandler.handle(err, {
+            source: 'autokick.execute',
+            guildId,
+            userId: member.id,
+          });
+          return;
+        }
+
+        try {
+          db.addSanction(guildId, member.id, client.user.id, 'kick', reason);
+        } catch (err) {
+          errorHandler.handle(err, {
+            source: 'autokick.recordSanction',
+            guildId,
+            userId: member.id,
+          });
+        }
+
+        try {
+          const log = embed.log(guildId, 'AutoKick déclenché', [
+            {
+              name   : 'Utilisateur expulsé',
+              value  : `<@${member.id}> (${member.user.tag}) \`${member.id}\``,
+              inline : false,
+            },
+            {
+              name   : 'Ajouté à la liste par',
+              value  : `<@${autoKickEntry.addedBy}> \`${autoKickEntry.addedBy}\``,
+              inline : true,
+            },
+            {
+              name   : 'Raison',
+              value  : autoKickEntry.reason || 'Aucune raison précisée',
+              inline : false,
+            },
+          ]);
+          await logger.send(client, guildId, 'modlog', log);
+        } catch (err) {
+          errorHandler.handle(err, {
+            source: 'autokick.log',
+            guildId,
+            userId: member.id,
+          });
+        }
+        return;
+      }
+
       if (config.antiraidEnabled) {
         const antiraidConfig = db.getAntiraidConfig(guildId);
         const creationLimit  = Number(antiraidConfig?.creationLimit) || 0;
