@@ -88,7 +88,7 @@ const CATEGORY_ORDER = [
   'customs',
 ];
 
-const PERM_ORDER = ['everyone', 'public', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'owner', 'buyer'];
+const PERM_ORDER = ['everyone', 'public', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'owner', 'buyer', 'buyerPrincipal'];
 
 const PERM_LABELS = {
   everyone : 'Public global',
@@ -103,7 +103,8 @@ const PERM_LABELS = {
   '8'      : 'Perm 8',
   '9'      : 'Perm 9',
   owner    : 'Owner',
-  buyer    : 'Buyer',
+  buyer    : 'Buyers (principal inclus)',
+  buyerPrincipal: 'Buyer principal uniquement',
 };
 
 const CATEGORY_ALIASES = {
@@ -185,6 +186,7 @@ module.exports = {
     description : "Affiche l'aide du bot.",
     usage       : 'help [commande|catégorie|all]',
     aliases     : ['h', 'aide'],
+    defaultPermission: 'everyone',
   },
 
   async run(client, message, args) {
@@ -694,7 +696,7 @@ async function _handleButtonMenu(client, message, guildId, prefix, deleteReply, 
 }
 
 async function _handlePagination(client, message, guildId, prefix, deleteReply, deleteDelay) {
-  const allCommands = _getDisplayCommands(client, message);
+  const allCommands = _getPermissionDisplayCommands(client, message);
 
   if (!allCommands.length) {
     const sent = await embed.replyError(
@@ -707,13 +709,11 @@ async function _handlePagination(client, message, guildId, prefix, deleteReply, 
     return;
   }
 
-  const isBuyerUser = perms.isBuyer(message.author.id);
   const groups      = _groupByPerm(allCommands, guildId);
 
-  const orderedPerms = PERM_ORDER.filter(p => {
-    if (p === 'buyer' && !isBuyerUser) return false;
-    return Array.isArray(groups[p]) && groups[p].length > 0;
-  });
+  const orderedPerms = PERM_ORDER.filter(p =>
+    Array.isArray(groups[p]) && groups[p].length > 0
+  );
 
   if (!orderedPerms.length) {
     const sent = await embed.replyError(
@@ -845,12 +845,7 @@ async function _handlePagination(client, message, guildId, prefix, deleteReply, 
 }
 
 function _groupByPerm(commands, guildId) {
-  let dbPerms = [];
-  try { dbPerms = db.getAllCmdPerms(guildId) || []; } catch { dbPerms = []; }
-
-  const permMap = new Map(
-    dbPerms.map(r => [r.commandName ?? r.name, r.perm])
-  );
+  const permMap = _getCommandPermissionMap(guildId);
 
   const groups = {};
 
@@ -858,11 +853,35 @@ function _groupByPerm(commands, guildId) {
     const name = cmd.help?.name ?? cmd.name;
     if (!name) continue;
 
+    if (Array.isArray(cmd.help?.permissionScopes) && cmd.help.permissionScopes.length) {
+      for (const scope of cmd.help.permissionScopes) {
+        if (!scope?.permission) continue;
+        const scopedCommand = {
+          ...cmd,
+          permissionScope: scope.permission,
+          help: {
+            ...cmd.help,
+            usage: scope.usage ?? cmd.help.usage,
+            description: scope.description ?? cmd.help.description,
+          },
+        };
+        if (!groups[scope.permission]) groups[scope.permission] = [];
+        groups[scope.permission].push(scopedCommand);
+      }
+      continue;
+    }
 
-    const isVirtualOrCustom = !cmd.help || cmd.category === 'customs';
-    const perm = isVirtualOrCustom
+    const permissionCommandName = cmd.permissionCommandName ?? name;
+    const isCustom = !cmd.help && !cmd.permissionCommandName;
+    const perm = isCustom
       ? 'everyone'
-      : (permMap.get(name) ?? 'everyone');
+      : cmd.help?.selfManaged && (cmd.help.defaultPermission ?? cmd.defaultPermission)
+        ? cmd.help.defaultPermission ?? cmd.defaultPermission
+        : cmd.permissionScope
+          ?? perms.resolveCommandPermission(
+            permMap.get(permissionCommandName),
+            cmd.help?.defaultPermission ?? cmd.defaultPermission,
+          );
 
     if (!groups[perm]) groups[perm] = [];
     groups[perm].push(cmd);
@@ -951,13 +970,16 @@ function _joinCommandLines(lines) {
 function _buildPermPages(commands, perm, guildId, prefix) {
   const label = PERM_LABELS[perm] ?? perm;
   const pages = _buildCommandLinePages(commands, prefix, PAGE_SIZE);
+  const intro = perm === 'public'
+    ? 'Ces commandes sont utilisables dans les salons autorisés avec `+public allow` ou partout avec `+public on`.'
+    : null;
 
   if (!pages.length) return [];
 
   return pages.map((lines, idx) => {
     return {
       title  : `Permission \u2022 ${label}`,
-      intro  : null,
+      intro,
       fields : [
         {
           name  : 'Commandes',
@@ -1235,11 +1257,15 @@ function _interpolateHelpMessage(text, message, prefix, client) {
 }
 
 function _getUniqueCommands(client, message) {
+  return _getAllUniqueCommands(client)
+    .filter(cmd => perms.check(message, cmd.help.name, cmd.help.defaultPermission));
+}
+
+function _getAllUniqueCommands(client) {
   const unique = new Map();
 
   for (const cmd of client.commands.values()) {
     if (!cmd.help?.name) continue;
-    if (!perms.check(message, cmd.help.name)) continue;
     if (!unique.has(cmd.help.name)) unique.set(cmd.help.name, cmd);
   }
 
@@ -1249,9 +1275,13 @@ function _getUniqueCommands(client, message) {
 }
 
 function _getVirtualCommands(client, message) {
+  return _getVirtualCommandsFromParents(_getUniqueCommands(client, message));
+}
+
+function _getVirtualCommandsFromParents(parentCommands) {
   const commands = [];
 
-  for (const cmd of _getUniqueCommands(client, message)) {
+  for (const cmd of parentCommands) {
     if (!Array.isArray(cmd.help?.subcommands)) continue;
 
     for (const sub of cmd.help.subcommands) {
@@ -1262,11 +1292,27 @@ function _getVirtualCommands(client, message) {
         description : sub.description ?? 'Aucune description.',
         usage       : sub.usage ?? sub.name,
         category    : sub.category,
+        permissionCommandName: cmd.help.name,
+        defaultPermission: cmd.help.defaultPermission,
       });
     }
   }
 
   return commands.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function _getPermissionDisplayCommands(client, message) {
+  const nativeCommands = _getAllUniqueCommands(client);
+  return [
+    ...nativeCommands,
+    ..._getVirtualCommandsFromParents(nativeCommands),
+    ..._getCustomCommands(message),
+  ].filter(cmd => (cmd.help?.name ?? cmd.name) !== 'help');
+}
+
+function _getCommandPermissionMap(guildId) {
+  const dbPerms = db.getAllCmdPerms(guildId) || [];
+  return new Map(dbPerms.map(row => [row.commandName ?? row.name, row.perm]));
 }
 
 function _getDisplayCommands(client, message) {

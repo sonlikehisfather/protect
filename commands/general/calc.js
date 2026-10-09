@@ -22,6 +22,7 @@ module.exports = {
     description : 'Effectue un calcul mathématique.',
     usage       : 'calc <expression>',
     aliases     : ['calculate', 'math'],
+    defaultPermission: 'everyone',
   },
 
   async run(client, message, args) {

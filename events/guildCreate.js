@@ -11,7 +11,7 @@ module.exports = {
 
   async execute(client, guild) {
     try {
-
+      _initializeCommandPermissions(client, guild.id);
 
       try { db.unmarkGuildPendingPurge(guild?.id); } catch {}
 
@@ -86,6 +86,19 @@ module.exports = {
     }
   },
 };
+
+function _initializeCommandPermissions(client, guildId) {
+  const defaults = new Map();
+
+  for (const command of client.commands.values()) {
+    const { name, defaultPermission } = command.help || {};
+    if (name && defaultPermission) defaults.set(name, defaultPermission);
+  }
+
+  for (const [commandName, permission] of defaults) {
+    db.setCmdPermIfAbsent(guildId, commandName, permission);
+  }
+}
 
 
 async function _sendServerJoinNotification(client, guild) {

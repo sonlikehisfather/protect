@@ -22,6 +22,7 @@ module.exports = {
     description : 'Affiche la bannière du serveur.',
     usage       : 'serverbanner',
     aliases     : ['guildbanner', 'sbanner'],
+    defaultPermission: 'everyone',
   },
 
   async run(client, message) {

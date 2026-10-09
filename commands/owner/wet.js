@@ -25,6 +25,7 @@ module.exports = {
     usage       : 'wet [@membre/ID] [raison] | unwet <@membre/ID>',
     aliases     : ['unwet'],
     category    : 'owner',
+    defaultPermission: 'buyer',
     selfManaged : true,
   },
 

@@ -18,6 +18,7 @@ module.exports = {
     description : 'Afficher les informations de wet d’un utilisateur.',
     usage       : 'wetinfo <@membre/ID>',
     category    : 'owner',
+    defaultPermission: 'buyer',
     selfManaged : true,
   },
 

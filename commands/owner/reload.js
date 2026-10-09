@@ -19,6 +19,18 @@ exports.help = {
   description: 'Recharger commandes/tracking sans reboot.',
   use        : 'reload <commande> | reload commands | reload tracking | reload all | reload events',
   usage      : 'reload <commande> | reload commands | reload tracking | reload all | reload events',
+  permissionScopes: [
+    {
+      permission : 'owner',
+      usage      : 'reload <commande|commands|tracking|all>',
+      description: 'Recharger une commande ou les commandes et le tracking.',
+    },
+    {
+      permission : 'buyer',
+      usage      : 'reload events',
+      description: 'Recharger les événements. Réservé aux Buyers.',
+    },
+  ],
 };
 
 exports.run = async (client, message, args) => {

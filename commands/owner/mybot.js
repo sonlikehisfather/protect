@@ -30,6 +30,7 @@ exports.help = {
   usage       : 'mybot',
   aliases     : ['addbot', 'invitebot', 'botinvite'],
   category    : 'owner',
+  defaultPermission: 'buyer',
 };
 
 exports.run = async (client, message) => {

@@ -7,9 +7,12 @@ const {
   ButtonStyle,
   ChannelType,
   ComponentType,
+  ContainerBuilder,
   MessageFlags,
   ModalBuilder,
+  SeparatorBuilder,
   StringSelectMenuBuilder,
+  TextDisplayBuilder,
   TextInputBuilder,
   TextInputStyle,
 } = require('discord.js');
@@ -28,12 +31,14 @@ const MAX_PING_ROLES = 5;
 const PANEL_IDLE     = 120_000;
 const PANEL_TIMEOUT  = 300_000;
 const MODAL_TIMEOUT  = 120_000;
+const COMPONENTS_V2_FLAG = MessageFlags?.IsComponentsV2 ?? (1 << 15);
 
 
 exports.help = {
   name        : 'report',
   description : 'Signaler un membre ou un message au staff.',
   usage       : 'report <@membre|reply> [raison] | report settings',
+  defaultPermission: 'everyone',
 };
 
 exports.run = async (client, message, args) => {
@@ -198,13 +203,11 @@ async function _handleReport(client, message, guildId, args, config) {
     );
   }
 
-  fields.push({
-    name   : 'Statistiques',
-    value  : `Report #${reportId} \u2022 ${reportCount} report(s) total contre ce membre.`,
-    inline : false,
-  });
-
-  const reportEmbed = embed.log(guildId, 'Nouveau report', fields);
+  const reportData = {
+    title: 'Nouveau signalement',
+    description: `Report **#${reportId}** · ${reportCount} signalement(s) au total contre ce membre.`,
+    fields,
+  };
 
   const buttonRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
@@ -224,22 +227,24 @@ async function _handleReport(client, message, guildId, args, config) {
     : null;
 
   const sentReport = await reportChannel.send({
-    content         : pingContent ?? undefined,
-    embeds          : [reportEmbed],
-    components      : [buttonRow],
-    allowedMentions : { roles: mentionRoles },
+    ..._buildV2Payload({
+      ...reportData,
+      description: [pingContent, reportData.description].filter(Boolean).join('\n'),
+      rows: [buttonRow],
+      allowedMentions: { roles: mentionRoles },
+    }),
   }).catch(() => null);
 
   if (!sentReport) {
     return _sendErr(message, 'Impossible d\'envoyer le report dans le salon configure.', deleteReply, deleteDelay);
   }
 
-  _attachStaffCollector(sentReport, guildId, reportId, reportEmbed, targetUser);
+  _attachStaffCollector(sentReport, guildId, reportId, reportData);
 
-  const sent = await embed.reply(
+  const sent = await _replyReport(
     message,
-    `Report #${reportId} envoye au staff.`,
-    { timestamp: false }
+    'Signalement envoyé',
+    `Ton signalement **#${reportId}** a été transmis au staff.`,
   ).catch(() => null);
 
   if (sent && deleteReply) {
@@ -299,15 +304,11 @@ async function _promptReasonSelect(message, targetUser, reasons, reasonRequired)
   );
 
   const prompt = await message.reply({
-    embeds: [
-      embed.build(
-        message.guild.id,
-        `Choisis une raison pour signaler **${targetUser.tag}**.`,
-        { title: 'Raison du report', timestamp: false }
-      ),
-    ],
-    components      : [selectRow, cancelRow],
-    allowedMentions : { parse: [] },
+    ..._buildV2Payload({
+      title: 'Signaler un membre',
+      description: `Choisis une raison pour **${targetUser.tag}** dans le menu ci-dessous.`,
+      rows: [selectRow, cancelRow],
+    }),
   }).catch(() => null);
 
   if (!prompt) return null;
@@ -368,17 +369,13 @@ async function _promptReasonModal(message, reasonRequired) {
   );
 
   const prompt = await message.reply({
-    embeds: [
-      embed.build(
-        message.guild.id,
-        reasonRequired
-          ? 'Clique sur **Saisir une raison** pour preciser ton signalement.'
-          : 'Clique sur **Saisir une raison** (facultatif) ou Annuler.',
-        { title: 'Raison du report', timestamp: false }
-      ),
-    ],
-    components      : [openRow],
-    allowedMentions : { parse: [] },
+    ..._buildV2Payload({
+      title: 'Raison du signalement',
+      description: reasonRequired
+        ? 'Clique sur **Saisir une raison** pour préciser ton signalement.'
+        : 'Clique sur **Saisir une raison** (facultatif) ou **Annuler**.',
+      rows: [openRow],
+    }),
   }).catch(() => null);
 
   if (!prompt) return null;
@@ -440,11 +437,10 @@ async function _promptReasonModalFromInteraction(interaction, reasonRequired) {
 
   if (!raw) {
     if (reasonRequired) {
-      await submitted.reply({
-        embeds          : [embed.build(submitted.guild?.id, 'Raison requise. Opération annulée.', { timestamp: false })],
-        flags           : MessageFlags.Ephemeral,
-        allowedMentions : { parse: [] },
-      }).catch(() => {});
+      await submitted.reply(_interactionTextPayload(
+        'Signalement annulé',
+        'Une raison est obligatoire.',
+      )).catch(() => {});
       return '__ABORT__';
     }
     await submitted.deferUpdate().catch(() => {});
@@ -452,11 +448,10 @@ async function _promptReasonModalFromInteraction(interaction, reasonRequired) {
   }
 
   if (raw.length < REASON_MIN) {
-    await submitted.reply({
-      embeds          : [embed.build(submitted.guild?.id, `La raison doit faire au moins **${REASON_MIN}** caracteres.`, { timestamp: false })],
-      flags           : MessageFlags.Ephemeral,
-      allowedMentions : { parse: [] },
-    }).catch(() => {});
+    await submitted.reply(_interactionTextPayload(
+      'Raison trop courte',
+      `La raison doit faire au moins **${REASON_MIN} caractères**.`,
+    )).catch(() => {});
     return '__ABORT__';
   }
   if (raw.length > REASON_MAX) {
@@ -485,7 +480,7 @@ function _validateReason(raw, config) {
 }
 
 
-function _attachStaffCollector(reportMessage, guildId, reportId, originalEmbed, targetUser) {
+function _attachStaffCollector(reportMessage, guildId, reportId, reportData) {
 
 
   const collector = reportMessage.createMessageComponentCollector({
@@ -499,11 +494,10 @@ function _attachStaffCollector(reportMessage, guildId, reportId, originalEmbed, 
   collector.on('collect', async interaction => {
     try {
       if (!perms.check(interaction, 'reportconfig')) {
-        await interaction.reply({
-          embeds          : [embed.build(guildId, 'Permission insuffisante.', { timestamp: false })],
-          flags           : MessageFlags.Ephemeral,
-          allowedMentions : { parse: [] },
-        }).catch(() => {});
+        await interaction.reply(_interactionTextPayload(
+          'Action réservée au staff',
+          'Tu n’as pas la permission de traiter ce signalement.',
+        )).catch(() => {});
         return;
       }
 
@@ -517,24 +511,17 @@ function _attachStaffCollector(reportMessage, guildId, reportId, originalEmbed, 
       }
 
 
-      const fields = (originalEmbed.data?.fields ?? []).slice();
-      fields.push({
-        name   : isHandle ? 'Traite par' : 'Rejete par',
-        value  : `<@${interaction.user.id}> (${interaction.user.tag})`,
-        inline : false,
-      });
-
-      const updated = embed.log(
-        guildId,
-        isHandle ? 'Report traite' : 'Report rejete',
-        fields,
-        { color: isHandle ? 0x2ECC71 : 0xE74C3C },
-      );
-
-      await interaction.update({
-        embeds     : [updated],
-        components : [],
-      }).catch(() => {});
+      await interaction.update(_buildV2Payload({
+        ...reportData,
+        title: isHandle ? 'Signalement traité' : 'Signalement rejeté',
+        fields: [
+          ...reportData.fields,
+          {
+            name: isHandle ? 'Traité par' : 'Rejeté par',
+            value: `<@${interaction.user.id}> (${interaction.user.tag})`,
+          },
+        ],
+      })).catch(() => {});
 
       collector.stop('done');
     } catch (err) {
@@ -578,11 +565,9 @@ async function _cliToggle(message, guildId, enabled, config) {
 
   db.setGuildConfig(guildId, 'reportEnabled', enabled);
 
-  const sent = await embed.reply(
-    message,
-    enabled ? 'Système de reports activé.' : 'Système de reports désactivé.',
-    { timestamp: false }
-  ).catch(() => null);
+  const sent = await _replyReport(message, 'État mis à jour', enabled
+    ? 'Le système de signalements est maintenant **activé**.'
+    : 'Le système de signalements est maintenant **désactivé**.');
 
   if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
 }
@@ -607,11 +592,7 @@ async function _cliChannel(message, guildId, args, config) {
     }
     db.setGuildConfig(guildId, 'reportChannel', null);
     db.setGuildConfig(guildId, 'reportEnabled', 0);
-    const sent = await embed.reply(
-      message,
-      'Salon retiré, système désactivé.',
-      { timestamp: false }
-    ).catch(() => null);
+    const sent = await _replyReport(message, 'Salon retiré', 'Le système de signalements a été désactivé.');
     if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
     return;
   }
@@ -630,12 +611,11 @@ async function _cliChannel(message, guildId, args, config) {
 
   if (
     !botPerms?.has('ViewChannel') ||
-    !botPerms?.has('SendMessages') ||
-    !botPerms?.has('EmbedLinks')
+    !botPerms?.has('SendMessages')
   ) {
     return _sendErr(
       message,
-      `Je n'ai pas les permissions nécessaires dans <#${channel.id}> : Voir le salon, Envoyer des messages, Intégrer des liens.`,
+      `Je n'ai pas les permissions nécessaires dans <#${channel.id}> : Voir le salon et Envoyer des messages.`,
       deleteReply,
       deleteDelay
     );
@@ -643,65 +623,58 @@ async function _cliChannel(message, guildId, args, config) {
 
   db.setGuildConfig(guildId, 'reportChannel', channel.id);
 
-  const sent = await embed.reply(
-    message,
-    `Salon de reports defini sur <#${channel.id}>.`,
-    { timestamp: false }
-  ).catch(() => null);
+  const sent = await _replyReport(message, 'Salon défini', `Les signalements seront envoyés dans <#${channel.id}>.`);
   if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
 }
 
 
 async function _openSettingsPanel(client, message, guildId) {
-  const buildPayload = () => {
+  const buildPayload = (disabled = false) => {
     const cfg = db.getGuildConfig(guildId) || {};
     const reasons      = _parseJsonArray(cfg.reportReasons);
     const mentionRoles = _parseJsonArray(cfg.reportMentionRoles);
 
-    const fields = [
-      { name: 'État',                value: Number(cfg.reportEnabled) ? 'Activé' : 'Désactivé',                      inline: true },
-      { name: 'Salon',               value: cfg.reportChannel ? `<#${cfg.reportChannel}>` : 'Aucun',                  inline: true },
-      { name: 'Raison obligatoire',  value: Number(cfg.reportReasonRequired ?? 1) ? 'Oui' : 'Non',                   inline: true },
-      {
-        name  : `Raisons préconfigurées (${reasons.length}/${MAX_REASONS})`,
-        value : reasons.length
-          ? reasons.map((r, i) => `\`${i + 1}.\` ${String(r).slice(0, 100)}`).join('\n').slice(0, 1000)
-          : 'Aucune. Une raison libre sera demandée a l\'utilisateur.',
-        inline: false,
-      },
-      {
-        name  : `Rôles mentionnés (${mentionRoles.length}/${MAX_PING_ROLES})`,
-        value : mentionRoles.length
-          ? mentionRoles.map(id => `<@&${id}>`).join(', ')
-          : 'Aucun.',
-        inline: false,
-      },
-    ];
+    const reasonSummary = reasons.length
+      ? reasons.map((reason, index) => `\`${index + 1}.\` ${String(reason).slice(0, 100)}`).join('\n')
+      : 'Aucune raison prédéfinie. Une raison libre sera demandée.';
+    const roleSummary = mentionRoles.length
+      ? mentionRoles.map(id => `<@&${id}>`).join(', ')
+      : 'Aucun rôle ne sera mentionné.';
+    const description = [
+      `**État** · ${Number(cfg.reportEnabled) ? '🟢 Activé' : '⚪ Désactivé'}`,
+      `**Salon de réception** · ${cfg.reportChannel ? `<#${cfg.reportChannel}>` : 'Non configuré'}`,
+      `**Raison obligatoire** · ${Number(cfg.reportReasonRequired ?? 1) ? 'Oui' : 'Non'}`,
+      '',
+      `**Raisons prédéfinies · ${reasons.length}/${MAX_REASONS}**`,
+      reasonSummary,
+      '',
+      `**Rôles notifiés · ${mentionRoles.length}/${MAX_PING_ROLES}**`,
+      roleSummary,
+      '',
+      '-# Choisis une action dans le menu pour modifier la configuration.',
+    ].join('\n');
 
     const selectRow = new ActionRowBuilder().addComponents(
       new StringSelectMenuBuilder()
         .setCustomId('local:reportset:action')
         .setPlaceholder('Choisir une action...')
+        .setDisabled(disabled)
         .addOptions(
-          { label: 'Activer / Désactiver',          value: 'toggle',    emoji: '\uD83D\uDD01' },
-          { label: 'Définir le salon',              value: 'channel',   emoji: '\uD83D\uDCCD' },
-          { label: 'Toggle raison obligatoire',     value: 'required',  emoji: '\u2754' },
-          { label: 'Ajouter une raison',            value: 'reason_add',emoji: '\u2795' },
-          { label: 'Retirer une raison',            value: 'reason_del',emoji: '\u2796' },
-          { label: 'Définir rôles mentionnés',      value: 'roles',     emoji: '\uD83D\uDC65' },
-          { label: 'Fermer',                        value: 'close',     emoji: '\u274C' },
+          { label: 'Activer / désactiver', value: 'toggle',     description: 'Changer l’état du système', emoji: '\uD83D\uDD01' },
+          { label: 'Choisir le salon',     value: 'channel',    description: 'Définir où les signalements arrivent', emoji: '\uD83D\uDCCD' },
+          { label: 'Raison obligatoire',   value: 'required',   description: 'Rendre la raison facultative ou obligatoire', emoji: '\u2754' },
+          { label: 'Ajouter une raison',   value: 'reason_add', description: 'Ajouter un motif prédéfini', emoji: '\u2795' },
+          { label: 'Retirer une raison',   value: 'reason_del', description: 'Supprimer un motif prédéfini', emoji: '\u2796' },
+          { label: 'Rôles notifiés',       value: 'roles',      description: 'Choisir les rôles à mentionner', emoji: '\uD83D\uDC65' },
+          { label: 'Fermer le panneau',    value: 'close',      description: 'Fermer ce panneau', emoji: '\u274C' },
         ),
     );
 
-    return {
-      embeds : [embed.build(guildId, null, {
-        title     : 'Configuration des reports',
-        fields,
-        timestamp : false,
-      })],
-      components      : [selectRow],
-      allowedMentions : { parse: [] },
-    };
+    return _buildV2Payload({
+      title: 'Centre de signalements',
+      description,
+      rows: [selectRow],
+    });
   };
 
   const panel = await message.reply(buildPayload()).catch(() => null);
@@ -747,7 +720,7 @@ async function _openSettingsPanel(client, message, guildId) {
   collector.on('end', (_, reason) => {
     embed.clearPrivateInteraction(panel);
     if (reason === 'closed') return;
-    panel.edit({ components: [] }).catch(() => {});
+    panel.edit(buildPayload(true)).catch(() => {});
   });
 }
 
@@ -757,11 +730,10 @@ async function _applySettingsAction(interaction, guildId, action) {
   if (action === 'toggle') {
     const current = Number(cfg.reportEnabled);
     if (!current && !cfg.reportChannel) {
-      await interaction.reply({
-        embeds          : [embed.build(guildId, 'Définissez d\'abord un salon.', { timestamp: false })],
-        flags           : MessageFlags.Ephemeral,
-        allowedMentions : { parse: [] },
-      }).catch(() => {});
+      await interaction.reply(_interactionTextPayload(
+        'Salon manquant',
+        'Définis d’abord le salon de réception avant d’activer le système.',
+      )).catch(() => {});
       return;
     }
     db.setGuildConfig(guildId, 'reportEnabled', current ? 0 : 1);
@@ -792,11 +764,10 @@ async function _applySettingsAction(interaction, guildId, action) {
     const clean = value.replace(/[<#>]/g, '').trim();
     const ch    = interaction.guild.channels.cache.get(clean);
     if (!ch || ![ChannelType.GuildText, ChannelType.GuildAnnouncement].includes(ch.type)) {
-      await interaction.followUp({
-        embeds          : [embed.build(guildId, 'Salon invalide.', { timestamp: false })],
-        flags           : MessageFlags.Ephemeral,
-        allowedMentions : { parse: [] },
-      }).catch(() => {});
+      await interaction.followUp(_interactionTextPayload(
+        'Salon invalide',
+        'Choisis un salon textuel de ce serveur.',
+      )).catch(() => {});
       return;
     }
     db.setGuildConfig(guildId, 'reportChannel', ch.id);
@@ -806,11 +777,10 @@ async function _applySettingsAction(interaction, guildId, action) {
   if (action === 'reason_add') {
     const reasons = _parseJsonArray(cfg.reportReasons);
     if (reasons.length >= MAX_REASONS) {
-      await interaction.reply({
-        embeds          : [embed.build(guildId, `Limite ${MAX_REASONS} raisons atteinte.`, { timestamp: false })],
-        flags           : MessageFlags.Ephemeral,
-        allowedMentions : { parse: [] },
-      }).catch(() => {});
+      await interaction.reply(_interactionTextPayload(
+        'Limite atteinte',
+        `Tu peux configurer jusqu’à **${MAX_REASONS} raisons**.`,
+      )).catch(() => {});
       return;
     }
     const value = await _modalInput(interaction, {
@@ -824,11 +794,10 @@ async function _applySettingsAction(interaction, guildId, action) {
 
     const trimmed = value.trim().slice(0, 100);
     if (reasons.some(r => String(r).toLowerCase() === trimmed.toLowerCase())) {
-      await interaction.followUp({
-        embeds          : [embed.build(guildId, 'Cette raison existe déjà.', { timestamp: false })],
-        flags           : MessageFlags.Ephemeral,
-        allowedMentions : { parse: [] },
-      }).catch(() => {});
+      await interaction.followUp(_interactionTextPayload(
+        'Raison déjà présente',
+        'Cette raison existe déjà dans la liste.',
+      )).catch(() => {});
       return;
     }
     reasons.push(trimmed);
@@ -839,11 +808,10 @@ async function _applySettingsAction(interaction, guildId, action) {
   if (action === 'reason_del') {
     const reasons = _parseJsonArray(cfg.reportReasons);
     if (!reasons.length) {
-      await interaction.reply({
-        embeds          : [embed.build(guildId, 'Aucune raison configuree.', { timestamp: false })],
-        flags           : MessageFlags.Ephemeral,
-        allowedMentions : { parse: [] },
-      }).catch(() => {});
+      await interaction.reply(_interactionTextPayload(
+        'Aucune raison configurée',
+        'Ajoute d’abord une raison prédéfinie.',
+      )).catch(() => {});
       return;
     }
     const value = await _modalInput(interaction, {
@@ -862,11 +830,10 @@ async function _applySettingsAction(interaction, guildId, action) {
 
     const idx = Number(value.trim()) - 1;
     if (!Number.isInteger(idx) || idx < 0 || idx >= reasons.length) {
-      await interaction.followUp({
-        embeds          : [embed.build(guildId, 'Numéro invalide.', { timestamp: false })],
-        flags           : MessageFlags.Ephemeral,
-        allowedMentions : { parse: [] },
-      }).catch(() => {});
+      await interaction.followUp(_interactionTextPayload(
+        'Numéro invalide',
+        'Choisis un numéro présent dans la liste ou `all`.',
+      )).catch(() => {});
       return;
     }
     reasons.splice(idx, 1);
@@ -902,11 +869,10 @@ async function _applySettingsAction(interaction, guildId, action) {
     const valid = ids.filter(id => interaction.guild.roles.cache.has(id));
 
     if (!valid.length) {
-      await interaction.followUp({
-        embeds          : [embed.build(guildId, 'Aucun rôle valide détecté.', { timestamp: false })],
-        flags           : MessageFlags.Ephemeral,
-        allowedMentions : { parse: [] },
-      }).catch(() => {});
+      await interaction.followUp(_interactionTextPayload(
+        'Aucun rôle valide',
+        'Mentionne au moins un rôle existant sur ce serveur.',
+      )).catch(() => {});
       return;
     }
 
@@ -959,11 +925,51 @@ function _parseJsonArray(raw) {
 }
 
 async function _sendErr(message, text, deleteReply, deleteDelay) {
-  const sent = await embed.replyError(
-    message,
-    text,
-    { timestamp: false }
-  ).catch(() => null);
+  const sent = await _replyReport(message, 'Impossible de continuer', text).catch(() => null);
   if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
   return null;
+}
+
+async function _replyReport(message, title, description) {
+  return message.reply(_buildV2Payload({ title, description }));
+}
+
+function _interactionTextPayload(title, description) {
+  return _buildV2Payload({
+    title,
+    description,
+    flags: COMPONENTS_V2_FLAG | MessageFlags.Ephemeral,
+  });
+}
+
+function _buildV2Payload({
+  title,
+  description = '',
+  fields = [],
+  rows = [],
+  allowedMentions = { parse: [] },
+  flags = COMPONENTS_V2_FLAG,
+}) {
+  const container = new ContainerBuilder();
+  const sections = [`## ${title}`];
+
+  if (description) sections.push(description);
+  for (const field of fields) {
+    sections.push('', `**${field.name}**`, String(field.value ?? '—'));
+  }
+
+  const content = sections.join('\n').slice(0, 4000);
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(content || '## Signalement'));
+
+  if (rows.length) {
+    container.addSeparatorComponents(new SeparatorBuilder());
+    for (const row of rows) container.addActionRowComponents(row);
+  }
+
+  return {
+    embeds: [],
+    components: [container],
+    flags,
+    allowedMentions,
+  };
 }

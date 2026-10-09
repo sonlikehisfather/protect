@@ -27,7 +27,11 @@ exports.run = async (client, message, args) => {
     return embed.replyError(message, 'Utilisation : `+changeall <ancienne> <nouvelle>` - Ex : `+changeall perm3 perm4`');
   }
 
-  if (!perms.canEditPerm(message, from) || !perms.canEditPerm(message, to)) {
+  if (
+    !perms.canEditPerm(message, from, guildId) ||
+    !perms.canEditPerm(message, to, guildId) ||
+    !perms.canEditCommandPermGroup(message, client, guildId, from, to)
+  ) {
     return embed.replyError(
       message,
       'Vous ne pouvez pas modifier ces permissions.'

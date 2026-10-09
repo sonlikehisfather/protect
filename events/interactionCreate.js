@@ -226,6 +226,9 @@ async function _handleSlash(client, interaction) {
 async function _handleButton(client, interaction) {
   const id = interaction.customId;
 
+  if (id.startsWith('local:report:')) {
+    return;
+  }
 
   if (id.startsWith('rr:')) {
     return;
@@ -642,6 +645,10 @@ async function _handleServerLeaveButton(client, interaction, id) {
 async function _handleSelectMenu(client, interaction) {
   const id = interaction.customId;
   console.log(`[SELECT-MENU] Received: ${id}, type=${interaction.componentType}, user=${interaction.user.id}`);
+
+  if (id.startsWith('local:report:') || id.startsWith('local:reportset:')) {
+    return;
+  }
 
   if (id.startsWith('ticket_rating:')) {
     return tickets.handleRating(interaction);

@@ -13,6 +13,7 @@ exports.help = {
   use         : 'cleandm <@membre|id|all>',
   usage       : 'cleandm <@membre|id|all>',
   category    : 'owner',
+  defaultPermission: 'buyer',
 };
 
 exports.run = async (client, message, args) => {

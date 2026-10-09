@@ -56,39 +56,80 @@ module.exports = {
     const pingStr = wsPing < 0 ? '-' : `${wsPing}ms`;
 
     {
-      const W    = 44;
-      const R    = '\x1b[0m';
-      const CYAN = '\x1b[96m';
-      const GRN  = '\x1b[92m';
-      const hr   = `${CYAN}├${'─'.repeat(W)}┤${R}`;
-      const bTop = `${CYAN}┌${'─'.repeat(W)}┐${R}`;
-      const bBot = `${CYAN}└${'─'.repeat(W)}┘${R}`;
-      const brow = (label, val) => {
-        const inner = `  ${label.padEnd(12)}${String(val)}`;
-        return `${CYAN}│${R}${inner.padEnd(W)}${CYAN}│${R}`;
-      };
-      const trow = (text) => {
-        const inner = `  ${text}`;
-        return `${CYAN}│${R}${GRN}${inner.padEnd(W)}${R}${CYAN}│${R}`;
-      };
       const cmdCount   = client.__cmdCount         ?? client.commands.size;
       const evtModules = client.__eventModuleCount ?? '?';
       const evtTypes   = client.__eventTypeCount   ?? client.eventNames().length;
-      console.log('');
-      console.log(bTop);
-      console.log(trow(`${client.user.tag} est en ligne`));
-      console.log(hr);
-      console.log(brow('Guilds',     client.guilds.cache.size));
-      console.log(brow('Membres',    memberCount));
-      console.log(brow('Latence',    pingStr));
-      console.log(brow('Node.js',    process.version));
-      console.log(brow('discord.js', `v${djsVersion}`));
-      console.log(brow('Env',        process.env.NODE_ENV ?? 'development'));
-      console.log(hr);
-      console.log(brow('Commandes',  `${cmdCount} prefix`));
-      console.log(brow('Events',     `${evtModules} modules / ${evtTypes} types`));
-      console.log(bBot);
-      console.log('');
+      const RESET = '\x1b[0m';
+      const DIM = '\x1b[2m';
+      const BOLD = '\x1b[1m';
+      const CYAN = '\x1b[96m';
+      const WHITE = '\x1b[97m';
+      const GREEN = '\x1b[92m';
+      const BLUE = '\x1b[94m';
+      const AMBER = '\x1b[93m';
+      const RED = '\x1b[91m';
+      const paint = (color, value) => `${color}${value}${RESET}`;
+      const environment = process.env.NODE_ENV ?? 'development';
+      const pingColor = wsPing < 0 ? AMBER : wsPing < 150 ? GREEN : wsPing < 300 ? AMBER : RED;
+      const envColor = environment === 'production' ? GREEN : AMBER;
+      const leftColumn = [
+        { label: 'GUILDS', value: client.guilds.cache.size, color: BLUE },
+        { label: 'MEMBERS', value: memberCount, color: BLUE },
+        { label: 'GATEWAY', value: pingStr, color: pingColor },
+      ];
+      const rightColumn = [
+        { label: 'NODE.JS', value: process.version, color: WHITE },
+        { label: 'DISCORD.JS', value: `v${djsVersion}`, color: WHITE },
+        { label: 'ENVIRONMENT', value: environment, color: envColor },
+      ];
+      const columnWidth = Math.max(
+        28,
+        ...leftColumn.map(({ label, value }) => Math.max(12, label.length) + 2 + String(value).length),
+        ...rightColumn.map(({ label, value }) => Math.max(12, label.length) + 2 + String(value).length),
+      );
+      const metricWidth = ({ label, value }) => Math.max(12, label.length) + 2 + String(value).length;
+      const systemMetrics = [
+        { label: 'COMMANDS', value: `${cmdCount} prefix`, color: BLUE },
+        { label: 'EVENT MODULES', value: evtModules, color: BLUE },
+        { label: 'EVENT TYPES', value: evtTypes, color: BLUE },
+      ];
+      const systemContentWidth = systemMetrics.reduce((total, item) => total + metricWidth(item), 0) + 4;
+      const innerWidth = Math.max(columnWidth * 2 + 5, systemContentWidth + 2);
+      const rule = `${CYAN}├${'─'.repeat(innerWidth)}┤${RESET}`;
+      const frame = (left, leftWidth, right, rightWidth) => {
+        const gap = innerWidth - leftWidth - rightWidth - 2;
+        return `${CYAN}│${RESET} ${left}${' '.repeat(Math.max(1, gap))}${right} ${CYAN}│${RESET}`;
+      };
+      const section = title => {
+        const text = `─  ${title}  `;
+        return `${CYAN}├${paint(CYAN, text)}${'─'.repeat(innerWidth - text.length)}┤${RESET}`;
+      };
+      const metric = ({ label, value, color }) =>
+        `${DIM}${label.padEnd(12)}  ${RESET}${paint(color, String(value))}`;
+      const paddedMetric = (item, width) =>
+        `${metric(item)}${' '.repeat(Math.max(0, width - metricWidth(item)))}`;
+      const columnGap = Math.max(1, innerWidth - columnWidth * 2 - 4);
+      const columnRow = (left, right) =>
+        `${CYAN}│${RESET} ${paddedMetric(left, columnWidth)} ${CYAN}│${RESET}${' '.repeat(columnGap)}${paddedMetric(right, columnWidth)} ${CYAN}│${RESET}`;
+      const systemRow = `${CYAN}│${RESET} ${systemMetrics.map(metric).join('  ')} ${CYAN}│${RESET}`;
+      const titleText = '◆  PROTECT';
+      const onlineText = '● ONLINE';
+      const identityText = client.user.tag;
+      const taglineText = 'Discord bot  ·  Ready to serve';
+      const output = [
+        '',
+        `${CYAN}╭${'─'.repeat(innerWidth)}╮${RESET}`,
+        frame(paint(BOLD + CYAN, titleText), titleText.length, paint(BOLD + GREEN, onlineText), onlineText.length),
+        frame(paint(WHITE, identityText), identityText.length, paint(DIM, taglineText), taglineText.length),
+        rule,
+        section('NETWORK'),
+        ...leftColumn.map((left, index) => columnRow(left, rightColumn[index])),
+        section('BOT SYSTEMS'),
+        systemRow,
+        `${CYAN}╰${'─'.repeat(innerWidth)}╯${RESET}`,
+        '',
+      ].join('\n');
+      console.log(output);
     }
 
     await deploySlash(client);

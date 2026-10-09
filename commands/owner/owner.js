@@ -10,6 +10,18 @@ exports.help = {
   use        : 'owner [@membre|id]',
   usage      : 'owner [@membre|id]',
   aliases    : ['owners'],
+  permissionScopes: [
+    {
+      permission : 'owner',
+      usage      : 'owners',
+      description: 'Afficher les owners du serveur. Accessible aux Owners et Buyers.',
+    },
+    {
+      permission : 'buyer',
+      usage      : 'owner <@membre|id>',
+      description: 'Ajouter ou retirer un Owner du serveur. Réservé aux Buyers.',
+    },
+  ],
 };
 
 exports.run = async (client, message, args) => {

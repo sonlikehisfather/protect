@@ -51,6 +51,9 @@ function isGlobalBuyer(userId) {
   return isBuyer(userId);
 }
 
+function resolveCommandPermission(configuredPermission, defaultPermission = null) {
+  return configuredPermission ?? defaultPermission ?? 'owner';
+}
 
 function check(message, commandName, defaultPermission = null) {
 
@@ -62,10 +65,10 @@ function check(message, commandName, defaultPermission = null) {
 
   if (isBuyer(userId)) return true;
 
-  const required =
-    db.getCmdPerm(guildId, commandName)
-    ?? defaultPermission
-    ?? 'everyone';
+  const required = resolveCommandPermission(
+    db.getConfiguredCmdPerm(guildId, commandName),
+    defaultPermission ?? db.getCmdPerm(guildId, commandName),
+  );
 
   const cmdTargets = db.getCmdTargets(guildId, commandName);
   if (cmdTargets.length) {
@@ -274,38 +277,80 @@ function permLabel(perm) {
 
 
 function canEditPerm(message, targetPerm, guildId = null) {
+  return canAssignPermission(message, targetPerm, guildId);
+}
 
-  if (!message?.author)
-    return false;
+function _permissionRank(permission) {
+  if (permission === 'everyone' || permission === 'public') return 0;
+  if (/^[1-9]$/.test(String(permission))) return Number(permission);
+  if (permission === 'owner') return 10;
+  if (permission === 'buyer') return 11;
+  return null;
+}
 
-  const userId = message.author.id;
+function _memberAuthority(message, guildId) {
+  const userId = message?.author?.id;
+  if (!userId) return 0;
+  if (isSuperAdmin(userId)) return Number.POSITIVE_INFINITY;
+  if (isBuyer(userId)) return 11;
+  if (isOwner(guildId, userId)) return 10;
+  if (message.member) return getMemberLevel(message.member, guildId);
+  return 0;
+}
 
+function canManagePermission(message, permission, guildId) {
+  const requiredRank = _permissionRank(permission);
+  if (requiredRank == null || !message?.author) return false;
 
-  if (isSuperAdmin(userId))
-    return true;
+  return _memberAuthority(message, guildId) >= requiredRank;
+}
 
-
-  if (isBuyer(userId)) {
-
-    if (targetPerm === 'buyer')
-      return false;
-
-    return true;
+function canAssignPermission(message, permission, guildId) {
+  if (permission === 'buyer') {
+    return isSuperAdmin(message?.author?.id);
   }
+  return canManagePermission(message, permission, guildId);
+}
 
+function canEditCommandPerm(message, client, guildId, commandName) {
+  const userId = message?.author?.id;
+  if (!userId) return false;
 
-  if (guildId && isOwner(guildId, userId)) {
+  const command = client.commands.get(commandName);
+  const canonicalName = command?.help?.name || commandName;
+  const configuredPermission = db.getConfiguredCmdPerm(guildId, canonicalName);
+  const currentPermission = resolveCommandPermission(
+    configuredPermission,
+    command?.help?.defaultPermission ?? db.getCmdPerm(guildId, canonicalName),
+  );
 
-    if (targetPerm === 'buyer')
-      return false;
+  if (
+    !isBuyer(userId) &&
+    (command?.help?.defaultPermission === 'buyer' || configuredPermission === 'buyer')
+  ) return false;
 
-    if (targetPerm === 'owner')
-      return false;
+  return canManagePermission(message, currentPermission, guildId);
+}
 
-    return true;
-  }
+function canEditCommandPermGroup(message, client, guildId, fromPerm, toPerm = fromPerm) {
+  if (
+    !canManagePermission(message, fromPerm, guildId) ||
+    !canAssignPermission(message, toPerm, guildId)
+  ) return false;
 
-  return false;
+  return db.getAllCmdPerms(guildId)
+    .filter(row => row.perm === fromPerm)
+    .every(row => canEditCommandPerm(message, client, guildId, row.commandName));
+}
+
+function canResetCommandPerms(message, client, guildId) {
+  return db.getAllCmdPerms(guildId)
+    .every(row => {
+      if (!canEditCommandPerm(message, client, guildId, row.commandName)) return false;
+      const command = client.commands.get(row.commandName);
+      const defaultPermission = command?.help?.defaultPermission ?? 'owner';
+      return canAssignPermission(message, defaultPermission, guildId);
+    });
 }
 
 
@@ -320,7 +365,13 @@ module.exports = {
   getSuperAdminId,
   isOwner,
 
+  resolveCommandPermission,
   check,
+  canEditCommandPerm,
+  canEditCommandPermGroup,
+  canResetCommandPerms,
+  canManagePermission,
+  canAssignPermission,
 
   getMemberLevel,
   hasLevel,

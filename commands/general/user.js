@@ -25,6 +25,7 @@ module.exports = {
     description : 'Affiche les informations relatives à un utilisateur.',
     usage       : 'user [membre]',
     aliases     : ['userinfo', 'ui'],
+    defaultPermission: 'everyone',
   },
 
   async run(client, message, args) {

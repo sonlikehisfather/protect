@@ -23,6 +23,7 @@ module.exports = {
     description : "Affiche la photo de profil d'un utilisateur.",
     usage       : 'pic [membre]',
     aliases     : ['avatar', 'pp'],
+    defaultPermission: 'everyone',
   },
 
   async run(client, message, args) {

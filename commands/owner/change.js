@@ -44,7 +44,14 @@ exports.run = async (client, message, args) => {
     if (!perms.isBuyer(authorId) && !perms.isOwner(guildId, authorId)) {
       return embed.replyError(
         message,
-        'Seul le buyer ou un owner peut réinitialiser toutes les permissions.'
+        'Seul un Buyer ou un Owner peut réinitialiser les permissions.'
+      );
+    }
+
+    if (!perms.canResetCommandPerms(message, client, guildId)) {
+      return embed.replyError(
+        message,
+        'Impossible de réinitialiser les permissions : cette action modifierait une commande réservée aux Buyers.'
       );
     }
 
@@ -67,6 +74,13 @@ exports.run = async (client, message, args) => {
       return embed.reply(
         message,
         'Réinitialisation annulée.'
+      );
+    }
+
+    if (!perms.canResetCommandPerms(message, client, guildId)) {
+      return embed.replyError(
+        message,
+        'Impossible de réinitialiser les permissions : cette action modifierait une commande réservée aux Buyers.'
       );
     }
 
@@ -174,9 +188,21 @@ exports.run = async (client, message, args) => {
     );
   }
 
-  const currentPerm = db.getCmdPerm(guildId, command.help.name) ?? 'everyone';
+  if (!perms.canEditCommandPerm(message, client, guildId, command.help.name)) {
+    return embed.replyError(
+      message,
+      'Cette commande est réservée aux Buyers et sa permission ne peut être modifiée que par un Buyer.'
+    );
+  }
 
-  if (!perms.canEditPerm(message, currentPerm) || !perms.canEditPerm(message, perm)) {
+  const currentPerm = db.getConfiguredCmdPerm(guildId, command.help.name)
+    ?? command.help.defaultPermission
+    ?? 'owner';
+
+  if (
+    !perms.canEditPerm(message, currentPerm, guildId) ||
+    !perms.canEditPerm(message, perm, guildId)
+  ) {
     return embed.replyError(
       message,
       'Vous ne pouvez pas modifier ces permissions.'

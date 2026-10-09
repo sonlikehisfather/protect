@@ -24,6 +24,18 @@ exports.help = {
   usage      : 'bl [@membre/ID] [raison]',
   aliases    : ['blacklist'],
   defaultPermission: 'owner',
+  permissionScopes: [
+    {
+      permission : 'owner',
+      usage      : 'bl [@membre/ID] [raison]',
+      description: 'Afficher ou modifier la blacklist du serveur. Réservé aux Owners et Buyers.',
+    },
+    {
+      permission : 'buyer',
+      usage      : 'bl clear confirm',
+      description: 'Vider toute la blacklist du serveur. Réservé aux Buyers.',
+    },
+  ],
 };
 
 exports.run = async (client, message, args) => {

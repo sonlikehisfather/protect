@@ -147,7 +147,9 @@ function _replyNative(message, guildId, command, cmdName, hasCustomDuplicate, pr
   const realName = help.name || cmdName;
   const perm     = help.permission || null;
 
-  const dbPerm  = db.getCmdPerm(guildId, realName);
+  const dbPerm  = db.getConfiguredCmdPerm(guildId, realName)
+    ?? help.defaultPermission
+    ?? db.getCmdPerm(guildId, realName);
   const dbLabel = PERM_LABELS[dbPerm] || dbPerm;
 
   const aliases  = help.aliases?.length

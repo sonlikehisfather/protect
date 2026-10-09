@@ -6,11 +6,24 @@ const perms = require('../../utils/permissions');
 
 exports.help = {
   name        : 'buyer',
-  description : 'Toggle buyer global (super admin seulement). Sans argument : liste.',
+  description : 'Gérer les Buyers : la liste est visible par les Buyers, leur gestion est réservée au Buyer principal.',
   use         : 'buyer [@membre|id]',
   usage       : 'buyer [@membre|id]',
   category    : 'owner',
   aliases     : ['buyers'],
+  defaultPermission: 'buyer',
+  permissionScopes: [
+    {
+      permission : 'buyer',
+      usage      : 'buyers',
+      description: 'Afficher la liste des Buyers. Accessible aux Buyers.',
+    },
+    {
+      permission : 'buyerPrincipal',
+      usage      : 'buyer <@membre|id>',
+      description: 'Ajouter ou retirer un Buyer. Réservé au Buyer principal.',
+    },
+  ],
 };
 
 exports.run = async (client, message, args) => {

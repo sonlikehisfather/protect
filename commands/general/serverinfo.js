@@ -38,6 +38,7 @@ module.exports = {
     description : 'Affiche les informations du serveur.',
     usage       : 'serverinfo',
     aliases     : ['guildinfo', 'si'],
+    defaultPermission: 'everyone',
   },
 
   async run(client, message) {

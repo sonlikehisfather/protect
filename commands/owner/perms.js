@@ -17,6 +17,18 @@ exports.help = {
   use        : 'perms <action> [args]',
   usage      : 'perms <action> [args]',
   multi      : true,
+  permissionScopes: [
+    {
+      permission : 'owner',
+      usage      : 'perms <list|set|del|cmd|cmdall|cmdreset>',
+      description: 'Consulter ou gérer les permissions. Réservé aux Owners et Buyers.',
+    },
+    {
+      permission : 'buyer',
+      usage      : 'perms clear',
+      description: 'Effacer les permissions du serveur. Réservé aux Buyers.',
+    },
+  ],
 };
 
 
@@ -53,7 +65,13 @@ exports.run = async (client, message, args) => {
         return embed.replyError(message, 'Utilisation : `perms cmd <commande> <1-9|owner|buyer|public|everyone>`');
       }
 
-      if (!perms.canEditPerm(message, perm)) {
+      const command = client.commands.get(cmdName);
+      const commandName = command?.help?.name || cmdName;
+      if (!perms.canEditCommandPerm(message, client, guildId, commandName)) {
+        return embed.replyError(message, 'Cette commande est réservée aux Buyers et sa permission ne peut être modifiée que par un Buyer.');
+      }
+
+      if (!perms.canEditPerm(message, perm, guildId)) {
         return embed.replyError(message, 'Vous ne pouvez pas assigner cette permission.');
       }
 
@@ -61,8 +79,8 @@ exports.run = async (client, message, args) => {
       // registered as real commands (eg. ticket sub-actions like "close").
       // Previously this check prevented assigning perms for internal actions.
 
-      db.setCmdPerm(guildId, cmdName, perm);
-      return embed.reply(message, `Commande \`${cmdName}\` → **${perms.permLabel(perm)}**`);
+      db.setCmdPerm(guildId, commandName, perm);
+      return embed.reply(message, `Commande \`${commandName}\` → **${perms.permLabel(perm)}**`);
     }
 
     case 'cmdall': {
@@ -73,7 +91,11 @@ exports.run = async (client, message, args) => {
         return embed.replyError(message, 'Utilisation : `perms cmdall <ancienne> <nouvelle>`');
       }
 
-      if (!perms.canEditPerm(message, from) || !perms.canEditPerm(message, to)) {
+      if (
+        !perms.canEditPerm(message, from, guildId) ||
+        !perms.canEditPerm(message, to, guildId) ||
+        !perms.canEditCommandPermGroup(message, client, guildId, from, to)
+      ) {
         return embed.replyError(message, 'Vous ne pouvez pas modifier ces permissions.');
       }
 
@@ -89,9 +111,13 @@ exports.run = async (client, message, args) => {
         !perms.isBuyer(message.author.id) &&
         !perms.isOwner(guildId, message.author.id)
       ) {
+        return embed.replyError(message, 'Permission refusée.');
+      }
+
+      if (!perms.canResetCommandPerms(message, client, guildId)) {
         return embed.replyError(
           message,
-          'Permission refusée.'
+          'Impossible de réinitialiser les permissions : cette action modifierait une commande réservée aux Buyers.'
         );
       }
 
@@ -120,7 +146,7 @@ async function _handleSet(message, guildId, levelArg, targetsArg, usageHint) {
     return embed.replyError(message, `Utilisation : \`${usageHint}\``);
   }
 
-  if (!perms.canEditPerm(message, String(level))) {
+  if (!perms.canEditPerm(message, String(level), guildId)) {
     return embed.replyError(message, 'Vous ne pouvez pas modifier cette permission.');
   }
 
@@ -157,7 +183,7 @@ async function _handleDel(message, guildId, levelArg, targetsArg, usageHint) {
     return embed.replyError(message, `Utilisation : \`${usageHint}\``);
   }
 
-  if (!perms.canEditPerm(message, String(level))) {
+  if (!perms.canEditPerm(message, String(level), guildId)) {
     return embed.replyError(message, 'Vous ne pouvez pas modifier cette permission.');
   }
 

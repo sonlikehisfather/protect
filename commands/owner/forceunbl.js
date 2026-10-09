@@ -10,6 +10,7 @@ exports.help = {
   use        : 'forceunbl <@membre/ID>',
   usage      : 'forceunbl <@membre/ID>',
   category   : 'owner',
+  defaultPermission: 'buyer',
 };
 
 exports.run = async (client, message, args) => {

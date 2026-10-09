@@ -52,6 +52,7 @@ module.exports = {
     usage       : 'translate <texte>',
     aliases     : ['tr', 'trad'],
     category    : 'general',
+    defaultPermission: 'everyone',
   },
 
   async run(client, message, args) {

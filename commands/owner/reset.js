@@ -11,6 +11,18 @@ exports.help = {
   use        : 'reset <server|all>',
   usage      : 'reset <server|all>',
   category   : 'owner',
+  permissionScopes: [
+    {
+      permission : 'owner',
+      usage      : 'reset server',
+      description: 'Réinitialiser les paramètres du serveur. Réservé aux Owners et Buyers.',
+    },
+    {
+      permission : 'buyer',
+      usage      : 'reset all',
+      description: 'Réinitialiser les paramètres sur tous les serveurs. Réservé aux Buyers.',
+    },
+  ],
 };
 
 exports.run = async (client, message, args) => {

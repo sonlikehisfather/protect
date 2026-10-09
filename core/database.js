@@ -4556,6 +4556,7 @@ function prepareStatements(db) {
     getPermLevels      : db.prepare('SELECT * FROM perm_levels WHERE guildId = ?'),
     getCmdPerm         : db.prepare('SELECT perm FROM cmd_perms WHERE guildId = ? AND commandName = ?'),
     setCmdPerm         : db.prepare('INSERT OR REPLACE INTO cmd_perms (guildId, commandName, perm, updatedAt) VALUES (?, ?, ?, unixepoch())'),
+    insertCmdPermIfAbsent: db.prepare('INSERT OR IGNORE INTO cmd_perms (guildId, commandName, perm, updatedAt) VALUES (?, ?, ?, unixepoch())'),
     getAllCmdPerms     : db.prepare('SELECT * FROM cmd_perms WHERE guildId = ?'),
     getPublicChannels  : db.prepare('SELECT channelId FROM public_channels WHERE guildId = ?'),
     insertPublicChannel: db.prepare('INSERT OR IGNORE INTO public_channels (guildId, channelId) VALUES (?, ?)'),
@@ -5330,9 +5331,19 @@ const db = {
     return _stmts.getCmdPerm.get(guildId, commandName)?.perm ?? 'owner';
   },
 
+  getConfiguredCmdPerm(guildId, commandName) {
+    getDb();
+    return _stmts.getCmdPerm.get(guildId, commandName)?.perm ?? null;
+  },
+
   setCmdPerm(guildId, commandName, perm) {
     getDb();
     _stmts.setCmdPerm.run(guildId, commandName, perm);
+  },
+
+  setCmdPermIfAbsent(guildId, commandName, perm) {
+    getDb();
+    return _stmts.insertCmdPermIfAbsent.run(guildId, commandName, perm).changes > 0;
   },
 
   getAllCmdPerms(guildId) {

@@ -19,6 +19,7 @@ module.exports = {
     description : 'Affiche la latence du bot.',
     usage       : 'ping',
     aliases     : [],
+    defaultPermission: 'everyone',
   },
 
   async run(client, message) {

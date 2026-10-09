@@ -10,6 +10,7 @@ module.exports = {
     use         : 'helpall',
     usage       : 'helpall',
     aliases     : [],
+    defaultPermission: 'everyone',
   },
 
   async run(client, message, args) {

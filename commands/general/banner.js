@@ -23,6 +23,7 @@ module.exports = {
     description : "Affiche la bannière d'un utilisateur.",
     usage       : 'banner [membre]',
     aliases     : ['userbanner'],
+    defaultPermission: 'everyone',
   },
 
   async run(client, message, args) {

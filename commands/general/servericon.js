@@ -22,6 +22,7 @@ module.exports = {
     description : "Affiche l'icône du serveur.",
     usage       : 'servericon',
     aliases     : ['guildicon', 'serveravatar', 'siicon'],
+    defaultPermission: 'everyone',
   },
 
   async run(client, message) {
