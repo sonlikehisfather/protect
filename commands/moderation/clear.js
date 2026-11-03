@@ -13,6 +13,9 @@ const perms             = require('../../utils/permissions');
 const { resolveMember } = require('../../utils/memberResolver');
 
 
+const MAX_CLEAR = 1000;
+const MAX_SCAN  = 1000;
+
 const CLEARWL_CONFIRM_IDLE_MS = 60_000;
 const CLEARWL_CONFIRM_TIME_MS = 120_000;
 
@@ -44,7 +47,7 @@ module.exports = {
     const deleteCmd   = Boolean(config?.autoDeleteModCmds);
     const deleteReply = Boolean(config?.autoDeleteModReplies);
     const deleteDelay = config?.autoDeleteDelay ?? 5;
-    const clearLimit  = Math.max(1, Math.min(config?.clearLimit ?? 100, 100));
+    const clearLimit  = Math.max(1, Math.min(config?.clearLimit ?? 100, MAX_CLEAR));
 
     const sub = args[0]?.toLowerCase();
 
@@ -211,7 +214,7 @@ module.exports = {
 
     const amountArg = args[0];
     const isExplicitAmount = typeof amountArg === 'string' && /^\d+$/.test(amountArg);
-    const amount = args.length === 0
+    let amount = args.length === 0
       ? 50
       : isExplicitAmount
         ? parseInt(amountArg, 10)
@@ -309,15 +312,47 @@ module.exports = {
     await message.delete().catch(() => {});
 
     const hasFilter = targets.length > 0;
+
+    // Membre ciblé sans nombre : supprime tout ce qui est trouvé (jusqu au max possible).
+    const scanAll = hasFilter && !isExplicitAmount;
+    if (scanAll) amount = MAX_CLEAR;
     const targetIds = new Set(targets.map(t => t.id));
-    const fetchSize = Math.min(100, hasFilter ? Math.max(amount * 4, 20) : amount + 5);
 
-    const fetched = await channel.messages.fetch({ limit: fetchSize }).catch(() => null);
+    // Parcourt le salon page par page (100 messages max par appel) jusqu'à
+    // trouver assez de messages, atteindre la limite de scan ou les 14 jours.
+    const maxAge    = 14 * 24 * 60 * 60 * 1000;
+    const scanLimit = scanAll ? MAX_SCAN : hasFilter ? Math.min(MAX_SCAN, Math.max(amount * 10, 300)) : amount + 5;
+    const toDelete  = [];
+    let scanned     = 0;
+    let before      = message.id;
+    let fetchFailed = false;
 
-    if (!fetched || !fetched.size) {
+    while (toDelete.length < amount && scanned < scanLimit) {
+      const page = await channel.messages
+        .fetch({ limit: Math.min(100, scanLimit - scanned), before })
+        .catch(() => null);
+
+      if (!page) { fetchFailed = scanned === 0; break; }
+      if (!page.size) break;
+
+      scanned += page.size;
+      before   = page.last().id;
+
+      let tooOld = false;
+      for (const m of page.values()) {
+        if (Date.now() - m.createdTimestamp >= maxAge) { tooOld = true; continue; }
+        if (hasFilter && !targetIds.has(m.author.id)) continue;
+        if (toDelete.length < amount) toDelete.push(m);
+      }
+
+      // Pages triées du plus récent au plus ancien : inutile d'aller plus loin.
+      if (tooOld) break;
+    }
+
+    if (fetchFailed) {
       const sent = await embed.replyError(
         message,
-        'Impossible de r\u00e9cup\u00e9rer les messages du salon.',
+        'Impossible de récupérer les messages du salon.',
         { timestamp: false }
       ).catch(() => null);
 
@@ -327,23 +362,13 @@ module.exports = {
       return;
     }
 
-    let messagesToDelete = fetched
-      .filter(m => m.id !== message.id)
-      .filter(m => Date.now() - m.createdTimestamp < 14 * 24 * 60 * 60 * 1000);
-
-    if (hasFilter) {
-      messagesToDelete = messagesToDelete.filter(m => targetIds.has(m.author.id));
-    }
-
-    messagesToDelete = messagesToDelete.first(amount);
-
-    if (!messagesToDelete.length) {
+    if (!toDelete.length) {
       const names = targets.map(t => `**${t.user.username}**`).join(', ');
       const sent = await embed.replyError(
         message,
         hasFilter
-          ? `Aucun message r\u00e9cent de ${names} n'a \u00e9t\u00e9 trouv\u00e9.`
-          : 'Aucun message r\u00e9cent \u00e0 supprimer n\'a \u00e9t\u00e9 trouv\u00e9.',
+          ? `Aucun message récent de ${names} n'a été trouvé.`
+          : 'Aucun message récent à supprimer n\'a été trouvé.',
         { timestamp: false }
       ).catch(() => null);
 
@@ -353,12 +378,20 @@ module.exports = {
       return;
     }
 
-    const deleted = await channel.bulkDelete(messagesToDelete, true).catch(() => null);
+    // Suppression par lots de 100 (limite Discord pour bulkDelete).
+    let deletedCount = 0;
+    for (let i = 0; i < toDelete.length; i += 100) {
+      const chunk = toDelete.slice(i, i + 100);
+      const res   = chunk.length === 1
+        ? await chunk[0].delete().then(() => ({ size: 1 })).catch(() => null)
+        : await channel.bulkDelete(chunk, true).catch(() => null);
+      if (res) deletedCount += res.size;
+    }
 
-    if (!deleted) {
+    if (!deletedCount) {
       const sent = await embed.replyError(
         message,
-        'La suppression a \u00e9chou\u00e9.',
+        'La suppression a échoué.',
         { timestamp: false }
       ).catch(() => null);
 
@@ -367,6 +400,8 @@ module.exports = {
       }
       return;
     }
+
+    const deleted = { size: deletedCount };
 
     const names = targets.map(t => `**${t.user.username}**`).join(', ');
 
