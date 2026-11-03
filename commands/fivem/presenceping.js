@@ -15,6 +15,7 @@ module.exports = {
     usage       : 'presenceping [message_id|lien_message]',
     aliases     : ['pping'],
     category    : 'fivem',
+    selfManaged : true,
   },
 
   async run(client, message, args) {
@@ -36,15 +37,20 @@ module.exports = {
       return replyError(message, 'Aucun message cible fourni et aucune presence active enregistree.', module.exports.help.name);
     }
 
-    const roleIds = cfg.activePresence?.mentionRoleIds?.length
-      ? cfg.activePresence.mentionRoleIds
+    const explicitId = parsedTarget.messageId;
+    const entry = (explicitId && cfg.activePresences.find(p => p.messageId === explicitId)) || cfg.activePresence;
+
+    const roleIds = entry?.mentionRoleIds?.length
+      ? entry.mentionRoleIds
       : cfg.presenceMentionRoles;
 
     if (!roleIds.length) {
       return replyError(message, 'Aucun role de ping configure.', module.exports.help.name);
     }
 
-    const targetMessageId = parsedTarget.messageId || cfg.activePresence.messageId;
+    await guild.members.fetch().catch(() => {});
+
+    const targetMessageId = parsedTarget.messageId || entry?.messageId;
     const targetMessage = await _resolveTargetMessage(guild, cfg, message, parsedTarget.channelId, targetMessageId);
 
     if (!targetMessage) {
@@ -119,7 +125,7 @@ async function _resolveTargetMessage(guild, cfg, message, preferredChannelId, me
   };
 
   push(preferredChannelId);
-  push(cfg.activePresence?.channelId);
+  (cfg.activePresences || []).forEach(p => push(p.channelId));
   push(cfg.presenceOpChannelId);
   push(cfg.presenceMission1ChannelId);
   push(cfg.presenceMission2ChannelId);

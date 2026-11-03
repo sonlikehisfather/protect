@@ -3,6 +3,7 @@
 const db    = require('../../core/database');
 const embed = require('../../utils/embed');
 const perms = require('../../utils/permissions');
+const { sendHierarchyList } = require('../../utils/ownerList');
 
 exports.help = {
   name        : 'buyer',
@@ -37,7 +38,7 @@ exports.run = async (client, message, args) => {
       return embed.replyError(message, 'Permission refusée.', { timestamp: false });
     }
 
-    return _list(message);
+    return sendHierarchyList(message, 'Buyer list');
 
   }
 
@@ -67,37 +68,6 @@ exports.run = async (client, message, args) => {
 
 };
 
-
-async function _list(message) {
-
-  const superAdminId = perms.getSuperAdminId();
-  const buyers       = db.getGlobalBuyers();
-
-  const fields = [
-
-    {
-      name  : 'Buyer Principal',
-      value : `<@${superAdminId}>`,
-      inline: false,
-    },
-
-    {
-      name  : 'Buyers',
-      value : buyers.length
-        ? buyers.map(id => `<@${id}>`).join(', ')
-        : 'Aucun',
-      inline: false,
-    },
-
-  ];
-
-  return embed.sendEmbed(message.channel, message.guild.id, null, {
-        title    : 'Buyer list',
-        fields,
-        timestamp: false,
-      });
-
-}
 
 function _resolveUserId(message, raw) {
 

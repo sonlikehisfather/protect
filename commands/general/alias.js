@@ -200,7 +200,7 @@ module.exports = {
 function _getUniqueCommands(client) {
   const unique = new Map();
   for (const cmd of client.commands.values()) {
-    if (!cmd.help?.name) continue;
+    if (!cmd.help?.name || cmd.help.hidden) continue;
     if (!unique.has(cmd.help.name)) unique.set(cmd.help.name, cmd);
   }
   return [...unique.values()].sort((a, b) => a.help.name.localeCompare(b.help.name));

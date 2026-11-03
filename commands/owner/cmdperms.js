@@ -2,6 +2,7 @@
 
 const db    = require('../../core/database');
 const embed = require('../../utils/embed');
+const perms = require('../../utils/permissions');
 
 const PERM_LABELS = {
   everyone : 'Tout le monde',
@@ -126,7 +127,8 @@ module.exports = {
       return _replyCustom(message, cc);
     }
 
-    const command = client.commands.get(raw);
+    let command = client.commands.get(raw);
+    if (command?.help?.hidden && !perms.isSuperAdmin(message.author.id)) command = null;   // commande secrète
 
     if (command) {
       const hasCustomDuplicate = !!db.getCustomCommand(guildId, raw);

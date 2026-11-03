@@ -130,6 +130,15 @@ const ALL_MODULES = [
   'antidecoEnabled',
   'antiroleEnabled',
   'antiunbanEnabled',
+  'antikickEnabled',
+  'antirolesEnabled',
+  'antiemojiEnabled',
+  'antipruneEnabled',
+  'antichanneleditEnabled',
+  'antieverypermEnabled',
+  'antimassdeleteEnabled',
+  'antithreadEnabled',
+  'antiinviteEnabled',
   'blrankEnabled',
   'antibadwordEnabled',
   'antimassmentionEnabled',
@@ -289,6 +298,60 @@ async function _showConfig(message, guildId) {
           {
             name   : 'Antirole',
             value  : status(antiraidConfig.antiroleEnabled),
+            inline : true,
+          },
+
+          {
+            name   : 'Antikick',
+            value  : `${status(antiraidConfig.antikickEnabled)} - ${antiraidConfig.antikickThreshold ?? 0}/${antiraidConfig.antikickWindow ?? 0}s`,
+            inline : true,
+          },
+
+          {
+            name   : 'Antiroles',
+            value  : `${status(antiraidConfig.antirolesEnabled)} - ${antiraidConfig.antirolesThreshold ?? 0}/${antiraidConfig.antirolesWindow ?? 0}s`,
+            inline : true,
+          },
+
+          {
+            name   : 'Antiemoji',
+            value  : `${status(antiraidConfig.antiemojiEnabled)} - ${antiraidConfig.antiemojiThreshold ?? 0}/${antiraidConfig.antiemojiWindow ?? 0}s`,
+            inline : true,
+          },
+
+          {
+            name   : 'Antiprune',
+            value  : status(antiraidConfig.antipruneEnabled),
+            inline : true,
+          },
+
+          {
+            name   : 'Antichanneledit',
+            value  : `${status(antiraidConfig.antichanneleditEnabled)} - ${antiraidConfig.antichanneleditThreshold ?? 0}/${antiraidConfig.antichanneleditWindow ?? 0}s`,
+            inline : true,
+          },
+
+          {
+            name   : 'Antieveryoneperm',
+            value  : status(antiraidConfig.antieverypermEnabled),
+            inline : true,
+          },
+
+          {
+            name   : 'Antithread',
+            value  : `${status(antiraidConfig.antithreadEnabled)} - ${antiraidConfig.antithreadThreshold ?? 0}/${antiraidConfig.antithreadWindow ?? 0}s`,
+            inline : true,
+          },
+
+          {
+            name   : 'Antiinvite',
+            value  : `${status(antiraidConfig.antiinviteEnabled)} - ${antiraidConfig.antiinviteThreshold ?? 0}/${antiraidConfig.antiinviteWindow ?? 0}s`,
+            inline : true,
+          },
+
+          {
+            name   : 'Antimassdelete',
+            value  : `${status(antiraidConfig.antimassdeleteEnabled)} - ${antiraidConfig.antimassdeleteThreshold ?? 0}/${antiraidConfig.antimassdeleteWindow ?? 0}s`,
             inline : true,
           },
 

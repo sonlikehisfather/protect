@@ -44,6 +44,17 @@ module.exports = {
       return _showList(message);
     }
 
+    if (!isUnwet && args[0]?.toLowerCase() === 'clear') {
+      if (!perms.isBuyer(message.author.id)) {
+        return embed.replyError(message, 'Commande réservée aux buyers.');
+      }
+      if (args[1]?.toLowerCase() !== 'confirm') {
+        return embed.replyError(message, `Confirme avec : ${message.prefix || '+'}wet clear confirm`);
+      }
+      const count = db.clearWetlist();
+      return _reply(message, `Wetlist vidée (${count} entrée${count > 1 ? 's' : ''}). Les bans existants ne sont pas levés.`);
+    }
+
     const targetId = message.mentions.users.first()?.id
       ?? args[0]?.replace(/[<@!>]/g, '');
     if (!targetId || !/^\d{17,20}$/.test(targetId)) {

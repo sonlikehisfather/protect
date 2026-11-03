@@ -206,7 +206,7 @@ async function _pollAuditLog(client, guild, guildId, snapshot) {
       await guild.members.fetch(executor.id).catch(() => null);
     if (!executorMember) continue;
 
-    if (perms.isProtected(executor.id, guildId, executorMember)) continue;
+    if (require('../utils/antiraidCore').isExempt(executor.id, guildId, executorMember)) continue;
 
     await _triggerAntideco(client, guild, guildId, executor, executorMember, delta, config);
   }

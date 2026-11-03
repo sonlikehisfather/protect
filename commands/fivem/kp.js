@@ -2,11 +2,14 @@
 
 const { PermissionsBitField } = require('discord.js');
 
+const db = require('../../core/database');
 const {
   canUseFivem,
+  checkTargetAllowed,
   getDeletePolicy,
   getModuleConfig,
   extractUserId,
+  logAction,
   reply,
   replyError,
 } = require('./_shared');
@@ -14,10 +17,11 @@ const {
 module.exports = {
   help: {
     name        : 'kp',
-    description : 'Derank total: retire tous les roles du membre sauf le role conserve KP.',
+    description : 'Derank total: retire tous les roles du membre sauf le role conserve KP (sauvegarde pour unkp).',
     usage       : 'kp <@membre|id>',
     aliases     : [],
     category    : 'fivem',
+    selfManaged : true,
   },
 
   async run(client, message, args) {
@@ -37,6 +41,9 @@ module.exports = {
     const target = await guild.members.fetch(targetId).catch(() => null);
     if (!target) return replyError(message, 'Membre introuvable.', module.exports.help.name);
 
+    const denied = checkTargetAllowed(message, target);
+    if (denied) return replyError(message, denied, module.exports.help.name);
+
     const cfg = getModuleConfig(guildId);
 
     const me = guild.members.me ?? await guild.members.fetchMe().catch(() => null);
@@ -54,18 +61,31 @@ module.exports = {
 
     let removed = 0;
     let skipped = 0;
+    const removedIds = [];
 
     for (const role of removable.values()) {
-      await target.roles.remove(role.id, `KP by ${message.author.tag}`).then(() => { removed++; }).catch(() => { skipped++; });
+      await target.roles.remove(role.id, `KP by ${message.author.tag}`)
+        .then(() => { removed++; removedIds.push(role.id); })
+        .catch(() => { skipped++; });
+    }
+
+    if (removedIds.length) {
+      try { db.saveFivemRoleBackup(guildId, target.id, 'kp', removedIds, message.author.id); } catch {}
     }
 
     const keepText = keepRoleId
       ? (guild.roles.cache.has(keepRoleId) ? `<@&${keepRoleId}>` : '`Role conserve introuvable`')
       : '`Aucun role conserve`';
 
+    await logAction(message, 'KP', [
+      { name: 'Membre', value: `<@${target.id}> (${target.id})`, inline: false },
+      { name: 'Roles retires', value: `${removed}`, inline: true },
+      { name: 'Echecs', value: `${skipped}`, inline: true },
+    ]);
+
     return reply(
       message,
-      `KP termine pour <@${target.id}>.\nRoles retires: **${removed}**\nEchecs: **${skipped}**\nRole conserve: ${keepText}`,
+      `KP termine pour <@${target.id}>.\nRoles retires: **${removed}**\nEchecs: **${skipped}**\nRole conserve: ${keepText}\nUtilise \`unkp\` pour restaurer.`,
       { timestamp: false },
       module.exports.help.name
     );

@@ -8,6 +8,7 @@ const embed        = require('../utils/embed');
 const logger       = require('../utils/logger');
 const perms        = require('../utils/permissions');
 const errorHandler = require('../utils/errorHandler');
+const core         = require('../utils/antiraidCore');
 
 const recentGuildActions = new Map();
 
@@ -43,23 +44,9 @@ module.exports = {
 
       if (!changedFields.length && !vanityChanged) return;
 
-      await new Promise(res => setTimeout(res, AUDIT_WAIT_MS));
-
-      const now = Date.now();
-
-      const logs = await guild.fetchAuditLogs({
-        type  : AuditLogEvent.GuildUpdate,
-        limit : 5,
-      }).catch(() => null);
-
-      if (!logs) return;
-
-      const entry = [...logs.entries.values()].find(e =>
-        e.target?.id === guildId &&
-        now - e.createdTimestamp < AUDIT_MAX_AGE_MS
-      );
-
+      const entry = await core.findAuditEntry(guild, AuditLogEvent.GuildUpdate, guildId);
       if (!entry?.executor) return;
+      const now = Date.now();
 
       const executorId = entry.executor.id;
       if (executorId === client.user.id) return;
@@ -68,7 +55,7 @@ module.exports = {
         guild.members.cache.get(executorId) ??
         await guild.members.fetch(executorId).catch(() => null);
 
-      if (perms.isProtected(executorId, guildId, executorMember)) return;
+      if (core.isExempt(executorId, guildId, executorMember)) return;
 
 
       if (vanityChanged && antivanityOn) {
@@ -288,53 +275,5 @@ function _fmtChannel(channelId) {
 }
 
 async function _applyPunishment(client, guild, userId, punishment, source) {
-  const guildId = guild.id;
-  const member  = await guild.members.fetch(userId).catch(() => null);
-
-  switch (punishment) {
-    case 'warn':
-      db.addSanction(guildId, userId, client.user.id, 'warn', `Antiraid - ${source}`);
-      break;
-
-    case 'mute':
-      if (member) {
-        await member.timeout(10 * 60 * 1000, `Antiraid - ${source}`).catch(() => {});
-      }
-      db.addSanction(guildId, userId, client.user.id, 'mute', `Antiraid - ${source}`, 600);
-      break;
-
-    case 'kick':
-      if (member) {
-        await member.kick(`Antiraid - ${source}`).catch(() => {});
-      }
-      db.addSanction(guildId, userId, client.user.id, 'kick', `Antiraid - ${source}`);
-      break;
-
-    case 'ban':
-      await guild.members.ban(userId, { reason: `Antiraid - ${source}` }).catch(() => {});
-      db.addSanction(guildId, userId, client.user.id, 'ban', `Antiraid - ${source}`);
-      break;
-
-    case 'derank':
-    default:
-      if (member) {
-        const me = guild.members.me ?? await guild.members.fetchMe().catch(() => null);
-        const keepRoles = new Set(db.getNoderankRoles(guildId));
-        const rolesToRemove = member.roles.cache
-          .filter(role => role.id !== guild.id && !keepRoles.has(role.id) && !role.managed && (!me || me.roles.highest.comparePositionTo(role) > 0))
-          .map(role => role.id);
-
-        if (rolesToRemove.length) {
-          const deranked = await member.roles
-            .remove(rolesToRemove, `Antiraid - ${source}`)
-            .then(() => true)
-            .catch(() => false);
-
-          if (deranked) {
-            db.addSanction(guildId, userId, client.user.id, 'derank', `Antiraid - ${source}`);
-          }
-        }
-      }
-      break;
-  }
+  return core.punish(client, guild, userId, punishment, source);
 }

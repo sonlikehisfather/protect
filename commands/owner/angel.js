@@ -35,6 +35,17 @@ module.exports = {
       return _showList(message);
     }
 
+    if (args[0].toLowerCase() === 'clear') {
+      if (!perms.isBuyer(message.author.id)) {
+        return embed.replyError(message, 'Commande réservée aux buyers.');
+      }
+      if (args[1]?.toLowerCase() !== 'confirm') {
+        return embed.replyError(message, 'Confirme avec : +angel clear confirm');
+      }
+      const count = db.clearAngelUsers(guildId);
+      return embed.reply(message, `Liste des anges vidée (${count} entrée${count > 1 ? 's' : ''}).`);
+    }
+
     const targetId = message.mentions.users.first()?.id
       ?? args[0].match(/^<@!?(\d{17,20})>$/)?.[1]
       ?? (/^\d{17,20}$/.test(args[0]) ? args[0] : null);

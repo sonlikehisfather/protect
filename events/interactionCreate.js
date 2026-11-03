@@ -228,6 +228,7 @@ async function _handleSlash(client, interaction) {
 
 async function _handleButton(client, interaction) {
   const id = interaction.customId;
+  if (id.startsWith('vlt:')) return;   // Coffre : géré par les collecteurs de la commande
 
   if (id.startsWith('autokick:')) {
     return;
@@ -651,6 +652,7 @@ async function _handleServerLeaveButton(client, interaction, id) {
 
 async function _handleSelectMenu(client, interaction) {
   const id = interaction.customId;
+  if (id.startsWith('vlt:')) return;   // Coffre : géré par les collecteurs de la commande
   console.log(`[SELECT-MENU] Received: ${id}, type=${interaction.componentType}, user=${interaction.user.id}`);
 
   if (id.startsWith('autokick:')) {
@@ -943,6 +945,7 @@ async function _handleSelectMenu(client, interaction) {
 
 async function _handleModal(client, interaction) {
   const id = interaction.customId;
+  if (id.startsWith('vlt:')) return;   // Coffre : géré par les collecteurs de la commande
   const guildId = interaction.guild?.id;
 
   if (id.startsWith('autokick:')) {

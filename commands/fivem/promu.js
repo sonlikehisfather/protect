@@ -16,6 +16,7 @@ const {
 const {
   COMPONENTS_V2_FLAG,
   canUseFivem,
+  logAction,
   getDeletePolicy,
   getModuleConfig,
   wrapByMode,
@@ -33,6 +34,7 @@ module.exports = {
     usage       : 'promu',
     aliases     : ['promotion'],
     category    : 'fivem',
+    selfManaged : true,
   },
 
   async run(client, message) {
@@ -212,7 +214,8 @@ async function _applyPromotion(guild, message, state) {
 
   if (!matchedIndices.length) return { ok: false, error: 'Ce membre ne possede aucun role de la hierarchie.' };
 
-  const currentIdx = Math.max(...matchedIndices);
+  // Rang le plus haut detenu (index le plus bas), comme demot.
+  const currentIdx = Math.min(...matchedIndices);
   if (currentIdx <= 0) return { ok: false, error: 'Ce membre est deja au plus haut rang.' };
 
   const oldRank = guild.roles.cache.get(hierarchy[currentIdx]);
@@ -222,14 +225,17 @@ async function _applyPromotion(guild, message, state) {
     return { ok: false, error: 'Hierarchie invalide pour mes permissions.' };
   }
 
-  const removeOk = await target.roles.remove(oldRank.id, `Promotion auto by ${message.author.tag}`).then(() => true).catch(() => false);
-  if (!removeOk) return { ok: false, error: 'Impossible de retirer l\'ancien grade.' };
-
-  const addOk = await target.roles.add(newRank.id, `Promotion auto by ${message.author.tag}`).then(() => true).catch(() => false);
-  if (!addOk) return { ok: false, error: 'Impossible d\'ajouter le nouveau grade.' };
-
   const channel = guild.channels.cache.get(cfg.promotionUpChannelId || cfg.promotionChannelId || '');
   if (!channel?.isTextBased?.()) return { ok: false, error: 'Salon Rank-Up introuvable.' };
+
+  const addOk = await target.roles.add(newRank.id, `Promotion auto by ${message.author.tag}`).then(() => true).catch(() => false);
+  if (!addOk) return { ok: false, error: "Impossible d'ajouter le nouveau grade." };
+
+  const removeOk = await target.roles.remove(oldRank.id, `Promotion auto by ${message.author.tag}`).then(() => true).catch(() => false);
+  if (!removeOk) {
+    await target.roles.remove(newRank.id, 'Rollback promotion').catch(() => {});
+    return { ok: false, error: "Impossible de retirer l'ancien grade (annule)." };
+  }
 
   const body = [
     '```ini',
@@ -247,6 +253,13 @@ async function _applyPromotion(guild, message, state) {
     content: body,
     allowedMentions: { parse: [] },
   }).catch(() => null);
+
+  await logAction(message, 'Promotion', [
+    { name: 'Joueur', value: `<@${target.id}> (${target.id})`, inline: false },
+    { name: 'Ancien grade', value: `<@&${oldRank.id}>`, inline: true },
+    { name: 'Nouveau grade', value: `<@&${newRank.id}>`, inline: true },
+    { name: 'Raison', value: state.reason || 'Aucune raison', inline: false },
+  ]);
 
   return { ok: true };
 }

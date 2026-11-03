@@ -204,6 +204,8 @@ module.exports = {
     }
 
     _safeInterval(() => _processSanctions(client), TICK_MS);
+    _safeInterval(() => _processAntitokenLocks(client), TICK_MS);
+    _processAntitokenLocks(client).catch(() => {});
     _safeInterval(() => _processTempRoles(client), TICK_MS);
     _safeInterval(() => _processReminders(client), TICK_MS);
     _safeInterval(() => _processRainbowRoles(client), RAINBOW_TICK_MS);
@@ -383,6 +385,24 @@ async function _recoverExpiredSanctions(client) {
     }
   } catch (err) {
     errorHandler.handle(err, { source: 'recoverExpiredSanctions' });
+  }
+}
+
+async function _processAntitokenLocks(client) {
+  const { GuildVerificationLevel } = require('discord.js');
+  let due = [];
+  try { due = db.getDueAntitokenLocks(Math.floor(Date.now() / 1000)); } catch { return; }
+
+  for (const lock of due) {
+    const guild = client.guilds.cache.get(lock.guildId);
+    // Serveur pas (encore) disponible : on réessaiera au prochain tick.
+    if (!guild) continue;
+
+    // On ne touche pas au niveau si quelqu'un l'a déjà changé à la main.
+    if (guild.verificationLevel === GuildVerificationLevel.VeryHigh) {
+      await guild.setVerificationLevel(lock.previousLevel, 'Antitoken - fin du verrouillage').catch(() => {});
+    }
+    db.deleteAntitokenLock(lock.guildId);
   }
 }
 

@@ -4,6 +4,7 @@ const { PermissionsBitField } = require('discord.js');
 
 const {
   canUseFivem,
+  logAction,
   getDeletePolicy,
   getModuleConfig,
   extractUserId,
@@ -18,6 +19,7 @@ module.exports = {
     usage       : 'rc <@membre|id>',
     aliases     : [],
     category    : 'fivem',
+    selfManaged : true,
   },
 
   async run(client, message, args) {
@@ -67,6 +69,12 @@ module.exports = {
       }
       await target.roles.add(roleId, `RC by ${message.author.tag}`).then(() => { added++; }).catch(() => { skipped++; });
     }
+
+    await logAction(message, 'RC', [
+      { name: 'Membre', value: `<@${target.id}> (${target.id})`, inline: false },
+      { name: 'Roles ajoutes', value: `${added}`, inline: true },
+      { name: 'Ignores', value: `${skipped}`, inline: true },
+    ]);
 
     return reply(
       message,

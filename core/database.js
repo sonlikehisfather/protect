@@ -281,6 +281,55 @@ const CUSTOM_COMMAND_KEYS = new Set([
 ]);
 
 const ANTIRAID_CONFIG_KEYS = new Set([
+  'antithreadEnabled',
+  'antithreadThreshold',
+  'antithreadWindow',
+  'antithreadPunish',
+  'antithreadRestore',
+  'antiinviteEnabled',
+  'antiinviteThreshold',
+  'antiinviteWindow',
+  'antiinvitePunish',
+  'antiinviteRestore',
+  'antiraidLockdownChannels',
+  'antiraidLockdownVerif',
+  'antiraidLockdownInvites',
+  'antiraidAutoLockdown',
+  'antiraidAlertDm',
+  'antichanneleditEnabled',
+  'antichanneleditThreshold',
+  'antichanneleditWindow',
+  'antichanneleditPunish',
+  'antichanneleditRestore',
+  'antieverypermEnabled',
+  'antieverypermPunish',
+  'antieverypermRestore',
+  'antimassdeleteEnabled',
+  'antimassdeleteThreshold',
+  'antimassdeleteWindow',
+  'antimassdeletePunish',
+  'antikickEnabled',
+  'antikickThreshold',
+  'antikickWindow',
+  'antikickPunish',
+  'antirolesEnabled',
+  'antirolesThreshold',
+  'antirolesWindow',
+  'antirolesPunish',
+  'antirolesRestore',
+  'antiemojiEnabled',
+  'antiemojiThreshold',
+  'antiemojiWindow',
+  'antiemojiPunish',
+  'antipruneEnabled',
+  'antiprunePunish',
+  'antichannelRestore',
+  'antibanRestore',
+  'antiunbanRestore',
+  'antiraidProtectUserBypass',
+  'antiraidMuteDuration',
+  'antitokenRestoreMinutes',
+  'antiraidDerankBackup',
   'antilinkEnabled',
   'antilinkPunish',
   'antilinkWhitelist',
@@ -1739,6 +1788,104 @@ up(db) {
       db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antichannelWindow INTEGER NOT NULL DEFAULT 10`).run();
     if (!hasColumn('antiraid_config', 'antichannelPunish'))
       db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antichannelPunish TEXT NOT NULL DEFAULT 'derank'`).run();
+    if (!hasColumn('antiraid_config', 'antikickEnabled'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antikickEnabled INTEGER NOT NULL DEFAULT 0`).run();
+    if (!hasColumn('antiraid_config', 'antikickThreshold'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antikickThreshold INTEGER NOT NULL DEFAULT 3`).run();
+    if (!hasColumn('antiraid_config', 'antikickWindow'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antikickWindow INTEGER NOT NULL DEFAULT 10`).run();
+    if (!hasColumn('antiraid_config', 'antikickPunish'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antikickPunish TEXT NOT NULL DEFAULT 'derank'`).run();
+    if (!hasColumn('antiraid_config', 'antirolesEnabled'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antirolesEnabled INTEGER NOT NULL DEFAULT 0`).run();
+    if (!hasColumn('antiraid_config', 'antirolesThreshold'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antirolesThreshold INTEGER NOT NULL DEFAULT 3`).run();
+    if (!hasColumn('antiraid_config', 'antirolesWindow'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antirolesWindow INTEGER NOT NULL DEFAULT 10`).run();
+    if (!hasColumn('antiraid_config', 'antirolesPunish'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antirolesPunish TEXT NOT NULL DEFAULT 'derank'`).run();
+    if (!hasColumn('antiraid_config', 'antirolesRestore'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antirolesRestore INTEGER NOT NULL DEFAULT 0`).run();
+    if (!hasColumn('antiraid_config', 'antiemojiEnabled'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antiemojiEnabled INTEGER NOT NULL DEFAULT 0`).run();
+    if (!hasColumn('antiraid_config', 'antiemojiThreshold'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antiemojiThreshold INTEGER NOT NULL DEFAULT 3`).run();
+    if (!hasColumn('antiraid_config', 'antiemojiWindow'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antiemojiWindow INTEGER NOT NULL DEFAULT 10`).run();
+    if (!hasColumn('antiraid_config', 'antiemojiPunish'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antiemojiPunish TEXT NOT NULL DEFAULT 'derank'`).run();
+    if (!hasColumn('antiraid_config', 'antipruneEnabled'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antipruneEnabled INTEGER NOT NULL DEFAULT 0`).run();
+    if (!hasColumn('antiraid_config', 'antiprunePunish'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antiprunePunish TEXT NOT NULL DEFAULT 'derank'`).run();
+    if (!hasColumn('antiraid_config', 'antichannelRestore'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antichannelRestore INTEGER NOT NULL DEFAULT 0`).run();
+    if (!hasColumn('antiraid_config', 'antibanRestore'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antibanRestore INTEGER NOT NULL DEFAULT 0`).run();
+    if (!hasColumn('antiraid_config', 'antiunbanRestore'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antiunbanRestore INTEGER NOT NULL DEFAULT 0`).run();
+    if (!hasColumn('antiraid_config', 'antiraidProtectUserBypass'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antiraidProtectUserBypass INTEGER NOT NULL DEFAULT 0`).run();
+    if (!hasColumn('antiraid_config', 'antiraidMuteDuration'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antiraidMuteDuration INTEGER NOT NULL DEFAULT 600`).run();
+    if (!hasColumn('antiraid_config', 'antitokenRestoreMinutes'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antitokenRestoreMinutes INTEGER NOT NULL DEFAULT 30`).run();
+    if (!hasColumn('antiraid_config', 'antiraidDerankBackup'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antiraidDerankBackup INTEGER NOT NULL DEFAULT 1`).run();
+    if (!hasColumn('antiraid_config', 'antichanneleditEnabled'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antichanneleditEnabled INTEGER NOT NULL DEFAULT 0`).run();
+    if (!hasColumn('antiraid_config', 'antichanneleditThreshold'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antichanneleditThreshold INTEGER NOT NULL DEFAULT 3`).run();
+    if (!hasColumn('antiraid_config', 'antichanneleditWindow'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antichanneleditWindow INTEGER NOT NULL DEFAULT 10`).run();
+    if (!hasColumn('antiraid_config', 'antichanneleditPunish'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antichanneleditPunish TEXT NOT NULL DEFAULT 'derank'`).run();
+    if (!hasColumn('antiraid_config', 'antichanneleditRestore'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antichanneleditRestore INTEGER NOT NULL DEFAULT 0`).run();
+    if (!hasColumn('antiraid_config', 'antieverypermEnabled'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antieverypermEnabled INTEGER NOT NULL DEFAULT 0`).run();
+    if (!hasColumn('antiraid_config', 'antieverypermPunish'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antieverypermPunish TEXT NOT NULL DEFAULT 'derank'`).run();
+    if (!hasColumn('antiraid_config', 'antieverypermRestore'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antieverypermRestore INTEGER NOT NULL DEFAULT 1`).run();
+    if (!hasColumn('antiraid_config', 'antimassdeleteEnabled'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antimassdeleteEnabled INTEGER NOT NULL DEFAULT 0`).run();
+    if (!hasColumn('antiraid_config', 'antimassdeleteThreshold'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antimassdeleteThreshold INTEGER NOT NULL DEFAULT 30`).run();
+    if (!hasColumn('antiraid_config', 'antimassdeleteWindow'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antimassdeleteWindow INTEGER NOT NULL DEFAULT 10`).run();
+    if (!hasColumn('antiraid_config', 'antimassdeletePunish'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antimassdeletePunish TEXT NOT NULL DEFAULT 'derank'`).run();
+    if (!hasColumn('antiraid_config', 'antithreadEnabled'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antithreadEnabled INTEGER NOT NULL DEFAULT 0`).run();
+    if (!hasColumn('antiraid_config', 'antithreadThreshold'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antithreadThreshold INTEGER NOT NULL DEFAULT 5`).run();
+    if (!hasColumn('antiraid_config', 'antithreadWindow'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antithreadWindow INTEGER NOT NULL DEFAULT 10`).run();
+    if (!hasColumn('antiraid_config', 'antithreadPunish'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antithreadPunish TEXT NOT NULL DEFAULT 'derank'`).run();
+    if (!hasColumn('antiraid_config', 'antithreadRestore'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antithreadRestore INTEGER NOT NULL DEFAULT 0`).run();
+    if (!hasColumn('antiraid_config', 'antiinviteEnabled'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antiinviteEnabled INTEGER NOT NULL DEFAULT 0`).run();
+    if (!hasColumn('antiraid_config', 'antiinviteThreshold'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antiinviteThreshold INTEGER NOT NULL DEFAULT 5`).run();
+    if (!hasColumn('antiraid_config', 'antiinviteWindow'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antiinviteWindow INTEGER NOT NULL DEFAULT 10`).run();
+    if (!hasColumn('antiraid_config', 'antiinvitePunish'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antiinvitePunish TEXT NOT NULL DEFAULT 'derank'`).run();
+    if (!hasColumn('antiraid_config', 'antiinviteRestore'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antiinviteRestore INTEGER NOT NULL DEFAULT 0`).run();
+    if (!hasColumn('antiraid_config', 'antiraidLockdownChannels'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antiraidLockdownChannels INTEGER NOT NULL DEFAULT 1`).run();
+    if (!hasColumn('antiraid_config', 'antiraidLockdownVerif'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antiraidLockdownVerif INTEGER NOT NULL DEFAULT 1`).run();
+    if (!hasColumn('antiraid_config', 'antiraidLockdownInvites'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antiraidLockdownInvites INTEGER NOT NULL DEFAULT 1`).run();
+    if (!hasColumn('antiraid_config', 'antiraidAutoLockdown'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antiraidAutoLockdown INTEGER NOT NULL DEFAULT 0`).run();
+    if (!hasColumn('antiraid_config', 'antiraidAlertDm'))
+      db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antiraidAlertDm INTEGER NOT NULL DEFAULT 1`).run();
     if (!hasColumn('antiraid_config', 'antibanThreshold'))
       db.prepare(`ALTER TABLE antiraid_config ADD COLUMN antibanThreshold INTEGER NOT NULL DEFAULT 3`).run();
     if (!hasColumn('antiraid_config', 'antibanWindow'))
@@ -5247,6 +5394,241 @@ const db = {
     return !!_stmts.isOwner.get(guildId, userId);
   },
 
+  // ── Coffre (stockage privé de textes / images / vidéos) ─────────────────
+  _ensureVaultTables() {
+    getDb().exec(`
+      CREATE TABLE IF NOT EXISTS vault_access (
+        userId    TEXT PRIMARY KEY,
+        grantedBy TEXT,
+        grantedAt INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS vault_items (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        kind         TEXT NOT NULL,            -- text | image | video
+        title        TEXT NOT NULL,
+        note         TEXT,
+        content      TEXT,                     -- texte (kind = text)
+        filePath     TEXT,                     -- chemin relatif dans data/vault (image / vidéo)
+        originalName TEXT,
+        mime         TEXT,
+        size         INTEGER,
+        createdBy    TEXT NOT NULL,
+        createdAt    INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_vault_items_kind ON vault_items (kind, createdAt DESC);
+    `);
+  },
+
+  hasVaultAccess(userId) {
+    module.exports._ensureVaultTables();
+    return !!getDb().prepare('SELECT 1 FROM vault_access WHERE userId = ?').get(userId);
+  },
+  grantVaultAccess(userId, grantedBy) {
+    module.exports._ensureVaultTables();
+    getDb().prepare('INSERT OR REPLACE INTO vault_access (userId, grantedBy, grantedAt) VALUES (?, ?, ?)')
+      .run(userId, grantedBy, Date.now());
+  },
+  revokeVaultAccess(userId) {
+    module.exports._ensureVaultTables();
+    return getDb().prepare('DELETE FROM vault_access WHERE userId = ?').run(userId).changes > 0;
+  },
+  listVaultAccess() {
+    module.exports._ensureVaultTables();
+    return getDb().prepare('SELECT * FROM vault_access ORDER BY grantedAt').all();
+  },
+
+  addVaultItem(item) {
+    module.exports._ensureVaultTables();
+    const r = getDb().prepare(
+      `INSERT INTO vault_items (kind, title, note, content, filePath, originalName, mime, size, createdBy, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(item.kind, item.title, item.note ?? null, item.content ?? null, item.filePath ?? null,
+          item.originalName ?? null, item.mime ?? null, item.size ?? null, item.createdBy, Date.now());
+    return Number(r.lastInsertRowid);
+  },
+  getVaultItem(id) {
+    module.exports._ensureVaultTables();
+    return getDb().prepare('SELECT * FROM vault_items WHERE id = ?').get(id) ?? null;
+  },
+  deleteVaultItem(id) {
+    module.exports._ensureVaultTables();
+    return getDb().prepare('DELETE FROM vault_items WHERE id = ?').run(id).changes > 0;
+  },
+  renameVaultItem(id, title, note) {
+    module.exports._ensureVaultTables();
+    getDb().prepare('UPDATE vault_items SET title = ?, note = ? WHERE id = ?').run(title, note ?? null, id);
+  },
+  countVaultItems() {
+    module.exports._ensureVaultTables();
+    const out = { text: 0, image: 0, video: 0 };
+    for (const r of getDb().prepare('SELECT kind, COUNT(*) AS n FROM vault_items GROUP BY kind').all()) out[r.kind] = r.n;
+    return out;
+  },
+  /** opts : { kind, search, since (ms), order: 'recent'|'old'|'title', limit, offset } → { rows, total } */
+  queryVaultItems(opts = {}) {
+    module.exports._ensureVaultTables();
+    const where = ['kind = ?'];
+    const params = [opts.kind];
+    if (opts.since) { where.push('createdAt >= ?'); params.push(opts.since); }
+    if (opts.search) {
+      const like = `%${String(opts.search).replace(/[\\%_]/g, '\\$&')}%`;
+      where.push("(title LIKE ? ESCAPE '\\' OR note LIKE ? ESCAPE '\\' OR content LIKE ? ESCAPE '\\')");
+      params.push(like, like, like);
+    }
+    const order = opts.order === 'old' ? 'createdAt ASC, id ASC'
+                : opts.order === 'title' ? 'title COLLATE NOCASE ASC, id ASC'
+                : 'createdAt DESC, id DESC';
+    const w = where.join(' AND ');
+    const total = getDb().prepare(`SELECT COUNT(*) AS n FROM vault_items WHERE ${w}`).get(...params).n;
+    const rows = getDb().prepare(`SELECT * FROM vault_items WHERE ${w} ORDER BY ${order} LIMIT ? OFFSET ?`)
+      .all(...params, opts.limit ?? 8, opts.offset ?? 0);
+    return { rows, total };
+  },
+
+  _ensureAntiraidTables() {
+    getDb().exec(`
+      CREATE TABLE IF NOT EXISTS antiraid_history (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        guildId    TEXT NOT NULL,
+        at         INTEGER NOT NULL,
+        kind       TEXT NOT NULL,
+        source     TEXT NOT NULL,
+        executorId TEXT,
+        detail     TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_antiraid_history_guild ON antiraid_history (guildId, at DESC);
+      CREATE TABLE IF NOT EXISTS lockdown_state (
+        guildId  TEXT PRIMARY KEY,
+        data     TEXT NOT NULL,
+        lockedAt INTEGER NOT NULL,
+        lockedBy TEXT
+      );
+    `);
+  },
+
+  addAntiraidHistory(guildId, kind, source, executorId, detail) {
+    module.exports._ensureAntiraidTables();
+    getDb().prepare(
+      'INSERT INTO antiraid_history (guildId, at, kind, source, executorId, detail) VALUES (?, ?, ?, ?, ?, ?)'
+    ).run(guildId, Math.floor(Date.now() / 1000), kind, source, executorId ?? null, detail ? String(detail).slice(0, 500) : null);
+  },
+
+  getAntiraidHistory(guildId, limit = 15, executorId = null) {
+    module.exports._ensureAntiraidTables();
+    return executorId
+      ? getDb().prepare('SELECT * FROM antiraid_history WHERE guildId = ? AND executorId = ? ORDER BY at DESC, id DESC LIMIT ?').all(guildId, executorId, limit)
+      : getDb().prepare('SELECT * FROM antiraid_history WHERE guildId = ? ORDER BY at DESC, id DESC LIMIT ?').all(guildId, limit);
+  },
+
+  clearAntiraidHistory(guildId) {
+    module.exports._ensureAntiraidTables();
+    return getDb().prepare('DELETE FROM antiraid_history WHERE guildId = ?').run(guildId).changes;
+  },
+
+  getLockdownState(guildId) {
+    module.exports._ensureAntiraidTables();
+    const row = getDb().prepare('SELECT * FROM lockdown_state WHERE guildId = ?').get(guildId);
+    if (!row) return null;
+    let data = {};
+    try { data = JSON.parse(row.data); } catch {}
+    return { ...row, data };
+  },
+
+  setLockdownState(guildId, data, lockedBy) {
+    module.exports._ensureAntiraidTables();
+    getDb().prepare(
+      'INSERT OR REPLACE INTO lockdown_state (guildId, data, lockedAt, lockedBy) VALUES (?, ?, ?, ?)'
+    ).run(guildId, JSON.stringify(data), Math.floor(Date.now() / 1000), lockedBy ?? null);
+  },
+
+  updateLockdownData(guildId, data) {
+    module.exports._ensureAntiraidTables();
+    getDb().prepare('UPDATE lockdown_state SET data = ? WHERE guildId = ?').run(JSON.stringify(data), guildId);
+  },
+
+  deleteLockdownState(guildId) {
+    module.exports._ensureAntiraidTables();
+    getDb().prepare('DELETE FROM lockdown_state WHERE guildId = ?').run(guildId);
+  },
+
+  _ensureAntitokenLocks() {
+    getDb().exec(`
+      CREATE TABLE IF NOT EXISTS antitoken_locks (
+        guildId       TEXT PRIMARY KEY,
+        previousLevel INTEGER NOT NULL,
+        restoreAt     INTEGER NOT NULL
+      )
+    `);
+  },
+
+  setAntitokenLock(guildId, previousLevel, restoreAt) {
+    module.exports._ensureAntitokenLocks();
+    // Un 2e déclenchement pendant un verrouillage garde le niveau d'origine.
+    const existing = getDb().prepare('SELECT previousLevel FROM antitoken_locks WHERE guildId = ?').get(guildId);
+    getDb().prepare(
+      'INSERT OR REPLACE INTO antitoken_locks (guildId, previousLevel, restoreAt) VALUES (?, ?, ?)'
+    ).run(guildId, existing?.previousLevel ?? previousLevel, restoreAt);
+  },
+
+  getDueAntitokenLocks(nowSeconds) {
+    module.exports._ensureAntitokenLocks();
+    return getDb().prepare('SELECT * FROM antitoken_locks WHERE restoreAt <= ?').all(nowSeconds);
+  },
+
+  deleteAntitokenLock(guildId) {
+    module.exports._ensureAntitokenLocks();
+    getDb().prepare('DELETE FROM antitoken_locks WHERE guildId = ?').run(guildId);
+  },
+
+  _ensureFivemRoleBackups() {
+    getDb().exec(`
+      CREATE TABLE IF NOT EXISTS fivem_role_backups (
+        guildId   TEXT NOT NULL,
+        userId    TEXT NOT NULL,
+        kind      TEXT NOT NULL,
+        roles     TEXT NOT NULL,
+        createdBy TEXT,
+        createdAt INTEGER NOT NULL DEFAULT (unixepoch()),
+        PRIMARY KEY (guildId, userId, kind)
+      )
+    `);
+  },
+
+  saveFivemRoleBackup(guildId, userId, kind, roleIds, createdBy) {
+    module.exports._ensureFivemRoleBackups();
+    const prev = module.exports.getFivemRoleBackup(guildId, userId, kind);
+    // Un 2e fbl/kp ne doit pas écraser la sauvegarde d'origine : on fusionne.
+    const merged = [...new Set([...(prev?.roles ?? []), ...roleIds])];
+    getDb().prepare(
+      'INSERT OR REPLACE INTO fivem_role_backups (guildId, userId, kind, roles, createdBy, createdAt) VALUES (?, ?, ?, ?, ?, ?)'
+    ).run(guildId, userId, kind, JSON.stringify(merged), createdBy ?? null, prev?.createdAt ?? Math.floor(Date.now() / 1000));
+  },
+
+  getFivemRoleBackup(guildId, userId, kind) {
+    module.exports._ensureFivemRoleBackups();
+    const row = getDb().prepare(
+      'SELECT * FROM fivem_role_backups WHERE guildId = ? AND userId = ? AND kind = ?'
+    ).get(guildId, userId, kind);
+    if (!row) return null;
+    let roles = [];
+    try { roles = JSON.parse(row.roles); } catch {}
+    return { ...row, roles };
+  },
+
+  listFivemRoleBackups(guildId, kind) {
+    module.exports._ensureFivemRoleBackups();
+    return getDb().prepare(
+      'SELECT * FROM fivem_role_backups WHERE guildId = ? AND kind = ? ORDER BY createdAt DESC'
+    ).all(guildId, kind);
+  },
+
+  deleteFivemRoleBackup(guildId, userId, kind) {
+    module.exports._ensureFivemRoleBackups();
+    return getDb().prepare(
+      'DELETE FROM fivem_role_backups WHERE guildId = ? AND userId = ? AND kind = ?'
+    ).run(guildId, userId, kind).changes > 0;
+  },
+
   getFivemOwners(guildId) {
     getDb();
     return _stmts.getFivemOwners.all(guildId).map(r => r.userId);
@@ -6378,6 +6760,18 @@ const db = {
 
   removeWet(userId) {
     return getDb().prepare('DELETE FROM wetlist WHERE userId = ?').run(userId).changes > 0;
+  },
+
+  clearWetlist() {
+    return getDb().prepare('DELETE FROM wetlist').run().changes;
+  },
+
+  clearProtectedUsers(guildId) {
+    return getDb().prepare('DELETE FROM protected_users WHERE guildId = ?').run(guildId).changes;
+  },
+
+  clearAngelUsers(guildId) {
+    return getDb().prepare('DELETE FROM angel_users WHERE guildId = ?').run(guildId).changes;
   },
 
   isWet(userId) {
@@ -8870,6 +9264,23 @@ const db = {
     }
   },
 
+
+  getAchievements(guildId) {
+    try {
+      return getDb().prepare('SELECT * FROM casino_achievements WHERE guildId = ? ORDER BY id').all(guildId);
+    } catch { return []; }
+  },
+
+  /** Succès débloqués par un membre (chaque ligne porte l'id du succès, comme getAchievements). */
+  getUserAchievements(guildId, userId) {
+    try {
+      return getDb().prepare(
+        `SELECT a.* FROM casino_achievements a
+           JOIN casino_user_achievements u ON u.guildId = a.guildId AND u.achievementKey = a.key
+          WHERE u.guildId = ? AND u.userId = ?`
+      ).all(guildId, userId);
+    } catch { return []; }
+  },
 
   getUnlockedAchievementKeys(guildId, userId) {
     return new Set(

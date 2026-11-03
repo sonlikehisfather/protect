@@ -47,10 +47,23 @@ module.exports = {
 
       joinMap.set(guildId, []);
 
-      await guild.setVerificationLevel(
+      const previousLevel = guild.verificationLevel;
+
+      const locked = await guild.setVerificationLevel(
         GuildVerificationLevel.VeryHigh,
         `Antitoken déclenché (${recent.length} arrivées en ${config.antitokenWindow}s)`
-      ).catch(() => {});
+      ).then(() => true).catch(() => false);
+
+      // Option : remettre le niveau d'origine après X minutes (0 = jamais).
+      // Persisté en base : survit à un redémarrage (traité par la boucle de ready.js).
+      const restoreMinutes = Number(config.antitokenRestoreMinutes) || 0;
+      if (locked && restoreMinutes > 0 && previousLevel !== GuildVerificationLevel.VeryHigh) {
+        db.setAntitokenLock(guildId, previousLevel, Math.floor(Date.now() / 1000) + restoreMinutes * 60);
+      }
+
+      if (config.antiraidAutoLockdown) {
+        require('../utils/lockdown').enable(client, guild, client.user.id).catch(() => {});
+      }
 
       const raidPing = config.raidPingRole
         ? `<@&${config.raidPingRole}> `

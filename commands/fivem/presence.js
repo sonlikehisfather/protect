@@ -17,8 +17,8 @@ const {
   canUseFivem,
   getDeletePolicy,
   getModuleConfig,
-  setTextConfig,
-  setActivePresence,
+  addActivePresence,
+  pruneActivePresences,
   wrapByMode,
   reply,
   replyError,
@@ -34,6 +34,7 @@ module.exports = {
     usage       : 'presence',
     aliases     : ['fpresence'],
     category    : 'fivem',
+    selfManaged : true,
   },
 
   async run(client, message) {
@@ -142,7 +143,7 @@ module.exports = {
         await sent.react('❌').catch(() => {});
         await sent.react('⏳').catch(() => {});
 
-        setActivePresence(guildId, {
+        addActivePresence(guildId, {
           channelId      : sent.channel.id,
           messageId      : sent.id,
           title          : state.title,
@@ -152,10 +153,6 @@ module.exports = {
           createdBy      : message.author.id,
           createdAt      : Date.now(),
         });
-
-        if (targetInfo.slot === 'mission1') {
-          setTextConfig(guildId, 'fivemMission1MessageId', sent.id);
-        }
 
         collector.stop('published');
         await interaction.deferUpdate().catch(() => {});
@@ -323,22 +320,20 @@ async function _resolvePublishTarget(guild, cfg, type) {
     return { ok: false, error: 'Salon Mission 1 invalide.' };
   }
 
-  let mission1Busy = false;
-  if (cfg.mission1MessageId) {
-    const msg = await mission1Channel.messages.fetch(cfg.mission1MessageId).catch(() => null);
-    if (msg) {
-      mission1Busy = true;
-    } else {
-      setTextConfig(guild.id, 'fivemMission1MessageId', null);
-    }
-  }
+  const alive = await pruneActivePresences(guild);
+  const mission1Busy = alive.some(p => p.slot === 'mission1');
+  const mission2Busy = alive.some(p => p.slot === 'mission2');
 
   if (!mission1Busy) {
     return { ok: true, slot: 'mission1', channel: mission1Channel };
   }
 
   if (!mission2Id) {
-    return { ok: false, error: 'Mission 1 est deja occupee. Configure Mission 2 dans fconfig.' };
+    return { ok: false, error: 'Mission 1 est deja occupee. Configure Mission 2 dans fconfig, ou cloture avec `presenceclose`.' };
+  }
+
+  if (mission2Busy) {
+    return { ok: false, error: 'Mission 1 et Mission 2 sont deja occupees. Cloture-en une avec `presenceclose`.' };
   }
 
   const mission2Channel = guild.channels.cache.get(mission2Id);

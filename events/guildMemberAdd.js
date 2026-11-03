@@ -48,7 +48,7 @@ module.exports = {
           if (executorUser) {
             const executorMember = guild.members.cache.get(executorUser.id)
               ?? await guild.members.fetch(executorUser.id).catch(() => null);
-            if (perms.isProtected(executorUser.id, guildId, executorMember)) {
+            if (require('../utils/antiraidCore').isExempt(executorUser.id, guildId, executorMember)) {
 
               return;
             }

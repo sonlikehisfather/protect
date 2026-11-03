@@ -405,7 +405,7 @@ async function _handleBlrankGuard(client, member, addedRoles) {
     const executorMember = guild.members.cache.get(executor.id)
       ?? await guild.members.fetch(executor.id).catch(() => null);
 
-    if (perms.isProtected(executor.id, guildId, executorMember)) return;
+    if (require('../utils/antiraidCore').isExempt(executor.id, guildId, executorMember)) return;
   } else {
 
     if (perms.isProtected(member.id, guildId, member)) return;

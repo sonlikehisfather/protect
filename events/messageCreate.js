@@ -528,6 +528,7 @@ function _findSimilarCommands(input, commands) {
   const suggestions = [];
 
   for (const cmd of allCommands) {
+    if (cmd.help?.hidden) continue;   // jamais suggérée
     const cmdName = cmd.help?.name?.toLowerCase() || '';
     const aliases = cmd.help?.aliases?.map(a => a.toLowerCase()) || [];
 

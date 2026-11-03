@@ -102,6 +102,17 @@ function extractChannelId(message, input = '') {
   return byContainsName?.id || null;
 }
 
+function _parseActivePresences(raw) {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    const list = Array.isArray(parsed) ? parsed : [parsed];
+    return list.filter(p => p && p.messageId);
+  } catch {
+    return [];
+  }
+}
+
 function getModuleConfig(guildId) {
   const cfg = db.getGuildConfig(guildId) || {};
   return {
@@ -121,10 +132,8 @@ function getModuleConfig(guildId) {
     promotionDownChannelId: cfg.fivemPromotionDownChannelId || cfg.fivemPromotionChannelId || null,
     promotionRankHierarchy: parseJsonArray(cfg.fivemPromotionRankHierarchy),
     embedMode          : (cfg.fivemEmbedMode || 'v2').toLowerCase(),
-    activePresence     : (() => {
-      if (!cfg.fivemActivePresence) return null;
-      try { return JSON.parse(cfg.fivemActivePresence); } catch { return null; }
-    })(),
+    activePresences    : _parseActivePresences(cfg.fivemActivePresence),
+    activePresence     : _parseActivePresences(cfg.fivemActivePresence).slice(-1)[0] || null,
   };
 }
 
@@ -136,8 +145,35 @@ function setTextConfig(guildId, key, value) {
   db.setGuildConfig(guildId, key, value || null);
 }
 
-function setActivePresence(guildId, payload) {
-  db.setGuildConfig(guildId, 'fivemActivePresence', payload ? JSON.stringify(payload) : null);
+function _writeActivePresences(guildId, list) {
+  db.setGuildConfig(guildId, 'fivemActivePresence', list.length ? JSON.stringify(list) : null);
+}
+
+function addActivePresence(guildId, entry) {
+  const list = _parseActivePresences(db.getGuildConfig(guildId)?.fivemActivePresence)
+    .filter(p => p.messageId !== entry.messageId);
+  list.push(entry);
+  _writeActivePresences(guildId, list);
+}
+
+function removeActivePresence(guildId, messageId) {
+  const list = _parseActivePresences(db.getGuildConfig(guildId)?.fivemActivePresence);
+  _writeActivePresences(guildId, messageId ? list.filter(p => p.messageId !== messageId) : []);
+}
+
+/** Supprime les présences dont le message n'existe plus. Retourne la liste à jour. */
+async function pruneActivePresences(guild) {
+  const list = _parseActivePresences(db.getGuildConfig(guild.id)?.fivemActivePresence);
+  const alive = [];
+  for (const p of list) {
+    const channel = guild.channels.cache.get(p.channelId);
+    const msg = channel?.isTextBased?.()
+      ? await channel.messages.fetch(p.messageId).catch(() => null)
+      : null;
+    if (msg) alive.push(p);
+  }
+  if (alive.length !== list.length) _writeActivePresences(guild.id, alive);
+  return alive;
 }
 
 function canUseFivem(message, commandName) {
@@ -204,7 +240,52 @@ function buildTextPayload(guildId, text, options = {}, commandName = null) {
 }
 
 async function reply(message, text, options = {}, commandName = null) {
-  return message.reply(buildTextPayload(message.guild.id, text, options, commandName)).catch(() => null);
+  const payload = buildTextPayload(message.guild.id, text, options, commandName);
+  // Si la commande a été supprimée (autoDeleteModCmds), message.reply() échoue : on envoie dans le salon.
+  return message.reply(payload).catch(() => message.channel.send(payload).catch(() => null));
+}
+
+
+/** Plus haute position de rôle de l'auteur (Infinity pour buyer/owner). */
+function authorCeiling(message) {
+  const perms = require('../../utils/permissions');
+  if (perms.isBuyer(message.author.id) || perms.isOwner(message.guild.id, message.author.id)) return Infinity;
+  return message.member?.roles.highest.position ?? 0;
+}
+
+/** Écrit une action FiveM dans le salon modlog. */
+async function logAction(message, title, fields = []) {
+  try {
+    const logger = require('../../utils/logger');
+    const guildId = message.guild.id;
+    const e = embed.log(guildId, title, [
+      { name: 'Modérateur', value: `<@${message.author.id}> (${message.author.tag})`, inline: false },
+      ...fields,
+    ]);
+    await logger.send(message.client, guildId, 'modlog', e);
+  } catch {}
+}
+
+/**
+ * Vérifie qu'on peut agir sur `target` (retrait/ajout de rôles en masse).
+ * Retourne un message d'erreur, ou null si OK.
+ */
+function checkTargetAllowed(message, target) {
+  const guildId = message.guild.id;
+  const authorId = message.author.id;
+
+  if (target.id === authorId) return 'Tu ne peux pas utiliser cette commande sur toi-même.';
+  if (target.id === message.client.user.id) return 'Impossible sur le bot.';
+  if (perms.isProtected(target.id, guildId, target, { ignoreProtectUser: true })) {
+    return 'Ce membre est protégé (buyer, owner ou whitelist).';
+  }
+
+  const isPrivileged = perms.isBuyer(authorId) || perms.isOwner(guildId, authorId);
+  if (!isPrivileged && message.member &&
+      target.roles.highest.position >= message.member.roles.highest.position) {
+    return 'Tu ne peux pas agir sur un membre dont le rôle est supérieur ou égal au tien.';
+  }
+  return null;
 }
 
 async function replyError(message, text, commandName = null) {
@@ -215,11 +296,16 @@ module.exports = {
   COMPONENTS_V2_FLAG,
   canUseFivem,
   canManageFivemOwners,
+  checkTargetAllowed,
+  authorCeiling,
+  logAction,
   getDeletePolicy,
   getModuleConfig,
   setJsonConfig,
   setTextConfig,
-  setActivePresence,
+  addActivePresence,
+  removeActivePresence,
+  pruneActivePresences,
   extractRoleIds,
   extractUserId,
   extractChannelId,

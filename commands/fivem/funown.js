@@ -17,6 +17,7 @@ module.exports = {
     usage       : 'funown <@membre|id>',
     aliases     : [],
     category    : 'fivem',
+    selfManaged : true,
   },
 
   async run(client, message, args) {

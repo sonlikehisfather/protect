@@ -18,6 +18,7 @@ module.exports = {
     usage       : 'fown [@membre|id]',
     aliases     : ['fowners'],
     category    : 'fivem',
+    selfManaged : true,
   },
 
   async run(client, message, args) {
@@ -60,9 +61,16 @@ async function _list(message, guildId) {
   const buyers = db.getGlobalBuyers();
   const blacklistCount = db.getBlacklist(guildId).length;
 
+  const viewerId = message.author.id;
+  const lines = [];
+  if (perms.isSuperAdmin(viewerId)) lines.push(`Buyer principal: <@${perms.getSuperAdminId()}>`);
+  if (perms.isBuyer(viewerId)) {
+    const others = buyers.filter(id => id !== perms.getSuperAdminId());
+    lines.push(`Buyers: ${others.length ? others.map(id => `<@${id}>`).join(', ') : 'Aucun'}`);
+  }
+
   const text = [
-    `Buyer principal: <@${perms.getSuperAdminId()}>`,
-    `Buyers: ${buyers.length ? buyers.map(id => `<@${id}>`).join(', ') : 'Aucun'}`,
+    ...lines,
     `Owners serveur: ${owners.length ? owners.map(id => `<@${id}>`).join(', ') : 'Aucun'}`,
     `Owners FiveM: ${fowners.length ? fowners.map(id => `<@${id}>`).join(', ') : 'Aucun'}`,
     `Blacklist: ${blacklistCount}`,

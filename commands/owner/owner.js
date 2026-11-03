@@ -3,6 +3,7 @@
 const db    = require('../../core/database');
 const embed = require('../../utils/embed');
 const perms = require('../../utils/permissions');
+const { sendHierarchyList } = require('../../utils/ownerList');
 
 exports.help = {
   name       : 'owner',
@@ -39,7 +40,7 @@ exports.run = async (client, message, args) => {
       return embed.replyError(message, 'Permission refusée.');
     }
 
-    return _list(message, guildId);
+    return sendHierarchyList(message, 'Owner list');
 
   }
 
@@ -70,45 +71,6 @@ exports.run = async (client, message, args) => {
   return embed.reply(message, `<@${targetId}> est maintenant owner sur ce serveur.`);
 
 };
-
-async function _list(message, guildId) {
-
-  const owners = db.getOwners(guildId);
-  const buyers = db.getGlobalBuyers();
-
-  const fields = [
-
-    {
-      name  : 'Buyer Principal',
-      value : `<@${perms.getSuperAdminId()}>`,
-      inline: false,
-    },
-
-    {
-      name  : 'Buyers',
-      value : buyers.length
-        ? buyers.map(id => `<@${id}>`).join(', ')
-        : 'Aucun',
-      inline: false,
-    },
-
-    {
-      name  : 'Owners (ce serveur)',
-      value : owners.length
-        ? owners.map(id => `<@${id}>`).join(', ')
-        : 'Aucun',
-      inline: false,
-    },
-
-  ];
-
-  return embed.sendEmbed(message.channel, message.guild.id, null, {
-          title    : 'Owner list',
-          fields,
-          timestamp: false,
-        });
-
-}
 
 function _resolveUserId(message, raw) {
 

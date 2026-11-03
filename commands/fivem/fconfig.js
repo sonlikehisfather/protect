@@ -32,16 +32,6 @@ const {
 const PANEL_IDLE_MS = 180_000;
 const PANEL_TIME_MS = 900_000;
 const TOTAL_PAGES = 4;
-const DEBUG_FCONFIG = process.env.DEBUG_FCONFIG === 'true';
-
-function _dbg(tag, data = {}) {
-  if (!DEBUG_FCONFIG) return;
-  try {
-    console.log(`[FCONFIG:${tag}]`, JSON.stringify(data));
-  } catch {
-    console.log(`[FCONFIG:${tag}]`);
-  }
-}
 
 module.exports = {
   help: {
@@ -50,17 +40,13 @@ module.exports = {
     usage       : 'fconfig',
     aliases     : ['fiveconfig'],
     category    : 'fivem',
+    selfManaged : true,
   },
 
   async run(client, message, args) {
     const guild = message.guild;
     const guildId = guild.id;
 
-    _dbg('RUN', {
-      guildId,
-      userId: message.author.id,
-      args,
-    });
 
     if (!canUseFivem(message, module.exports.help.name)) {
       return replyError(message, "Vous n'avez pas la permission d'utiliser cette commande.", module.exports.help.name);
@@ -77,6 +63,7 @@ module.exports = {
 
     const state = {
       page: 0,
+      resetPending: false,
       rankBuilder: {
         active: false,
         roles: [],
@@ -84,11 +71,6 @@ module.exports = {
     };
     const panel = await message.channel.send(_panelPayload(guildId, state, false)).catch(() => null);
 
-    _dbg('PANEL_SENT', {
-      guildId,
-      userId: message.author.id,
-      panelId: panel?.id ?? null,
-    });
 
     if (!panel) {
       return replyError(message, 'Impossible d\'ouvrir le panneau fconfig.', module.exports.help.name);
@@ -106,17 +88,12 @@ module.exports = {
 
     collector.on('collect', async interaction => {
       const id = interaction.customId;
-      _dbg('CLICK', {
-        guildId,
-        userId: interaction.user.id,
-        customId: id,
-        page: state.page,
-      });
 
       try {
 
+        if (id !== 'fc:resetall' && state.resetPending) state.resetPending = false;
+
         if (id === 'fc:close') {
-          _dbg('CLOSE', { panelId: panel.id });
           collector.stop('closed');
           await interaction.deferUpdate().catch(() => {});
           await panel.delete().catch(() => {});
@@ -125,7 +102,6 @@ module.exports = {
 
         if (id === 'fc:prev') {
           state.page = (state.page - 1 + TOTAL_PAGES) % TOTAL_PAGES;
-          _dbg('PAGE', { page: state.page, direction: 'prev' });
           await interaction.deferUpdate().catch(() => {});
           await panel.edit(_panelPayload(guildId, state, false)).catch(() => {});
           return;
@@ -133,7 +109,6 @@ module.exports = {
 
         if (id === 'fc:next') {
           state.page = (state.page + 1) % TOTAL_PAGES;
-          _dbg('PAGE', { page: state.page, direction: 'next' });
           await interaction.deferUpdate().catch(() => {});
           await panel.edit(_panelPayload(guildId, state, false)).catch(() => {});
           return;
@@ -142,21 +117,24 @@ module.exports = {
         if (id === 'fc:mode') {
           await interaction.deferUpdate().catch(() => {});
           _cycleMode(guildId);
-          _dbg('MODE_CYCLE', { guildId });
           await panel.edit(_panelPayload(guildId, state, false)).catch(() => {});
           return;
         }
 
         if (id === 'fc:resetall') {
           await interaction.deferUpdate().catch(() => {});
+          if (!state.resetPending) {
+            state.resetPending = true;
+            await panel.edit(_panelPayload(guildId, state, false)).catch(() => {});
+            return;
+          }
+          state.resetPending = false;
           _resetAll(guildId);
-          _dbg('RESET_ALL', { guildId });
           await panel.edit(_panelPayload(guildId, state, false)).catch(() => {});
           return;
         }
 
         if (id === 'fc:presencechannel') {
-          _dbg('MODAL_OPEN', { key: 'fivemPresenceChannelOpId', customId: id });
         const cfg = getModuleConfig(guildId);
         await _handleTextModal({
           interaction,
@@ -183,12 +161,10 @@ module.exports = {
         });
 
           await panel.edit(_panelPayload(guildId, state, false)).catch(() => {});
-          _dbg('MODAL_DONE', { key: 'fivemPresenceChannelOpId', customId: id });
           return;
         }
 
         if (id === 'fc:mission1channel') {
-          _dbg('MODAL_OPEN', { key: 'fivemPresenceChannelMission1Id', customId: id });
         const cfg = getModuleConfig(guildId);
         await _handleTextModal({
           interaction,
@@ -202,8 +178,7 @@ module.exports = {
             const v = String(raw || '').trim();
             if (!v || _isResetValue(v)) {
               setTextConfig(guildId, 'fivemPresenceChannelMission1Id', null);
-              setTextConfig(guildId, 'fivemMission1MessageId', null);
-              return;
+                      return;
             }
             const channelId = extractChannelId(message, v);
             const channel = channelId ? guild.channels.cache.get(channelId) : null;
@@ -214,12 +189,10 @@ module.exports = {
         });
 
           await panel.edit(_panelPayload(guildId, state, false)).catch(() => {});
-          _dbg('MODAL_DONE', { key: 'fivemPresenceChannelMission1Id', customId: id });
           return;
         }
 
         if (id === 'fc:mission2channel') {
-          _dbg('MODAL_OPEN', { key: 'fivemPresenceChannelMission2Id', customId: id });
         const cfg = getModuleConfig(guildId);
         await _handleTextModal({
           interaction,
@@ -244,12 +217,10 @@ module.exports = {
         });
 
           await panel.edit(_panelPayload(guildId, state, false)).catch(() => {});
-          _dbg('MODAL_DONE', { key: 'fivemPresenceChannelMission2Id', customId: id });
           return;
         }
 
         if (id === 'fc:promochannel') {
-          _dbg('MODAL_OPEN', { key: 'fivemPromotionChannelId', customId: id });
         const cfg = getModuleConfig(guildId);
         await _handleTextModal({
           interaction,
@@ -278,12 +249,10 @@ module.exports = {
         });
 
           await panel.edit(_panelPayload(guildId, state, false)).catch(() => {});
-          _dbg('MODAL_DONE', { key: 'fivemPromotionChannelId', customId: id });
           return;
         }
 
         if (id === 'fc:promoupchannel') {
-          _dbg('MODAL_OPEN', { key: 'fivemPromotionUpChannelId', customId: id });
           const cfg = getModuleConfig(guildId);
           await _handleTextModal({
             interaction,
@@ -309,12 +278,10 @@ module.exports = {
           });
 
           await panel.edit(_panelPayload(guildId, state, false)).catch(() => {});
-          _dbg('MODAL_DONE', { key: 'fivemPromotionUpChannelId', customId: id });
           return;
         }
 
         if (id === 'fc:promodownchannel') {
-          _dbg('MODAL_OPEN', { key: 'fivemPromotionDownChannelId', customId: id });
           const cfg = getModuleConfig(guildId);
           await _handleTextModal({
             interaction,
@@ -340,7 +307,6 @@ module.exports = {
           });
 
           await panel.edit(_panelPayload(guildId, state, false)).catch(() => {});
-          _dbg('MODAL_DONE', { key: 'fivemPromotionDownChannelId', customId: id });
           return;
         }
 
@@ -390,7 +356,7 @@ module.exports = {
               return;
             }
 
-            const ids = extractRoleIds({ ...message, mentions: m.mentions }, raw)
+            const ids = extractRoleIds({ guild, mentions: m.mentions }, raw)
               .filter(roleId => guild.roles.cache.has(roleId));
             const roleId = ids[0] || null;
 
@@ -468,7 +434,6 @@ module.exports = {
         }
 
         if (id === 'fc:blacklist') {
-          _dbg('MODAL_OPEN', { key: 'fivemBlacklistRoleId', customId: id });
         const cfg = getModuleConfig(guildId);
         await _handleTextModal({
           interaction,
@@ -492,12 +457,10 @@ module.exports = {
         });
 
           await panel.edit(_panelPayload(guildId, state, false)).catch(() => {});
-          _dbg('MODAL_DONE', { key: 'fivemBlacklistRoleId', customId: id });
           return;
         }
 
         if (id === 'fc:kpkeep') {
-          _dbg('MODAL_OPEN', { key: 'fivemKpKeepRoleId', customId: id });
           const cfg = getModuleConfig(guildId);
           await _handleTextModal({
             interaction,
@@ -521,12 +484,10 @@ module.exports = {
           });
 
           await panel.edit(_panelPayload(guildId, state, false)).catch(() => {});
-          _dbg('MODAL_DONE', { key: 'fivemKpKeepRoleId', customId: id });
           return;
         }
 
           if (id === 'fc:rc' || id === 'fc:fbl' || id === 'fc:presenceping') {
-          _dbg('MODAL_OPEN', { key: _rolesKey(id.replace('fc:', '')), customId: id });
         const key = _rolesKey(id.replace('fc:', ''));
         const cfg = getModuleConfig(guildId);
         const current = _currentRoleList(cfg, key);
@@ -552,16 +513,11 @@ module.exports = {
         });
 
           await panel.edit(_panelPayload(guildId, state, false)).catch(() => {});
-          _dbg('MODAL_DONE', { key, customId: id });
           return;
         }
 
         await interaction.deferUpdate().catch(() => {});
       } catch (err) {
-        _dbg('COLLECT_ERROR', {
-          customId: id,
-          error: err?.message || String(err),
-        });
         if (!interaction.replied && !interaction.deferred) {
           await interaction.reply({ content: 'Erreur fconfig. Regarde les logs console.', flags: 64 }).catch(() => {});
         }
@@ -569,7 +525,6 @@ module.exports = {
     });
 
     collector.on('end', async (_, reason) => {
-      _dbg('COLLECTOR_END', { reason, panelId: panel.id, page: state.page });
       if (rankMsgCollector) {
         rankMsgCollector.stop('panel_end');
         rankMsgCollector = null;
@@ -626,11 +581,11 @@ function _resetAll(guildId) {
   setTextConfig(guildId, 'fivemPresenceChannelOpId', null);
   setTextConfig(guildId, 'fivemPresenceChannelMission1Id', null);
   setTextConfig(guildId, 'fivemPresenceChannelMission2Id', null);
-  setTextConfig(guildId, 'fivemMission1MessageId', null);
   setTextConfig(guildId, 'fivemPromotionChannelId', null);
   setTextConfig(guildId, 'fivemPromotionUpChannelId', null);
   setTextConfig(guildId, 'fivemPromotionDownChannelId', null);
   setJsonConfig(guildId, 'fivemPromotionRankHierarchy', []);
+  db.setGuildConfig(guildId, 'fivemActivePresence', null);
 }
 
 function _fmtRoleList(arr) {
@@ -735,7 +690,7 @@ function _panelPayload(guildId, state, disabled) {
     container.addActionRowComponents(
       new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('fc:presenceping').setLabel('Editer roles ping').setStyle(ButtonStyle.Secondary).setDisabled(disabled),
-        new ButtonBuilder().setCustomId('fc:resetall').setLabel('Reset module').setStyle(ButtonStyle.Danger).setDisabled(disabled),
+        new ButtonBuilder().setCustomId('fc:resetall').setLabel(state.resetPending ? 'Confirmer le reset ?' : 'Reset module').setStyle(ButtonStyle.Danger).setDisabled(disabled),
       )
     );
   }
@@ -805,11 +760,6 @@ function _panelPayload(guildId, state, disabled) {
 
 async function _handleTextModal({ interaction, title, inputId, value, maxLength, style, required, placeholder, onSubmit }) {
   const modalId = `fc:modal:${inputId}:${interaction.id}`;
-  _dbg('MODAL_BUILD', {
-    modalId,
-    inputId,
-    userId: interaction.user.id,
-  });
 
   const input = new TextInputBuilder()
     .setCustomId(inputId)
@@ -832,11 +782,9 @@ async function _handleTextModal({ interaction, title, inputId, value, maxLength,
 
   const shown = await interaction.showModal(modal).then(() => true).catch(() => false);
   if (!shown) {
-    _dbg('MODAL_SHOW_FAIL', { modalId, inputId, userId: interaction.user.id });
     return false;
   }
 
-  _dbg('MODAL_SHOWN', { modalId, inputId, userId: interaction.user.id });
 
   const submit = await interaction.awaitModalSubmit({
     filter : i => i.customId === modalId && i.user.id === interaction.user.id,
@@ -844,17 +792,10 @@ async function _handleTextModal({ interaction, title, inputId, value, maxLength,
   }).catch(() => null);
 
   if (!submit) {
-    _dbg('MODAL_TIMEOUT', { modalId, inputId, userId: interaction.user.id });
     return false;
   }
 
   const raw = submit.fields.getTextInputValue(inputId).trim();
-  _dbg('MODAL_SUBMIT', {
-    modalId,
-    inputId,
-    userId: interaction.user.id,
-    length: raw.length,
-  });
   onSubmit(raw);
   await submit.deferUpdate().catch(() => {});
   return true;
@@ -963,8 +904,7 @@ async function _handleLegacySubcommand(message, action, restArgs) {
     if (!raw || _isResetValue(raw)) {
       setTextConfig(guildId, key, null);
       if (key === 'fivemPresenceChannelMission1Id') {
-        setTextConfig(guildId, 'fivemMission1MessageId', null);
-      }
+        }
       if (key === 'fivemPresenceChannelOpId') {
         setTextConfig(guildId, 'fivemPresenceChannelId', null);
       }

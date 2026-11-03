@@ -78,7 +78,9 @@ module.exports = {
       allowedMentions: { parse: [] },
     }).catch(() => null);
 
-    if (sent && deleteReply) embed.scheduleDelete(sent, deleteDelay);
+    // Le GIF n'est volontairement jamais supprimé automatiquement : un GIF mis en favori
+    // pointe vers ce message, s'il disparaît le favori ne marche plus.
+    void sent;
   },
 };
 

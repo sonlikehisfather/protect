@@ -1266,6 +1266,7 @@ function _getAllUniqueCommands(client) {
 
   for (const cmd of client.commands.values()) {
     if (!cmd.help?.name) continue;
+    if (cmd.help.hidden) continue;   // commandes secrètes (ex : chest)
     if (!unique.has(cmd.help.name)) unique.set(cmd.help.name, cmd);
   }
 

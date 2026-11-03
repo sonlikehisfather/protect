@@ -8,6 +8,7 @@ const embed        = require('../utils/embed');
 const logger       = require('../utils/logger');
 const perms        = require('../utils/permissions');
 const errorHandler = require('../utils/errorHandler');
+const core         = require('../utils/antiraidCore');
 
 const channelDeleteMap = new Map();
 
@@ -34,23 +35,9 @@ module.exports = {
       if (!guildConfig?.antiraidEnabled || !config?.antichannelEnabled)
         return;
 
-      await new Promise(res => setTimeout(res, AUDIT_WAIT_MS));
-
-      const fetched = await guild.fetchAuditLogs({
-        type  : AuditLogEvent.ChannelDelete,
-        limit : 5,
-      }).catch(() => null);
-
-      if (!fetched) return;
-
-      const now = Date.now();
-
-      const entry = [...fetched.entries.values()].find(e =>
-        e.target?.id === channel.id &&
-        now - e.createdTimestamp < AUDIT_MAX_AGE_MS
-      );
-
+      const entry = await core.findAuditEntry(guild, AuditLogEvent.ChannelDelete, channel.id);
       if (!entry?.executor) return;
+      const now = Date.now();
 
       const executorId = entry.executor.id;
 
@@ -61,48 +48,16 @@ module.exports = {
         guild.members.cache.get(executorId) ??
         await guild.members.fetch(executorId).catch(() => null);
 
-      if (perms.isProtected(executorId, guildId, executorMember))
+      if (core.isExempt(executorId, guildId, executorMember))
         return;
 
-      const threshold =
-        Math.max(1, config.antichannelThreshold ?? 3);
+      const threshold = Math.max(1, config.antichannelThreshold ?? 3);
+      const windowMs  = Math.max(1000, (config.antichannelWindow ?? 10) * 1000);
 
-      const windowMs =
-        Math.max(1000, (config.antichannelWindow ?? 10) * 1000);
-
-      const key = `${guildId}_${executorId}`;
-      const current = channelDeleteMap.get(key);
-
-      if (!current || now - current.firstAt > windowMs) {
-
-        channelDeleteMap.set(key, {
-          count  : 1,
-          firstAt: now,
-        });
-
-        setTimeout(() => {
-
-          const state = channelDeleteMap.get(key);
-          if (!state) return;
-          if (state.firstAt !== now) return;
-
-          channelDeleteMap.delete(key);
-
-        }, windowMs + 1000);
-
-        return;
-      }
-
-      current.count++;
-
-      if (current.count < threshold) {
-
-        channelDeleteMap.set(key, current);
-        return;
-
-      }
-
-      channelDeleteMap.delete(key);
+      const result = core.hit(
+        `chdel_${guildId}_${executorId}`, threshold, windowMs, core.snapshotChannel(channel)
+      );
+      if (!result.triggered) return;
 
       const punishment =
         config.antichannelPunish ?? 'derank';
@@ -114,6 +69,15 @@ module.exports = {
         punishment,
         'antichannel-delete'
       );
+
+      let restored = 0;
+      if (config.antichannelRestore) {
+        const snaps = [...result.items].sort((a, b) => (a.type === 4 ? -1 : 0) - (b.type === 4 ? -1 : 0));
+        const idMap = new Map();   // ancien ID -> nouvel ID (pour rattacher les salons à leur catégorie recréée)
+        for (const snap of snaps) {
+          if (await core.restoreChannel(guild, snap, idMap)) restored++;
+        }
+      }
 
       const e = embed.log(
         guildId,
@@ -137,6 +101,11 @@ module.exports = {
           {
             name   : 'Action',
             value  : punishment,
+            inline : true,
+          },
+          {
+            name   : 'Salons recréés (restauration)',
+            value  : config.antichannelRestore ? `${restored}` : 'option désactivée',
             inline : true,
           },
         ],
@@ -165,127 +134,6 @@ module.exports = {
   },
 };
 
-async function _applyPunishment(
-  client,
-  guild,
-  userId,
-  punishment,
-  source
-) {
-
-  const guildId = guild.id;
-
-  const member =
-    await guild.members
-      .fetch(userId)
-      .catch(() => null);
-
-  switch (punishment) {
-
-    case 'warn':
-
-      db.addSanction(
-        guildId,
-        userId,
-        client.user.id,
-        'warn',
-        `Antiraid - ${source}`
-      );
-
-      break;
-
-    case 'mute':
-
-      if (member) {
-
-        await member.timeout(
-          10 * 60 * 1000,
-          `Antiraid - ${source}`
-        ).catch(() => {});
-
-      }
-
-      db.addSanction(
-        guildId,
-        userId,
-        client.user.id,
-        'mute',
-        `Antiraid - ${source}`,
-        600
-      );
-
-      break;
-
-    case 'kick':
-
-      if (member) {
-
-        await member.kick(
-          `Antiraid - ${source}`
-        ).catch(() => {});
-
-      }
-
-      db.addSanction(
-        guildId,
-        userId,
-        client.user.id,
-        'kick',
-        `Antiraid - ${source}`
-      );
-
-      break;
-
-    case 'ban':
-
-      await guild.members
-        .ban(userId, {
-          reason: `Antiraid - ${source}`,
-        })
-        .catch(() => {});
-
-      db.addSanction(
-        guildId,
-        userId,
-        client.user.id,
-        'ban',
-        `Antiraid - ${source}`
-      );
-
-      break;
-
-    case 'derank':
-    default:
-
-      if (member) {
-
-        const me = guild.members.me ?? await guild.members.fetchMe().catch(() => null);
-        const keepRoles = new Set(db.getNoderankRoles(guildId));
-        const rolesToRemove =
-          member.roles.cache
-            .filter(r => r.id !== guild.id && !keepRoles.has(r.id) && !r.managed && (!me || me.roles.highest.comparePositionTo(r) > 0))
-            .map(r => r.id);
-
-        if (rolesToRemove.length) {
-
-          const deranked = await member.roles
-            .remove(
-              rolesToRemove,
-              `Antiraid - ${source}`
-            )
-            .then(() => true)
-            .catch(() => false);
-
-          if (deranked) {
-            db.addSanction(guildId, userId, client.user.id, 'derank', `Antiraid - ${source}`);
-          }
-
-        }
-
-      }
-
-      break;
-
-  }
-
+async function _applyPunishment(client, guild, userId, punishment, source) {
+  return core.punish(client, guild, userId, punishment, source);
 }

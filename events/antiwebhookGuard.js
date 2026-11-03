@@ -8,6 +8,7 @@ const embed        = require('../utils/embed');
 const logger       = require('../utils/logger');
 const perms        = require('../utils/permissions');
 const errorHandler = require('../utils/errorHandler');
+const core         = require('../utils/antiraidCore');
 
 const recentWebhookActions = new Map();
 
@@ -38,10 +39,7 @@ module.exports = {
         now - e.createdTimestamp < 12_000
       );
 
-      const createLogs = await guild.fetchAuditLogs({
-        type  : AuditLogEvent.WebhookCreate,
-        limit : 5,
-      }).catch(() => null);
+      const createLogs = await core.fetchRecentAudit(guild, AuditLogEvent.WebhookCreate);
 
       const createEntry = createLogs
         ? [...createLogs.entries.values()].find(e =>
@@ -57,7 +55,7 @@ module.exports = {
           guild.members.cache.get(executorId) ??
           await guild.members.fetch(executorId).catch(() => null);
 
-        if (perms.isProtected(executorId, guildId, executorMember)) return;
+        if (core.isExempt(executorId, guildId, executorMember)) return;
 
         const dedupeKey = `${guildId}_${createEntry.target?.id ?? 'unknown'}`;
         const lastHit = recentWebhookActions.get(dedupeKey);
@@ -115,10 +113,7 @@ module.exports = {
         return;
       }
 
-      const updateLogs = await guild.fetchAuditLogs({
-        type  : AuditLogEvent.WebhookUpdate,
-        limit : 5,
-      }).catch(() => null);
+      const updateLogs = await core.fetchRecentAudit(guild, AuditLogEvent.WebhookUpdate);
 
       const updateEntry = updateLogs
         ? findByChannel(updateLogs.entries)
@@ -132,7 +127,7 @@ module.exports = {
           guild.members.cache.get(executorId) ??
           await guild.members.fetch(executorId).catch(() => null);
 
-        if (perms.isProtected(executorId, guildId, executorMember)) return;
+        if (core.isExempt(executorId, guildId, executorMember)) return;
 
         const dedupeKey = `${guildId}_${updateEntry.target?.id ?? 'unknown'}_update`;
         const lastHit = recentWebhookActions.get(dedupeKey);
@@ -172,10 +167,7 @@ module.exports = {
         return;
       }
 
-      const deleteLogs = await guild.fetchAuditLogs({
-        type  : AuditLogEvent.WebhookDelete,
-        limit : 5,
-      }).catch(() => null);
+      const deleteLogs = await core.fetchRecentAudit(guild, AuditLogEvent.WebhookDelete);
 
       const deleteEntry = deleteLogs
         ? findByChannel(deleteLogs.entries)
@@ -189,7 +181,7 @@ module.exports = {
           guild.members.cache.get(executorId) ??
           await guild.members.fetch(executorId).catch(() => null);
 
-        if (perms.isProtected(executorId, guildId, executorMember)) return;
+        if (core.isExempt(executorId, guildId, executorMember)) return;
 
         const dedupeKey = `${guildId}_${deleteEntry.target?.id ?? 'unknown'}_delete`;
         const lastHit = recentWebhookActions.get(dedupeKey);
@@ -239,53 +231,5 @@ module.exports = {
 };
 
 async function _applyPunishment(client, guild, userId, punishment, source) {
-  const guildId = guild.id;
-  const member  = await guild.members.fetch(userId).catch(() => null);
-
-  switch (punishment) {
-    case 'warn':
-      db.addSanction(guildId, userId, client.user.id, 'warn', `Antiraid - ${source}`);
-      break;
-
-    case 'mute':
-      if (member) {
-        await member.timeout(10 * 60 * 1000, `Antiraid - ${source}`).catch(() => {});
-      }
-      db.addSanction(guildId, userId, client.user.id, 'mute', `Antiraid - ${source}`, 600);
-      break;
-
-    case 'kick':
-      if (member) {
-        await member.kick(`Antiraid - ${source}`).catch(() => {});
-      }
-      db.addSanction(guildId, userId, client.user.id, 'kick', `Antiraid - ${source}`);
-      break;
-
-    case 'ban':
-      await guild.members.ban(userId, { reason: `Antiraid - ${source}` }).catch(() => {});
-      db.addSanction(guildId, userId, client.user.id, 'ban', `Antiraid - ${source}`);
-      break;
-
-    case 'derank':
-    default:
-      if (member) {
-        const me = guild.members.me ?? await guild.members.fetchMe().catch(() => null);
-        const keepRoles = new Set(db.getNoderankRoles(guildId));
-        const rolesToRemove = member.roles.cache
-          .filter(r => r.id !== guild.id && !keepRoles.has(r.id) && !r.managed && (!me || me.roles.highest.comparePositionTo(r) > 0))
-          .map(r => r.id);
-
-        if (rolesToRemove.length) {
-          const deranked = await member.roles
-            .remove(rolesToRemove, `Antiraid - ${source}`)
-            .then(() => true)
-            .catch(() => false);
-
-          if (deranked) {
-            db.addSanction(guildId, userId, client.user.id, 'derank', `Antiraid - ${source}`);
-          }
-        }
-      }
-      break;
-  }
+  return core.punish(client, guild, userId, punishment, source);
 }
