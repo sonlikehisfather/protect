@@ -5,6 +5,11 @@ const {
   ButtonBuilder,
   ButtonStyle,
   PermissionsBitField,
+  MessageFlags,
+  ContainerBuilder,
+  TextDisplayBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
 } = require('discord.js');
 
 const db     = require('../../core/database');
@@ -53,20 +58,15 @@ module.exports = {
       return embed.replyError(message, 'Aucun membre ne peut être banni.', { timestamp: false });
     }
 
-    const confirmMessage = await message.channel.send({
-      embeds: [
-        embed.build(
-          guildId,
-          `**Membres à bannir**\n\`${targets.size}\`\n\n` +
-          `**Ignorés (protégés, bots, non bannables)**\n\`${skipped}\`\n\n` +
-          `**Raison**\n${reason}\n\n` +
-          `Cette action va bannir tous les membres listés ci-dessus.`,
-          { title: 'Confirmer banall', timestamp: false }
-        ),
-      ],
-      components: [_buildConfirmRow(false)],
-      allowedMentions: { parse: [] },
-    }).catch(() => null);
+    const confirmBody =
+      `**Membres à bannir**\n\`${targets.size}\`\n\n` +
+      `**Ignorés (protégés, bots, non bannables)**\n\`${skipped}\`\n\n` +
+      `**Raison**\n${reason}\n\n` +
+      `Cette action va bannir tous les membres listés ci-dessus.`;
+
+    const confirmMessage = await message.channel.send(
+      _v2(guildId, 'Confirmer banall', confirmBody, _buildConfirmRow(false))
+    ).catch(() => null);
 
     if (!confirmMessage) return;
 
@@ -83,10 +83,7 @@ module.exports = {
     collector.on('collect', async interaction => {
       if (interaction.customId === 'local:banall:cancel') {
         collector.stop('cancelled');
-        await interaction.update({
-          embeds: [embed.build(guildId, 'Action annulée.', { title: 'Banall annulé', timestamp: false })],
-          components: [_buildConfirmRow(true)],
-        }).catch(() => {});
+        await interaction.update(_v2(guildId, 'Banall annulé', 'Action annulée.')).catch(() => {});
         return;
       }
 
@@ -96,7 +93,7 @@ module.exports = {
 
       collector.stop('confirmed');
       await interaction.deferUpdate().catch(() => {});
-      await confirmMessage.edit({ components: [_buildConfirmRow(true)] }).catch(() => {});
+      await confirmMessage.edit(_v2(guildId, 'Banall en cours', `Bannissement de \`${targets.size}\` membre(s)...`)).catch(() => {});
 
       await _runBanAll(client, message, guild, guildId, targets, me, reason);
     });
@@ -104,7 +101,7 @@ module.exports = {
     collector.on('end', async (_, endReason) => {
       embed.clearPrivateInteraction(confirmMessage);
       if (endReason === 'confirmed' || endReason === 'cancelled') return;
-      await confirmMessage.edit({ components: [_buildConfirmRow(true)] }).catch(() => {});
+      await confirmMessage.edit(_v2(guildId, 'Banall expiré', 'Aucune confirmation reçue : rien n’a été banni.')).catch(() => {});
     });
   },
 };
@@ -153,11 +150,7 @@ async function _runBanAll(client, message, guild, guildId, targets, me, reason) 
     `**Ignorés**\n\`${skippedLate}\`\n\n` +
     `**Échecs**\n\`${failedCount}\``;
 
-  await embed.sendEmbed(message.channel, guildId, text, {
-    title: 'Banall terminé',
-    timestamp: false,
-    allowedMentions: { parse: [] },
-  }).catch(() => {});
+  await message.channel.send(_v2(guildId, 'Banall terminé', text)).catch(() => {});
 
   const e = embed.log(guildId, 'Banall', [
     { name: 'Modérateur', value: `<@${message.author.id}> (${message.author.tag})`, inline: false },
@@ -167,6 +160,18 @@ async function _runBanAll(client, message, guild, guildId, targets, me, reason) 
   ]);
 
   await logger.send(client, guildId, 'modlog', e);
+}
+
+/** Message Components V2 : conteneur (titre + texte, puis rangée de boutons optionnelle). */
+function _v2(guildId, title, body, row = null) {
+  const c = new ContainerBuilder();
+  try { c.setAccentColor(embed.getGuildColor(guildId)); } catch {}
+  c.addTextDisplayComponents(new TextDisplayBuilder().setContent(`### ${title}\n${body}`.slice(0, 4000)));
+  if (row) {
+    c.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
+    c.addActionRowComponents(row);
+  }
+  return { components: [c], flags: MessageFlags.IsComponentsV2, allowedMentions: { parse: [] } };
 }
 
 function _buildConfirmRow(disabled) {

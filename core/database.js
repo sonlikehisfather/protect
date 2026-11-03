@@ -5413,10 +5413,17 @@ const db = {
         mime         TEXT,
         size         INTEGER,
         createdBy    TEXT NOT NULL,
-        createdAt    INTEGER NOT NULL
+        createdAt    INTEGER NOT NULL,
+        num          INTEGER                   -- numéro affiché, propre à chaque type (#1 image, #1 vidéo...)
       );
       CREATE INDEX IF NOT EXISTS idx_vault_items_kind ON vault_items (kind, createdAt DESC);
     `);
+
+    // Anciennes bases : ajoute la colonne num et numérote l'existant, type par type.
+    if (!getDb().prepare('PRAGMA table_info(vault_items)').all().some(c => c.name === 'num')) {
+      getDb().exec('ALTER TABLE vault_items ADD COLUMN num INTEGER');
+    }
+    getDb().exec(`UPDATE vault_items SET num = (SELECT COUNT(*) FROM vault_items v2 WHERE v2.kind = vault_items.kind AND v2.id <= vault_items.id) WHERE num IS NULL`);
   },
 
   hasVaultAccess(userId) {
@@ -5440,10 +5447,10 @@ const db = {
   addVaultItem(item) {
     module.exports._ensureVaultTables();
     const r = getDb().prepare(
-      `INSERT INTO vault_items (kind, title, note, content, filePath, originalName, mime, size, createdBy, createdAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO vault_items (kind, title, note, content, filePath, originalName, mime, size, createdBy, createdAt, num)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(num), 0) + 1 FROM vault_items WHERE kind = ?))`
     ).run(item.kind, item.title, item.note ?? null, item.content ?? null, item.filePath ?? null,
-          item.originalName ?? null, item.mime ?? null, item.size ?? null, item.createdBy, Date.now());
+          item.originalName ?? null, item.mime ?? null, item.size ?? null, item.createdBy, Date.now(), item.kind);
     return Number(r.lastInsertRowid);
   },
   getVaultItem(id) {
@@ -5460,7 +5467,7 @@ const db = {
   },
   countVaultItems() {
     module.exports._ensureVaultTables();
-    const out = { text: 0, image: 0, video: 0 };
+    const out = { text: 0, image: 0, video: 0, file: 0 };
     for (const r of getDb().prepare('SELECT kind, COUNT(*) AS n FROM vault_items GROUP BY kind').all()) out[r.kind] = r.n;
     return out;
   },

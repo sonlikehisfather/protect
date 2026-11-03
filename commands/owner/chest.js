@@ -13,7 +13,7 @@ const { Readable } = require('stream');
 const {
   ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder,
   ModalBuilder, TextInputBuilder, TextInputStyle, LabelBuilder, FileUploadBuilder,
-  AttachmentBuilder, MessageFlags,
+  AttachmentBuilder, MessageFlags, ContainerBuilder, TextDisplayBuilder, SeparatorBuilder, SeparatorSpacingSize,
 } = require('discord.js');
 
 const db     = require('../../core/database');
@@ -31,7 +31,10 @@ const KINDS = {
   text : { label: 'Textes', one: 'texte' },
   image: { label: 'Images', one: 'image' },
   video: { label: 'Vidéos', one: 'vidéo' },
+  file : { label: 'Fichiers', one: 'fichier' },
 };
+
+const TEXT_WAIT_MS = 120_000;
 
 const ORDERS = {
   recent: 'Plus récents d’abord',
@@ -91,10 +94,7 @@ async function _handleAccess(client, message, args) {
     const lines = rows.length
       ? rows.map(r => `▸ <@${r.userId}> (\`${r.userId}\`) depuis <t:${Math.floor(r.grantedAt / 1000)}:d>`).join('\n')
       : 'Aucune personne autorisée (à part toi).';
-    return message.channel.send({
-      embeds: [embed.build(guildId, lines, { title: '◈ Accès au chest', timestamp: false })],
-      allowedMentions: { parse: [] },
-    }).catch(() => {});
+    return message.channel.send(_ctr(guildId, { title: '◈ Accès au chest', body: lines })).catch(() => {});
   }
 
   if (action !== 'add' && action !== 'del') {
@@ -161,8 +161,11 @@ async function _openPanel(client, message) {
 
   collector.on('end', async () => {
     embed.clearPrivateInteraction(panel);
+    state.waiter?.stop('closed');
     _discardDraft(state);
+    // Fermeture (bouton ou inactivité) : le panel ET le message de commande disparaissent.
     await panel.delete().catch(() => {});
+    await message.delete().catch(() => {});
   });
 }
 
@@ -179,8 +182,8 @@ async function _onInteraction(message, panel, collector, state, i, render) {
   }
   if (id === 'vlt:home') { state.view = 'home'; state.confirmDelete = false; return update(); }
 
-  if (id.startsWith('vlt:kind:')) {
-    state.kind = id.split(':')[2];
+  if (id === 'vlt:kind') {
+    state.kind = i.values[0];
     state.view = 'list'; state.page = 0; state.search = '';
     return update();
   }
@@ -206,12 +209,15 @@ async function _onInteraction(message, panel, collector, state, i, render) {
   }
 
   // Ajout
-  if (id === 'vlt:add' || id.startsWith('vlt:addkind:')) {
-    const kind = id === 'vlt:add' ? state.kind : id.split(':')[2];
-    return _startAdd(state, i, kind, render);
+  if (id === 'vlt:add') { state.view = 'new'; return update(); }
+  if (id === 'vlt:newtype') return _onNewType(message, panel, state, i, render);
+  if (id === 'vlt:waitcancel') {
+    state.waitCancelled = true;
+    state.waiter?.stop('cancel');
+    return i.deferUpdate().catch(() => {});
   }
 
-  // Brouillon (images / vidéos)
+  // Brouillon (images, vidéos, fichiers)
   if (id === 'vlt:draft:files') return _draftFiles(state, panel, i, render);
   if (id === 'vlt:draft:cancel') {
     _discardDraft(state);
@@ -259,75 +265,94 @@ async function _onInteraction(message, panel, collector, state, i, render) {
 
 // ─── Ajout ──────────────────────────────────────────────────────────────────
 
-async function _startAdd(state, i, kind, render) {
-  const isText = kind === 'text';
-  const modal = new ModalBuilder().setCustomId(`vlt:modal:add:${i.id}`).setTitle(`Ajouter : ${KINDS[kind].one}`);
-
-  if (isText) {
-    modal.addLabelComponents(
-      _text('title', 'Titre', TextInputStyle.Short, { max: 100 }),
-      _text('content', 'Contenu', TextInputStyle.Paragraph, { max: 4000 }),
-      _text('note', 'Note (optionnelle)', TextInputStyle.Short, { required: false, max: 500 }),
-    );
-  } else {
-    modal.addLabelComponents(
-      _text('title', 'Titre', TextInputStyle.Short, { max: 100 }),
-      _text('note', 'Note (optionnelle)', TextInputStyle.Short, { required: false, max: 500 }),
-    );
-  }
-
-  await i.showModal(modal).catch(() => {});
-  const sub = await _awaitModal(i, modal.data.custom_id);
-  if (!sub) return;
-
-  const title = sub.fields.getTextInputValue('title').trim() || 'Sans titre';
-  const note  = sub.fields.getTextInputValue('note').trim() || null;
+/** Le menu "type" de la vue Nouvel élément : texte (via le chat) ou formulaire d'envoi de fichiers. */
+async function _onNewType(message, panel, state, i, render) {
+  const kind = i.values[0];
+  if (!KINDS[kind]) return i.deferUpdate().catch(() => {});
   state.kind = kind;
-
-  if (isText) {
-    const newId = db.addVaultItem({
-      kind, title, note, content: sub.fields.getTextInputValue('content'), createdBy: i.user.id,
-    });
-    state.view = 'detail'; state.itemId = newId;
-    state.notice = 'Texte enregistré.';
-    return sub.update(render()).catch(() => {});
-  }
-
-  // Image / vidéo : le titre est donné, les fichiers s'ajoutent ensuite via un bouton.
-  _discardDraft(state);
-  state.draft = { kind, title, note, files: [] };
-  state.view = 'draft';
-  return sub.update(render()).catch(() => {});
+  if (kind === 'text') return _waitText(message, panel, state, i, render);
+  return _uploadForm(state, panel, i, kind, render);
 }
 
-async function _draftFiles(state, panel, i, render) {
-  const d = state.draft;
-  if (!d) return i.deferUpdate().catch(() => {});
+async function _waitText(message, panel, state, i, render) {
+  state.view = 'waittext';
+  state.waitCancelled = false;
+  await i.update(render()).catch(() => {});
 
+  const col = message.channel.createMessageCollector({
+    filter: m => m.author.id === i.user.id,
+    max: 1,
+    time: TEXT_WAIT_MS,
+  });
+  state.waiter = col;
+
+  const got = await new Promise(resolve => {
+    let m = null;
+    col.on('collect', x => { m = x; });
+    col.on('end', () => resolve(m));
+  });
+  state.waiter = null;
+
+  const back = notice => { state.view = 'new'; state.notice = notice; return panel.edit(render()).catch(() => {}); };
+
+  if (!got) return back(state.waitCancelled ? 'Ajout annulé.' : 'Temps écoulé : rien n’a été enregistré.');
+  const content = got.content.trim();
+  got.delete().catch(() => {});
+  if (/^annuler$/i.test(content)) return back('Ajout annulé.');
+  if (!content) return back('Message vide : un texte doit être écrit dans le message.');
+
+  const newId = db.addVaultItem({
+    kind: 'text',
+    title: _cut(content.split('\n')[0].trim(), 60) || 'Sans titre',
+    content: content.slice(0, 4000),
+    createdBy: i.user.id,
+  });
+  state.view = 'detail'; state.itemId = newId;
+  state.notice = 'Texte enregistré. « Renommer » permet de changer le titre ou d’ajouter une note.';
+  return panel.edit(render()).catch(() => {});
+}
+
+async function _uploadForm(state, panel, i, kind, render) {
+  const k = KINDS[kind];
   const upload = new FileUploadBuilder().setCustomId('files').setMinValues(1).setMaxValues(10).setRequired(true);
-  const modal = new ModalBuilder().setCustomId(`vlt:modal:files:${i.id}`).setTitle(`Fichiers : ${_cut(d.title, 30)}`)
+  const modal = new ModalBuilder().setCustomId(`vlt:modal:up:${i.id}`).setTitle(`Nouveau : ${k.one}`)
     .addLabelComponents(
-      new LabelBuilder()
-        .setLabel(d.kind === 'image' ? 'Images (10 maximum à la fois)' : 'Vidéos (10 maximum à la fois)')
-        .setFileUploadComponent(upload),
+      _text('title', 'Titre', TextInputStyle.Short, { max: 100 }),
+      _text('note', 'Note (optionnelle)', TextInputStyle.Short, { required: false, max: 500 }),
+      new LabelBuilder().setLabel(k.label).setDescription('10 fichiers maximum à la fois.').setFileUploadComponent(upload),
     );
 
   await i.showModal(modal).catch(() => {});
   const sub = await _awaitModal(i, modal.data.custom_id);
   if (!sub) return;
 
+  _discardDraft(state);
+  state.draft = {
+    kind,
+    title: sub.fields.getTextInputValue('title').trim() || 'Sans titre',
+    note : sub.fields.getTextInputValue('note').trim() || null,
+    files: [],
+  };
+  state.view = 'draft';
   state.busy = true;
-  await sub.deferUpdate().catch(() => {});
+  state.notice = 'Téléchargement en cours...';
+  await sub.update(render()).catch(() => {});
 
+  state.notice = await _ingest(state.draft, sub.fields.getUploadedFiles('files', false));
+  state.busy = false;
+  return panel.edit(render()).catch(() => {});
+}
+
+/** Copie les fichiers reçus sur le disque et les ajoute au brouillon. Renvoie le message de bilan. */
+async function _ingest(d, files) {
   const errors = [];
   let added = 0;
-  const files = sub.fields.getUploadedFiles('files', false);
 
   for (const att of files?.values() ?? []) {
     if (d.files.length >= MAX_DRAFT_FILES) { errors.push(`Limite de ${MAX_DRAFT_FILES} fichiers atteinte.`); break; }
     const mime = att.contentType || _mimeFromName(att.name);
-    const okKind = d.kind === 'image' ? mime.startsWith('image/') : mime.startsWith('video/');
-    if (!okKind) { errors.push(`${att.name} : n’est pas ${d.kind === 'image' ? 'une image' : 'une vidéo'}`); continue; }
+    if (d.kind === 'image' && !mime.startsWith('image/')) { errors.push(`${att.name} : n’est pas une image`); continue; }
+    if (d.kind === 'video' && !mime.startsWith('video/')) { errors.push(`${att.name} : n’est pas une vidéo`); continue; }
     if (att.size > MAX_FILE_BYTES) { errors.push(`${att.name} : trop lourd (200 Mo maximum)`); continue; }
 
     try {
@@ -340,13 +365,36 @@ async function _draftFiles(state, panel, i, render) {
     }
   }
 
-  state.busy = false;
   const parts = [];
   if (added) parts.push(`${added} fichier(s) ajouté(s) au brouillon.`);
   if (errors.length) parts.push(errors.join('\n'));
-  state.notice = parts.join('\n') || 'Aucun fichier reçu.';
+  return parts.join('\n') || 'Aucun fichier reçu.';
+}
+
+/** Ajoute d'autres fichiers à un brouillon existant. */
+async function _draftFiles(state, panel, i, render) {
+  const d = state.draft;
+  if (!d) return i.deferUpdate().catch(() => {});
+
+  const upload = new FileUploadBuilder().setCustomId('files').setMinValues(1).setMaxValues(10).setRequired(true);
+  const modal = new ModalBuilder().setCustomId(`vlt:modal:files:${i.id}`).setTitle(`Fichiers : ${_cut(d.title, 30)}`)
+    .addLabelComponents(
+      new LabelBuilder().setLabel(KINDS[d.kind].label).setDescription('10 fichiers maximum à la fois.').setFileUploadComponent(upload),
+    );
+
+  await i.showModal(modal).catch(() => {});
+  const sub = await _awaitModal(i, modal.data.custom_id);
+  if (!sub) return;
+
+  state.busy = true;
+  state.notice = 'Téléchargement en cours...';
+  await sub.update(render()).catch(() => {});
+
+  state.notice = await _ingest(d, sub.fields.getUploadedFiles('files', false));
+  state.busy = false;
   return panel.edit(render()).catch(() => {});
 }
+
 
 async function _draftSave(message, state, i, render) {
   const d = state.draft;
@@ -387,7 +435,7 @@ async function _download(url, kind, originalName) {
   fs.mkdirSync(dir, { recursive: true });
 
   let ext = path.extname(originalName || '').toLowerCase();
-  if (!/^\.[a-z0-9]{1,5}$/.test(ext)) ext = kind === 'image' ? '.png' : '.mp4';
+  if (!/^\.[a-z0-9]{1,5}$/.test(ext)) ext = kind === 'image' ? '.png' : kind === 'video' ? '.mp4' : '.bin';
   const name = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`;
   const full = path.join(dir, name);
 
@@ -457,7 +505,50 @@ function _render(guildId, state) {
   if (state.view === 'list')   return _renderList(guildId, state);
   if (state.view === 'detail') return _renderDetail(guildId, state);
   if (state.view === 'draft')  return _renderDraft(guildId, state);
+  if (state.view === 'new')    return _renderNew(guildId, state);
+  if (state.view === 'waittext') return _renderWaitText(guildId);
   return _renderHome(guildId, state);
+}
+
+function _renderNew(guildId, state) {
+  const body =
+    'Choisis le type d’élément à ajouter.\n\n' +
+    '▸ **Texte** : tu l’envoies ensuite dans le chat\n' +
+    '▸ **Image, vidéo, fichier** : un formulaire s’ouvre (10 fichiers à la fois)' +
+    (state.notice ? `\n\n> ${state.notice}` : '');
+
+  return _ctr(guildId, {
+    title: '◈ Nouvel élément',
+    body,
+    rows: [
+      new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder().setCustomId('vlt:newtype').setPlaceholder('Type d’élément')
+          .addOptions(Object.entries(KINDS).map(([k, v]) => ({
+            label: v.one.charAt(0).toUpperCase() + v.one.slice(1),
+            value: k,
+            default: k === state.kind,
+          }))),
+      ),
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('vlt:home').setLabel('Retour').setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId('vlt:close').setLabel('Fermer').setStyle(ButtonStyle.Danger),
+      ),
+    ],
+  });
+}
+
+function _renderWaitText(guildId) {
+  return _ctr(guildId, {
+    title: '◈ Nouveau texte',
+    body :
+      'Envoie maintenant ton texte dans ce salon (4000 caractères maximum).\n' +
+      'Ton message sera supprimé une fois enregistré. Tu as 2 minutes.',
+    rows: [
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('vlt:waitcancel').setLabel('Annuler').setStyle(ButtonStyle.Danger),
+      ),
+    ],
+  });
 }
 
 function _renderHome(guildId, state) {
@@ -466,25 +557,26 @@ function _renderHome(guildId, state) {
     `Espace privé. Tout est rangé par type et classable par date.\n\n` +
     `▸ **Textes** : \`${c.text}\`\n` +
     `▸ **Images** : \`${c.image}\`\n` +
-    `▸ **Vidéos** : \`${c.video}\`` +
+    `▸ **Vidéos** : \`${c.video}\`\n` +
+    `▸ **Fichiers** : \`${c.file}\`` +
     (state.notice ? `\n\n> ${state.notice}` : '');
 
-  return {
-    embeds: [embed.build(guildId, desc, { title: '◈ Chest', timestamp: false })],
-    components: [
+  return _ctr(guildId, {
+    title: '◈ Chest',
+    body : desc,
+    rows : [
       new ActionRowBuilder().addComponents(
-        ...Object.entries(KINDS).map(([k, v]) =>
-          new ButtonBuilder().setCustomId(`vlt:kind:${k}`).setLabel(`${v.label} (${c[k]})`).setStyle(ButtonStyle.Primary)),
+        new StringSelectMenuBuilder().setCustomId('vlt:kind').setPlaceholder('Ouvrir une rubrique')
+          .addOptions(Object.entries(KINDS).map(([k, v]) => ({
+            label: v.label, value: k, description: `${c[k]} élément(s)`,
+          }))),
       ),
       new ActionRowBuilder().addComponents(
-        ...Object.entries(KINDS).map(([k, v]) =>
-          new ButtonBuilder().setCustomId(`vlt:addkind:${k}`).setLabel(`Ajouter ${v.one}`).setStyle(ButtonStyle.Success)),
-      ),
-      new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('vlt:add').setLabel('Nouvel élément').setStyle(ButtonStyle.Success),
         new ButtonBuilder().setCustomId('vlt:close').setLabel('Fermer').setStyle(ButtonStyle.Danger),
       ),
     ],
-  };
+  });
 }
 
 function _query(state) {
@@ -507,7 +599,7 @@ function _renderList(guildId, state) {
   }
 
   const lines = q.rows.length
-    ? q.rows.map(r => `\`#${r.id}\` **${_cut(r.title, 60)}** ・ <t:${Math.floor(r.createdAt / 1000)}:d>${r.size ? ` ・ ${_fmtSize(r.size)}` : ''}`).join('\n')
+    ? q.rows.map(r => `\`#${r.num ?? r.id}\` **${_cut(r.title, 60)}** ・ <t:${Math.floor(r.createdAt / 1000)}:d>${r.size ? ` ・ ${_fmtSize(r.size)}` : ''}`).join('\n')
     : '*Aucun élément pour ces filtres.*';
 
   const filters = [
@@ -516,10 +608,9 @@ function _renderList(guildId, state) {
     state.search ? `Recherche : **${_cut(state.search, 40)}**` : null,
   ].filter(Boolean).join(' ・ ');
 
-  const e = embed.build(guildId,
-    `${filters}\n\n${lines}${state.notice ? `\n\n> ${state.notice}` : ''}`,
-    { title: `◈ ${k.label} ・ ${q.total} élément(s)`, timestamp: false });
-  e.setFooter({ text: `Page ${state.page + 1}/${pages}` });
+  const body   = `${filters}\n\n${lines}${state.notice ? `\n\n> ${state.notice}` : ''}`;
+  const title  = `◈ ${k.label} ・ ${q.total} élément(s)`;
+  const footer = `Page ${state.page + 1}/${pages}`;
 
   const rows = [
     new ActionRowBuilder().addComponents(
@@ -536,7 +627,7 @@ function _renderList(guildId, state) {
     rows.push(new ActionRowBuilder().addComponents(
       new StringSelectMenuBuilder().setCustomId('vlt:open').setPlaceholder('Ouvrir un élément')
         .addOptions(q.rows.map(r => ({
-          label: _cut(`#${r.id} ${r.title}`, 100),
+          label: _cut(`#${r.num ?? r.id} ${r.title}`, 100),
           description: _fmtDate(r.createdAt),
           value: String(r.id),
         }))),
@@ -547,11 +638,14 @@ function _renderList(guildId, state) {
     new ButtonBuilder().setCustomId('vlt:prev').setLabel('Précédent').setStyle(ButtonStyle.Secondary).setDisabled(state.page <= 0),
     new ButtonBuilder().setCustomId('vlt:next').setLabel('Suivant').setStyle(ButtonStyle.Secondary).setDisabled(state.page >= pages - 1),
     new ButtonBuilder().setCustomId('vlt:search').setLabel('Rechercher').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('vlt:add').setLabel('Ajouter').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('vlt:add').setLabel('Nouveau').setStyle(ButtonStyle.Success),
+  ));
+  rows.push(new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('vlt:home').setLabel('Accueil').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('vlt:close').setLabel('Fermer').setStyle(ButtonStyle.Danger),
   ));
 
-  return { embeds: [e], components: rows };
+  return _ctr(guildId, { title, body, footer, rows });
 }
 
 function _renderDetail(guildId, state) {
@@ -576,8 +670,8 @@ function _renderDetail(guildId, state) {
     : '';
   const warn = state.confirmDelete ? '\n\n**Supprimer définitivement cet élément ?**' : '';
 
-  const e = embed.build(guildId, `${meta}${preview}${warn}${state.notice ? `\n\n> ${state.notice}` : ''}`,
-    { title: `◈ #${item.id} ・ ${_cut(item.title, 200)}`, timestamp: false });
+  const body  = `${meta}${preview}${warn}${state.notice ? `\n\n> ${state.notice}` : ''}`;
+  const title = `◈ #${item.num ?? item.id} ・ ${_cut(item.title, 200)}`;
 
   const buttons = state.confirmDelete
     ? [
@@ -591,7 +685,7 @@ function _renderDetail(guildId, state) {
         new ButtonBuilder().setCustomId('vlt:back').setLabel('Retour').setStyle(ButtonStyle.Primary),
       ];
 
-  return { embeds: [e], components: [new ActionRowBuilder().addComponents(...buttons)] };
+  return _ctr(guildId, { title, body, rows: [new ActionRowBuilder().addComponents(...buttons)] });
 }
 
 function _renderDraft(guildId, state) {
@@ -606,23 +700,43 @@ function _renderDraft(guildId, state) {
     `**Titre** : ${_cut(d.title, 100)}\n` +
     (d.note ? `**Note** : ${_cut(d.note, 300)}\n` : '') +
     `\n**Fichiers (${d.files.length})**\n${list}\n\n` +
-    `Clique sur **Ajouter des fichiers**, choisis tes ${d.kind === 'image' ? 'images' : 'vidéos'} dans le formulaire, ` +
+    `Clique sur **Ajouter des fichiers**, choisis tes ${KINDS[d.kind].label.toLowerCase()} dans le formulaire, ` +
     `puis **Enregistrer**.` +
     (state.notice ? `\n\n> ${state.notice}` : '');
 
-  return {
-    embeds: [embed.build(guildId, desc, { title: `◈ Nouveau : ${KINDS[d.kind].one}`, timestamp: false })],
-    components: [
+  return _ctr(guildId, {
+    title: `◈ Nouveau : ${KINDS[d.kind].one}`,
+    body : desc,
+    rows : [
       new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('vlt:draft:files').setLabel('Ajouter des fichiers').setStyle(ButtonStyle.Primary),
         new ButtonBuilder().setCustomId('vlt:draft:save').setLabel(`Enregistrer (${d.files.length})`).setStyle(ButtonStyle.Success).setDisabled(!d.files.length),
         new ButtonBuilder().setCustomId('vlt:draft:cancel').setLabel('Annuler').setStyle(ButtonStyle.Danger),
       ),
     ],
-  };
+  });
 }
 
 // ─── Utilitaires ────────────────────────────────────────────────────────────
+
+/** Message Components V2 : un conteneur (texte + séparateur + rangées de boutons / menus). */
+function _ctr(guildId, { title, body, footer, rows = [] }) {
+  const c = new ContainerBuilder();
+  try { c.setAccentColor(embed.getGuildColor(guildId)); } catch {}
+
+  const parts = [];
+  if (title) parts.push(`### ${title}`);
+  if (body)  parts.push(body);
+  if (footer) parts.push(`-# ${footer}`);
+  c.addTextDisplayComponents(new TextDisplayBuilder().setContent(parts.join('\n\n').slice(0, 4000)));
+
+  if (rows.length) {
+    c.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
+    for (const r of rows) c.addActionRowComponents(r);
+  }
+
+  return { components: [c], flags: MessageFlags.IsComponentsV2, allowedMentions: { parse: [] } };
+}
 
 function _text(id, label, style, { value, required = true, max } = {}) {
   const t = new TextInputBuilder().setCustomId(id).setStyle(style).setRequired(required);
