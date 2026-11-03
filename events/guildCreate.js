@@ -23,7 +23,7 @@ module.exports = {
 
       const ownerId = guild.ownerId;
 
-      if (ownerId && (perms.isBuyer(ownerId) || perms.isOwner(guildId,ownerId))) {
+      if (ownerId && (perms.isBuyer(ownerId) || perms.isOwner(guild.id, ownerId))) {
         console.log(`[SecurInvite] Serveur autorisé : ${guild.name} (${guild.id}) - owner autorisé (${ownerId})`);
         return;
       }
@@ -152,12 +152,13 @@ async function _sendServerJoinNotification(client, guild) {
 
       await owner.send({ embeds: [embed], components: [row] });
     } catch (sendErr) {
-      console.error('[Notification] Erreur détaillée:', sendErr);
       throw sendErr;
     }
   } catch (err) {
     if (err.code === 50007) {
       console.error('[Notification] Le buyer a désactivé les DMs');
+    } else if (err.code === 50278) {
+      console.error('[Notification] Le buyer n’a aucun serveur en commun avec le bot (DM impossible)');
     } else {
       console.error('[Notification] Erreur envoi au owner:', err.message, err.code ? `(Code: ${err.code})` : '', err.stack?.split('\n')[0] || '');
     }

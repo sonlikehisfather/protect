@@ -82,7 +82,7 @@ module.exports = {
         continue;
       }
 
-        if (perms.isProtected(member.id, guildId, member) ||
+        if (perms.isProtected(member.id, guildId, member, { ignoreProtectUser: true }) ||
           perms.isAngelProtected(member.id, guildId)) {
         protectedCount++;
         continue;

@@ -60,8 +60,15 @@ module.exports = {
       return _unwet(client, message, target);
     }
 
+    if (target.id === message.author.id) {
+      return embed.replyError(message, 'Tu ne peux pas te wet toi-même.');
+    }
     if (target.id === client.user.id) {
       return embed.replyError(message, 'Impossible de wet le bot.');
+    }
+    const targetMember = message.guild.members.cache.get(target.id) ?? null;
+    if (perms.isProtected(target.id, message.guild.id, targetMember)) {
+      return embed.replyError(message, 'Impossible de wet un buyer, un owner ou un utilisateur protégé.');
     }
     if (db.isWet(target.id)) {
       return _reply(message, `<@${target.id}> Deja wet`);
@@ -179,6 +186,7 @@ function _canUse(message) {
   const { author, guild, member } = message;
   if (perms.isBuyer(author.id)) return true;
 
+  if (!guild || !member) return false;
   const roleIds = member.roles.cache.map(role => role.id);
   return db.getCmdTargets(guild.id, module.exports.help.name).some(target =>
     (target.targetType === 'user' && target.targetId === author.id) ||

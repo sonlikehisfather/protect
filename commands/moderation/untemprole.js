@@ -77,7 +77,7 @@ module.exports = {
       return;
     }
 
-    if (perms.isProtected(target.id, guildId, target)) {
+    if (perms.isProtected(target.id, guildId, target, { ignoreProtectUser: true })) {
       const sent = await embed.replyError(
         message,
         'Ce membre est protégé.',

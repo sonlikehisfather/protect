@@ -186,7 +186,8 @@ function hasLevel(member, guildId, minLevel) {
 function isProtected(
   targetId,
   guildId,
-  targetMember = null
+  targetMember = null,
+  { ignoreProtectUser = false } = {}
 ) {
 
 
@@ -197,7 +198,7 @@ function isProtected(
     return true;
 
 
-  if (db.isProtectedUser(guildId, targetId))
+  if (!ignoreProtectUser && db.isProtectedUser(guildId, targetId))
     return true;
 
 

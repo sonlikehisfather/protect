@@ -96,8 +96,7 @@ module.exports = {
         skippedBot.push(target); continue;
       }
 
-      if (perms.isProtected(target.id, guildId, target) ||
-          perms.isAngelProtected(target.id, guildId)) {
+      if (perms.isProtected(target.id, guildId, target, { ignoreProtectUser: true })) {
         skippedProtected.push(target); continue;
       }
 

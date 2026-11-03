@@ -124,13 +124,11 @@ module.exports = {
 
     const members = sourceChannel.members.filter(member =>
       !member.user.bot &&
-      !perms.isProtected(member.id, guildId, member) &&
-      !perms.isAngelProtected(member.id, guildId)
+      !perms.isProtected(member.id, guildId, member)
     );
     const protectedCount = sourceChannel.members.filter(member =>
       !member.user.bot &&
-      (perms.isProtected(member.id, guildId, member) ||
-       perms.isAngelProtected(member.id, guildId))
+      perms.isProtected(member.id, guildId, member)
     ).size;
 
     if (!members.size) {

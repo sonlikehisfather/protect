@@ -63,6 +63,9 @@ exports.run = async (client, message, args) => {
     ?? await client.users.fetch(args[0]).catch(() => null);
 
   if (!target) return embed.replyError(message, 'Utilisateur introuvable.');
+  if (target.id === authorId) {
+    return embed.replyError(message, 'Tu ne peux pas te blacklister toi-même.');
+  }
   if (target.id === client.user.id) {
     return embed.replyError(message, 'Impossible de blacklister le bot.');
   }

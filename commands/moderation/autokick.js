@@ -307,10 +307,7 @@ async function _partitionProtectedUsers(guild, userIds) {
   for (const userId of userIds) {
     const member = guild.members.cache.get(userId)
       ?? await guild.members.fetch(userId).catch(() => null);
-    if (
-      perms.isProtected(userId, guild.id, member) ||
-      perms.isAngelProtected(userId, guild.id)
-    ) {
+    if (perms.isProtected(userId, guild.id, member)) {
       protectedIds.push(userId);
     } else {
       allowedIds.push(userId);

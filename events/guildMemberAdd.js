@@ -111,10 +111,7 @@ module.exports = {
 
       const autoKickEntry = db.getAutoKickEntry(guildId, member.id);
       if (autoKickEntry && db.isAutoKickEnabled(guildId)) {
-        if (
-          perms.isProtected(member.id, guildId, member) ||
-          perms.isAngelProtected(member.id, guildId)
-        ) {
+        if (perms.isProtected(member.id, guildId, member)) {
           return;
         }
 

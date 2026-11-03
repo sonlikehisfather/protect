@@ -122,8 +122,7 @@ module.exports = {
     const isOwner = perms.isOwner(guildId, message.author.id);
 
     for (const member of members) {
-        if (perms.isProtected(member.id, guildId, member) ||
-          perms.isAngelProtected(member.id, guildId)) {
+        if (perms.isProtected(member.id, guildId, member)) {
         protectedCnt++;
         continue;
       }
