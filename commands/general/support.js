@@ -28,6 +28,7 @@ module.exports = {
     usage       : 'support',
     aliases     : ['discord'],
     category    : 'general',
+    defaultPermission: 'everyone',
   },
 
   async run(client, message) {
