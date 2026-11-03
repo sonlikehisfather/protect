@@ -189,10 +189,10 @@ async function _setName(client, message, rawName, deleteReply, deleteDelay) {
 
   const changed = await _safeSetUsername(client, name);
 
-  if (!changed) {
+  if (!changed.ok) {
     return _sendError(
       message,
-      'Impossible de modifier le nom du bot. Discord peut limiter les changements de nom.',
+      `Impossible de modifier le nom du bot. ${changed.error}`,
       deleteReply,
       deleteDelay
     );
@@ -977,8 +977,8 @@ async function _applyProfileState(client, state) {
   if (state.name) {
     const changed = await _safeSetUsername(client, state.name);
 
-    if (changed) success.push('Nom');
-    else failed.push('Nom');
+    if (changed.ok) success.push('Nom');
+    else { failed.push('Nom'); errors.push(`Nom : ${changed.error}`); }
   }
 
   if (state.avatarRemove) {
@@ -1016,9 +1016,9 @@ async function _applyProfileState(client, state) {
 async function _safeSetUsername(client, name) {
   try {
     await client.user.setUsername(name);
-    return true;
-  } catch {
-    return false;
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: _formatDiscordError(err) };
   }
 }
 
