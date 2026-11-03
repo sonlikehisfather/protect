@@ -18,9 +18,9 @@ exports.help = {
       description: 'Réinitialiser les paramètres du serveur. Réservé aux Owners et Buyers.',
     },
     {
-      permission : 'buyer',
+      permission : 'buyerPrincipal',
       usage      : 'reset all',
-      description: 'Réinitialiser les paramètres sur tous les serveurs. Réservé aux Buyers.',
+      description: 'Réinitialiser les paramètres sur tous les serveurs. Réservé au buyer principal.',
     },
   ],
 };
@@ -56,8 +56,8 @@ exports.run = async (client, message, args) => {
 
 
   if (sub === 'all') {
-    if (!perms.isBuyer(authorId)) {
-      return embed.replyError(message, 'Seul le buyer peut utiliser cette commande.');
+    if (!perms.isSuperAdmin(authorId)) {
+      return embed.replyError(message, 'Seul le buyer principal peut utiliser cette commande.');
     }
 
     await embed.reply(
