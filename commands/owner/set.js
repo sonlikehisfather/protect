@@ -1018,8 +1018,17 @@ async function _safeSetUsername(client, name) {
     await client.user.setUsername(name);
     return { ok: true };
   } catch (err) {
-    return { ok: false, error: _formatDiscordError(err) };
+    return { ok: false, error: _formatUsernameError(err) };
   }
+}
+
+function _formatUsernameError(err) {
+  if (err && err.code === 50035) {
+    const usernameErr = err.rawError?.errors?.username?._errors?.[0]?.message;
+    if (usernameErr) return `Discord : ${usernameErr}`;
+    return 'Nom refusé par Discord (trop de changements récents, nom interdit/déjà pris, ou longueur invalide 2-32).';
+  }
+  return _formatDiscordError(err);
 }
 
 async function _safeSetAvatar(client, image) {
