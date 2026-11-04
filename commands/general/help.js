@@ -94,7 +94,7 @@ const CATEGORY_ORDER = [
   'voicemaster',
 ];
 
-const PERM_ORDER = ['everyone', 'public', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'owner', 'buyer', 'buyerPrincipal'];
+const PERM_ORDER = ['everyone', 'public', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'owner', 'buyer', 'buyerPrincipal', 'voicemaster'];
 
 const PERM_LABELS = {
   everyone : 'Public global',
@@ -111,6 +111,7 @@ const PERM_LABELS = {
   owner    : 'Owner',
   buyer    : 'Buyers (principal inclus)',
   buyerPrincipal: 'Buyer principal uniquement',
+  voicemaster: 'Voicemaster',
 };
 
 const CATEGORY_ALIASES = {
@@ -718,6 +719,9 @@ async function _handlePagination(client, message, guildId, prefix, deleteReply, 
 
   const groups      = _groupByPerm(allCommands, guildId);
 
+  const vmCommands = _getVoicemasterCommands(client, message);
+  if (vmCommands.length) groups.voicemaster = vmCommands;
+
   const orderedPerms = PERM_ORDER.filter(p =>
     Array.isArray(groups[p]) && groups[p].length > 0
   );
@@ -981,7 +985,9 @@ function _buildPermPages(commands, perm, guildId, prefix) {
   const pages = _buildCommandLinePages(commands, prefix, PAGE_SIZE);
   const intro = perm === 'public'
     ? 'Ces commandes sont utilisables dans les salons autorisés avec `+public allow` ou partout avec `+public on`.'
-    : null;
+    : perm === 'voicemaster'
+      ? _getCategoryIntro('voicemaster')
+      : null;
 
   if (!pages.length) return [];
 

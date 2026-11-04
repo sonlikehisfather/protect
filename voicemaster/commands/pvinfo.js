@@ -11,16 +11,21 @@ module.exports = {
   name    : 'pvinfo',
   description : "Affiche le propriétaire et les accès d'un salon privé.",
   minRank : LEVELS.OWNER,
-  usage   : '=pvinfo <id_salon|#salon>',
+  usage   : '=pvinfo [id_salon]',
 
   async run({ message, args, reply }) {
     const guild = message.guild;
 
-    if (!args[0]) return reply(messages.usage('=pvinfo <id_salon|#salon>'));
+    let channel = null;
 
-    const channelId = args[0].replace(/[<#>]/g, '');
-    const channel   = guild.channels.cache.get(channelId);
-    if (!channel || !channel.isVoiceBased()) return reply(messages.pvBadChannel());
+    if (args[0]) {
+      const channelId = args[0].replace(/[<#>]/g, '');
+      channel = guild.channels.cache.get(channelId);
+      if (!channel || !channel.isVoiceBased()) return reply(messages.pvBadChannel());
+    } else {
+      channel = message.member.voice?.channel ?? null;
+      if (!channel) return reply(messages.needVoice());
+    }
 
     const pv = store.getPvByChannel(guild.id, channel.id);
     if (!pv) return reply(messages.notPv());
