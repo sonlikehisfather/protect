@@ -18,6 +18,9 @@ const config = require('../../config.json');
 const perms  = require('../../utils/permissions');
 const db     = require('../../core/database');
 const { replaceVariables } = require('../../utils/variables');
+const vmRanks  = require('../../voicemaster/ranks');
+const vmConfig = require('../../voicemaster/config');
+const vmLevels = vmConfig.LEVELS;
 
 
 const PAGE_SIZE     = 12;
@@ -48,6 +51,7 @@ const CATEGORY_LABELS = {
   giveaways    : 'Giveaways',
   backups      : 'Backups',
   customs      : 'Commandes personnalisées',
+  voicemaster  : 'Voicemaster',
 };
 
 const CATEGORY_DESCRIPTIONS = {
@@ -67,6 +71,7 @@ const CATEGORY_DESCRIPTIONS = {
   giveaways    : 'Création et gestion des giveaways',
   backups      : 'Sauvegardes et restaurations serveur',
   customs      : 'Commandes personnalisées du serveur',
+  voicemaster  : 'Gestion des vocaux (préfixe =)',
 };
 
 const CATEGORY_ORDER = [
@@ -86,6 +91,7 @@ const CATEGORY_ORDER = [
   'giveaways',
   'backups',
   'customs',
+  'voicemaster',
 ];
 
 const PERM_ORDER = ['everyone', 'public', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'owner', 'buyer', 'buyerPrincipal'];
@@ -124,6 +130,7 @@ const CATEGORY_ALIASES = {
   giveaways    : ['giveaways', 'giveaway'],
   backups      : ['backups', 'backup', 'sauvegardes', 'sauvegarde'],
   customs      : ['customs', 'custom', 'commandes personnalisees', 'commandes personnalisées'],
+  voicemaster  : ['voicemaster', 'voice master', 'vm'],
 };
 
 
@@ -912,7 +919,9 @@ function _buildCommandHeader(cmd, prefix, limit = EMBED_FIELD_SAFE_LIMIT) {
   const raw          = cmd.help ? _getCommandUsage(cmd.help) : (cmd.usage ?? cmd.name ?? 'commande');
   const contentLimit = Math.max(1, limit - 6);
 
-  return `**\`${_truncateText(`${prefix}${raw}`, contentLimit)}\`**`;
+  const usedPrefix   = cmd.prefixOverride ?? prefix;
+
+  return `**\`${_truncateText(`${usedPrefix}${raw}`, contentLimit)}\`**`;
 }
 
 function _buildCommandLine(cmd, prefix) {
@@ -1333,6 +1342,34 @@ function _getDisplayCommands(client, message) {
   return _displayCommandsCache.get(cacheKey);
 }
 
+/**
+ * Commandes du VoiceMaster (préfixe "="). La catégorie est toujours visible.
+ * Avec un rang : seulement les commandes accessibles à ce rang.
+ * Sans rang : la liste complète, à titre d'information.
+ */
+function _getVoicemasterCommands(client, message) {
+  if (!client.vmCommands || !message.guild) return [];
+
+  const level  = vmRanks.getLevel(message.guild.id, message.author.id);
+  const hasRank = level !== vmLevels.NONE;
+
+  const unique = new Map();
+  for (const cmd of client.vmCommands.values()) {
+    if (!unique.has(cmd.name)) unique.set(cmd.name, cmd);
+  }
+
+  return [...unique.values()]
+    .filter(cmd => !hasRank || level >= cmd.minRank)
+    .sort((a, b) => a.minRank - b.minRank || a.name.localeCompare(b.name))
+    .map(cmd => ({
+      name           : cmd.name,
+      description    : cmd.description ?? 'Aucune description.',
+      usage          : String(cmd.usage ?? cmd.name).replace(/^=/, ''),
+      category       : 'voicemaster',
+      prefixOverride : vmConfig.PREFIX,
+    }));
+}
+
 function _getCustomCommands(message) {
   let ccRuntime = null;
   try { ccRuntime = require('../../modules/customCommands'); } catch { return []; }
@@ -1364,6 +1401,8 @@ function _getCustomCommands(message) {
 function _getCategories(client, message) {
   const cats = new Set();
 
+  if (_getVoicemasterCommands(client, message).length) cats.add('voicemaster');
+
   for (const cmd of _getDisplayCommands(client, message)) {
     if (cmd.help?.category) cats.add(cmd.help.category);
     else if (cmd.category) cats.add(cmd.category);
@@ -1394,6 +1433,8 @@ function _matchCategory(categories, input) {
 }
 
 function _getCommandsByCategory(client, message, category) {
+  if (category === 'voicemaster') return _getVoicemasterCommands(client, message);
+
   return _getDisplayCommands(client, message).filter(cmd => {
     if (cmd.help?.category) return cmd.help.category === category;
     return cmd.category === category;
@@ -1416,7 +1457,7 @@ function _buildCategoryPages(client, message, categories, guildId, prefix) {
     const pages    = _buildCommandLinePages(commands, prefix, CAT_PAGE_SIZE);
 
     result[cat] = pages.map((lines, idx) => {
-      const intro = '*Les arguments peuvent \u00eatre des mentions, des noms ou des IDs Discord.\nS\'ils ne sont pas des mentions, s\u00e9pare-les par \`,\`*';
+      const intro = _getCategoryIntro(cat);
 
       return {
         title  : `Catégorie \u2022 ${_getCategoryLabel(cat)}`,
@@ -1442,7 +1483,7 @@ function _buildAllCategoryEmbeds(client, message, categories, guildId, prefix) {
     const commands = _getCommandsByCategory(client, message, cat);
     const pages    = _buildCommandLinePages(commands, prefix, CAT_PAGE_SIZE);
 
-    const intro = '*Les arguments peuvent \u00eatre des mentions, des noms ou des IDs Discord.\nS\'ils ne sont pas des mentions, s\u00e9pare-les par \`,\`*';
+    const intro = _getCategoryIntro(cat);
 
     for (let i = 0; i < pages.length; i++) {
       result.push({
@@ -1460,6 +1501,14 @@ function _buildAllCategoryEmbeds(client, message, categories, guildId, prefix) {
   }
 
   return result;
+}
+
+function _getCategoryIntro(cat) {
+  if (cat === 'voicemaster') {
+    return `*Préfixe \`${vmConfig.PREFIX}\` · Les arguments sont des mentions ou des IDs Discord.*`;
+  }
+
+  return '*Les arguments peuvent être des mentions, des noms ou des IDs Discord.\nS\'ils ne sont pas des mentions, sépare-les par \`,\`*';
 }
 
 function _getCommandUsage(help) {

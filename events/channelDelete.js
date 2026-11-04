@@ -16,6 +16,8 @@ module.exports = {
     try {
       if (!channel.guild) return;
 
+      try { require('../voicemaster/guard').onChannelDelete(channel); } catch {}
+
       const guildId = channel.guild.id;
 
       try {

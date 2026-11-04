@@ -24,6 +24,7 @@ function loadAll(client) {
   loadEvents(client);
   loadCommands(client);
   loadSlashCommands(client);
+  require('../voicemaster').init(client);
 }
 
 async function deploySlash(client) {

@@ -56,7 +56,8 @@ module.exports = {
     const pingStr = wsPing < 0 ? '-' : `${wsPing}ms`;
 
     {
-      const cmdCount   = client.__cmdCount         ?? client.commands.size;
+      /* Le total inclut les commandes du VoiceMaster (préfixe =). */
+      const cmdCount   = (client.__cmdCount ?? client.commands.size) + (client.__vmCmdCount ?? 0);
       const evtModules = client.__eventModuleCount ?? '?';
       const evtTypes   = client.__eventTypeCount   ?? client.eventNames().length;
       const RESET = '\x1b[0m';

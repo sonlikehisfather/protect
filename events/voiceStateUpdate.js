@@ -14,6 +14,7 @@ const punishSteps  = require('../modules/punishSteps');
 const errorHandler = require('../utils/errorHandler');
 const tempvoc      = require('../modules/tempvoc');
 const angelActions = require('../utils/angelActions');
+const voicemasterGuard = require('../voicemaster/guard');
 
 
 const pollMap = new Map();
@@ -36,6 +37,12 @@ module.exports = {
     const guildId = guild.id;
 
     if (!member || member.user.bot) return;
+
+    try {
+      await voicemasterGuard.onVoiceStateUpdate(oldState, newState);
+    } catch (err) {
+      errorHandler.handle(err, { source: 'voicemaster.guard', guildId });
+    }
 
     if (await _restoreAngelVoiceChanges(oldState, newState, member, guild, guildId)) return;
 

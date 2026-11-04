@@ -9,6 +9,7 @@ const errorHandler    = require('../utils/errorHandler');
 const commandCooldown = require('../utils/commandCooldown');
 const config          = require('../config.json');
 const modmail         = require('../modules/modmail');
+const voicemaster     = require('../voicemaster');
 
 let automod         = null;
 let levels          = null;
@@ -231,6 +232,15 @@ module.exports = {
 
     // detect which prefix (if any) is used from allowedPrefixes
     const usedPrefix = allowedPrefixes.find(p => content.startsWith(p));
+
+    if (!usedPrefix) {
+      try {
+        if (await voicemaster.handle(client, message, content)) return;
+      } catch (err) {
+        errorHandler.handle(err, { source: 'voicemaster', guildId });
+      }
+    }
+
     if (!usedPrefix) {
       try {
         if (levels) {
