@@ -12,6 +12,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+*.log
+logs/
 
 # Base de données
 *.db
@@ -41,6 +43,11 @@ Thumbs.db
 *.pfx
 secrets.json
 config.secret.json
+
+# Temporaires
+*.tmp
+*.bak
+.nyc_output/
 
 # Build
 .cache/
