@@ -16,31 +16,48 @@ Bot Discord multifonction écrit en Node.js avec Discord.js v14 et SQLite. Il re
 - Communauté : giveaways, niveaux/XP, compteurs, suivi des invitations, anniversaires et statistiques vocales.
 - Jeux et économie : casino, jeux, monnaie et profils associés.
 - FiveM : commandes et outils d’administration dédiés.
-- Administration du bot : commandes owner, blacklist globale, activité, permissions et gestion multi-serveurs.
+- Administration du bot : commandes owner, blacklist globale, activité, permissions, gestion multi-serveurs et `+buyeralert` pour prévenir tous les buyers par message privé (buyer principal uniquement).
+- Voicemaster : module vocal intégré au bot avec son propre préfixe `=`, réservé aux membres ayant un rang (voir ci-dessous).
 
-Le bot utilise des commandes préfixées. À la date de cette mise à jour, le loader détecte 275 commandes dans 15 catégories et 43 modules d’événements. Les alias sont chargés avec leur commande. Il n’y a pas de dossier `slashCommands` dans cette version.
+Le bot utilise des commandes préfixées. À la date de cette mise à jour, le loader détecte 300 commandes dans 15 catégories et 56 modules d’événements, auxquels s’ajoutent les 22 commandes du module Voicemaster (préfixe `=`). Les alias sont chargés avec leur commande. Il n’y a pas de dossier `slashCommands` dans cette version.
 
 ## Catégories de commandes
 
 | Catégorie | Nombre | Exemples |
 | --- | ---: | --- |
-| Anti-raid | 20 | `antiban`, `antibot`, `antirole` |
+| Anti-raid | 32 | `antiban`, `antibot`, `antirole` |
 | Sauvegardes | 1 | `backup` |
 | Casino | 35 | `casino`, `blackjack`, `roulette` |
 | Configuration modération | 13 | `antilink`, `antispam`, `badword` |
 | Configuration serveur | 26 | `autorole`, `welcome`, `verify` |
-| FiveM | 11 | `fconfig`, `fown`, `presence` |
+| FiveM | 14 | `fconfig`, `fown`, `presence` |
 | Jeux | 8 | `8ball`, `quiz`, `roll` |
-| Générales | 44 | `help`, `serverinfo`, `ping` |
+| Générales | 47 | `help`, `serverinfo`, `ping` |
 | Giveaways | 4 | `gstart`, `greroll` |
 | Niveaux | 4 | `level`, `rank`, `leaderboard` |
 | Logs | 2 | `logs`, `logs doc` |
-| Modération | 42 | `ban`, `mute`, `warn` |
-| Owner | 33 | `owner`, `bl`, `backup` |
+| Modération | 45 | `ban`, `mute`, `warn` |
+| Owner | 37 | `owner`, `bl`, `buyeralert` |
 | Serveur | 23 | `button`, `v2`, `autoreact` |
 | Tickets | 9 | `ticket`, `claim`, `rename` |
 
 Utilise `+help` pour afficher l’aide chargée par le bot. Le préfixe par défaut est `+`; il peut être changé globalement dans `config.json` ou configuré séparément pour chaque serveur. Les réglages par serveur sont conservés dans SQLite.
+
+## Voicemaster
+
+Voicemaster est un module intégré au bot, avec son propre préfixe `=`. Il ne comporte aucune commande publique : chaque commande dépend d’un rang, et les membres sans rang ne reçoivent aucune réponse.
+
+Hiérarchie : Whitelist < Owner < Sys < Sys+ (le buyer principal défini par `BUYER_ID` est au-dessus). Les rangs Owner, Sys et Whitelist sont propres à chaque serveur; Sys+ est global. Un rang supérieur passe toujours les restrictions d’un rang inférieur.
+
+| Domaine | Commandes |
+| --- | --- |
+| Rangs | `=wl`, `=ow`, `=sys`, `=sys+` |
+| Salons privés | `=pv`, `=acces`, `=all`, `=pvlist`, `=pvinfo` |
+| Déplacements | `=mv`, `=join`, `=vmall`, `=bringcc` |
+| Outils | `=menotte`, `=wlmv`, `=follow`, `=find`, `=mp`, `=ui`, `=vc` |
+| Aide et logs | `=help` (selon le rang), `=vmlogs` |
+
+Les logs Voicemaster se configurent avec `=vmlogs setup` (Sys+ minimum). La catégorie Voicemaster est toujours visible dans `+help`. Les données sont stockées dans les tables `vm_*` de `database.sqlite`.
 
 ## Prérequis
 
@@ -138,6 +155,7 @@ Les commandes `npm start` et `npm run dev` utilisent le runtime portable sous `.
 commands/   Commandes préfixées, classées par catégorie
 core/       Client Discord, loader et base SQLite
 events/     Gestionnaires d’événements Discord
+voicemaster/ Module Voicemaster (préfixe `=`) : rangs, salons privés, logs et commandes
 modules/    Automodération, tickets, niveaux, modmail et autres systèmes
 utils/      Permissions, logs, embeds, résolution de membres et aides internes
 data/       Données générées, notamment les sauvegardes
