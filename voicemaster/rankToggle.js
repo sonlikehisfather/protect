@@ -7,6 +7,7 @@
  *  - sys, owner : Sys+ et plus
  *  - un Sys+ ne peut pas être modifié par un autre qu'un principal
  *  - le principal n'est jamais modifiable
+ *  - sans argument : liste paginée des membres du rang
  */
 
 const store    = require('./store');
@@ -15,6 +16,7 @@ const messages = require('./messages');
 const logger   = require('./logger');
 const { LEVELS, LEVEL_NAMES, STORED_RANKS } = require('./config');
 const { resolveMember } = require('./target');
+const { sendRankList }  = require('./rankList');
 
 function createRankToggle({ name, rank, minRank, description }) {
   const label = LEVEL_NAMES[STORED_RANKS[rank]];
@@ -23,13 +25,18 @@ function createRankToggle({ name, rank, minRank, description }) {
     name,
     description,
     minRank,
-    usage: `=${name} <@membre|id>`,
+    usage: `=${name} [@membre|id]`,
 
     async run({ message, args, reply }) {
       const guildId = message.guild.id;
       const actorId = message.author.id;
 
-      if (!args[0]) return reply(messages.usage(`=${name} <@membre|id>`));
+      if (!args[0]) {
+        const ids = rank === 'sys+'
+          ? store.listSysPlus()
+          : store.listStoredRank(guildId, rank);
+        return sendRankList(message, `Liste · ${label} Voicemaster`, ids);
+      }
 
       const member = await resolveMember(message, args[0]);
       if (!member) return reply(messages.targetNotFound());

@@ -5,17 +5,18 @@ const messages = require('../messages');
 const logger   = require('../logger');
 const { LEVELS } = require('../config');
 const { resolveMember } = require('../target');
+const { sendRankList }  = require('../rankList');
 
 module.exports = {
   name    : 'wl',
   description : "Ajoute ou retire un membre de la whitelist Voicemaster (accès à =ui et =vc).",
   minRank : LEVELS.OWNER,
-  usage   : '=wl <@membre|id>',
+  usage   : '=wl [@membre|id]',
 
   async run({ message, args, reply }) {
     const guildId = message.guild.id;
 
-    if (!args[0]) return reply(messages.usage('=wl <@membre|id>'));
+    if (!args[0]) return sendRankList(message, 'Liste · Whitelist Voicemaster', store.listWl(guildId));
 
     const member = await resolveMember(message, args[0]);
     if (!member) return reply(messages.targetNotFound());

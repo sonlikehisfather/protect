@@ -119,6 +119,20 @@ function removeStoredRank(guildId, userId) {
     .run(guildId, userId).changes > 0;
 }
 
+function listStoredRank(guildId, rank) {
+  return _db()
+    .prepare('SELECT userId FROM vm_ranks WHERE guildId = ? AND rank = ? ORDER BY createdAt')
+    .all(guildId, rank)
+    .map(r => r.userId);
+}
+
+function listSysPlus() {
+  return _db()
+    .prepare('SELECT userId FROM vm_sysplus ORDER BY createdAt')
+    .all()
+    .map(r => r.userId);
+}
+
 /* Logs VoiceMaster : un salon par type, avec un indicateur actif/inactif */
 
 function getLogEntry(guildId, type) {
@@ -382,6 +396,8 @@ module.exports = {
   getStoredRank,
   setStoredRank,
   removeStoredRank,
+  listStoredRank,
+  listSysPlus,
   isWl,
   addWl,
   removeWl,
